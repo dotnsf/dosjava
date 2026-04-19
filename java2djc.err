@@ -1,0 +1,2 @@
+tools\java2djc.c(112): Warning! W303: Parameter 'cls' has been defined, but not referenced
+tools\java2djc.c(479): Warning! W138: No newline at end of file
