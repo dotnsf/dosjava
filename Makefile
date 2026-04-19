@@ -36,8 +36,11 @@ FORMAT_OBJS = $(OBJ_DIR)/djc.obj $(OBJ_DIR)/opcodes.obj
 RUNTIME_OBJS = $(OBJ_DIR)/object.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/system.obj $(OBJ_DIR)/integer.obj
 TEST_OBJS = $(OBJ_DIR)/test_memory.obj
 
+# Compiler object files
+COMPILER_OBJS = $(OBJ_DIR)/lexer.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/codegen.obj
+
 # Targets
-all: test_memory test_interpreter mkdjc java2djc
+all: test_memory test_interpreter mkdjc java2djc test_lexer test_parser test_semantic test_codegen djc
 
 # Test memory program
 test_memory: $(BIN_DIR)/test_mem.exe
@@ -47,6 +50,12 @@ test_interpreter: $(BIN_DIR)/test_int.exe
 
 # .djc file generator tool
 mkdjc: $(BIN_DIR)/mkdjc.exe
+
+# Test lexer program
+test_lexer: $(BIN_DIR)/test_lexer.exe
+
+# Test parser program
+test_parser: $(BIN_DIR)/test_parser.exe
 
 # Java to .djc converter
 java2djc: $(BIN_DIR)/java2djc.exe
@@ -128,6 +137,76 @@ $(OBJ_DIR)/classfile.obj: tools/classfile.c tools/classfile.h
 	@echo Compiling classfile.c...
 	$(CC) $(CFLAGS) -fo=$@ tools/classfile.c
 
+# Compile rules - Compiler
+$(OBJ_DIR)/lexer.obj: tools/compiler/lexer.c tools/compiler/lexer.h
+	@echo Compiling lexer.c...
+	$(CC) $(CFLAGS) -fo=$@ tools/compiler/lexer.c
+
+$(OBJ_DIR)/test_lexer.obj: tools/compiler/test_lexer.c tools/compiler/lexer.h
+	@echo Compiling test_lexer.c...
+	$(CC) $(CFLAGS) -fo=$@ tools/compiler/test_lexer.c
+
+$(BIN_DIR)/test_lexer.exe: $(OBJ_DIR)/test_lexer.obj $(OBJ_DIR)/lexer.obj
+	@echo Linking test_lexer.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_lexer.obj $(OBJ_DIR)/lexer.obj }
+
+$(OBJ_DIR)/parser.obj: tools/compiler/parser.c tools/compiler/parser.h tools/compiler/ast.h
+	@echo Compiling parser.c...
+	$(CC) $(CFLAGS) -fo=$@ tools/compiler/parser.c
+
+$(OBJ_DIR)/test_parser.obj: tools/compiler/test_parser.c tools/compiler/parser.h tools/compiler/lexer.h
+	@echo Compiling test_parser.c...
+	$(CC) $(CFLAGS) -fo=$@ tools/compiler/test_parser.c
+
+$(BIN_DIR)/test_parser.exe: $(OBJ_DIR)/test_parser.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj
+	@echo Linking test_parser.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_parser.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj }
+
+# Compile rules - Semantic Analyzer
+$(OBJ_DIR)/symtable.obj: tools/compiler/symtable.c tools/compiler/symtable.h tools/compiler/ast.h
+	@echo Compiling symtable.c...
+	$(CC) $(CFLAGS) -fo=$@ tools/compiler/symtable.c
+
+$(OBJ_DIR)/semantic.obj: tools/compiler/semantic.c tools/compiler/semantic.h tools/compiler/symtable.h
+	@echo Compiling semantic.c...
+	$(CC) $(CFLAGS) -fo=$@ tools/compiler/semantic.c
+
+$(OBJ_DIR)/test_semantic.obj: tools/compiler/test_semantic.c tools/compiler/semantic.h
+	@echo Compiling test_semantic.c...
+	$(CC) $(CFLAGS) -fo=$@ tools/compiler/test_semantic.c
+
+$(BIN_DIR)/test_semantic.exe: $(OBJ_DIR)/test_semantic.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj
+	@echo Linking test_semantic.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_semantic.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj }
+
+test_semantic: $(BIN_DIR)/test_semantic.exe
+
+# Compile rules - Code Generator
+$(OBJ_DIR)/codegen.obj: tools/compiler/codegen.c tools/compiler/codegen.h tools/compiler/semantic.h
+	@echo Compiling codegen.c...
+	$(CC) $(CFLAGS) -fo=$@ tools/compiler/codegen.c
+
+$(OBJ_DIR)/test_codegen.obj: tools/compiler/test_codegen.c tools/compiler/codegen.h
+	@echo Compiling test_codegen.c...
+	$(CC) $(CFLAGS) -fo=$@ tools/compiler/test_codegen.c
+
+$(BIN_DIR)/test_codegen.exe: $(OBJ_DIR)/test_codegen.obj $(OBJ_DIR)/codegen.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS)
+	@echo Linking test_codegen.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_codegen.obj $(OBJ_DIR)/codegen.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) }
+
+test_codegen: $(BIN_DIR)/test_codegen.exe
+
+# Compile rules - Integrated Compiler (djc)
+$(OBJ_DIR)/djc_main.obj: tools/compiler/djc.c tools/compiler/djc.h
+	@echo Compiling djc.c...
+	$(CC) $(CFLAGS) -fo=$@ tools/compiler/djc.c
+
+$(BIN_DIR)/djc.exe: $(OBJ_DIR)/djc_main.obj $(COMPILER_OBJS) $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS)
+	@echo Linking djc.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/djc_main.obj $(COMPILER_OBJS) $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) }
+
+djc: $(BIN_DIR)/djc.exe
+
 # Clean
 clean:
 	@echo Cleaning build files...
@@ -162,5 +241,10 @@ test_memory: .SYMBOLIC
 test_interpreter: .SYMBOLIC
 mkdjc: .SYMBOLIC
 java2djc: .SYMBOLIC
+test_lexer: .SYMBOLIC
+test_parser: .SYMBOLIC
+test_semantic: .SYMBOLIC
+test_codegen: .SYMBOLIC
+djc: .SYMBOLIC
 clean: .SYMBOLIC
 dirs: .SYMBOLIC

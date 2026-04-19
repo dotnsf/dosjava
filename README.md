@@ -1,387 +1,323 @@
-# DOS Java - Lightweight Java for 16-bit PC-DOS
+# DOS Java Compiler
 
-A minimal Java runtime environment designed to run on 16-bit PC-DOS systems, compiled with Open Watcom v2 C compiler.
+16-bit PC-DOS上で動作するJavaコンパイラとランタイム環境
 
-## Overview
+## 概要
 
-DOS Java is a lightweight implementation of a Java subset that can execute on 16-bit DOS systems with limited memory (640KB). It features:
+DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパイル・実行するための完全なツールチェーンです。Open Watcom v2 Cコンパイラでビルドされ、Small memory model（64KB code + 64KB data）で動作します。
 
-- **Custom bytecode format** (.djc) optimized for 16-bit architecture
-- **Minimal java.lang package** (Object, String, System, Integer, Boolean)
-- **Small memory footprint** (Small memory model: 64KB code + 64KB data)
-- **Reference counting GC** suitable for constrained environments
-- **Preprocessor tool** to convert standard .class files to .djc format
+## 主な機能
 
-## System Requirements
+- **統合コンパイラ（djc.exe）**: Javaソースから.djcバイトコードへの一括コンパイル
+- **仮想マシン**: スタックベースのバイトコードインタープリタ
+- **ランタイムライブラリ**: 基本的なJavaクラス（Object, String, System, Integer）
+- **ツールチェーン**: .djc生成、.class変換ツール
 
-### Target System (DOS)
-- **OS**: PC-DOS, MS-DOS 3.0 or higher
-- **CPU**: 8086/8088 or higher
-- **Memory**: 640KB RAM (minimum 256KB recommended)
-- **Storage**: Floppy disk or hard drive
+## サポートするJavaサブセット
 
-### Development System
-- **Compiler**: Open Watcom v2 C compiler
-- **Java**: JDK 8 or higher (for compiling test programs)
-- **OS**: Windows, Linux, or DOS
-- **Emulator** (optional): DOSBox, QEMU, or VirtualBox
+### データ型
+- `int` - 16-bit符号付き整数（-32768 ～ 32767）
+- `boolean` - 真偽値（true/false）
+- `void` - 戻り値なし
 
-## Quick Start
+### 制御構文
+- `if` 文
+- `while` ループ
+- `return` 文
 
-### 1. Write a Java Program
+### 演算子
+- **算術**: `+`, `-`, `*`, `/`, `%`
+- **関係**: `==`, `!=`, `<`, `>`, `<=`, `>=`
+- **論理**: `&&`, `||`, `!`
+- **代入**: `=`
 
-```java
-// HelloWorld.java
-class HelloWorld {
-    public static void main() {
-        System.out.println("Hello, DOS!");
-    }
-}
+### クラスとメソッド
+- クラス宣言（1ファイル1クラス）
+- staticメソッド
+- ローカル変数
+
+### 制限事項
+- オブジェクト生成不可（`new`）
+- 配列不可
+- 継承・インターフェース不可
+- 例外処理不可
+- パッケージ・import不可
+
+## システム要件
+
+### 実行環境
+- 16-bit PC-DOS 3.0以上
+- 640KB RAM以上
+- DOSBox（推奨）
+
+### ビルド環境
+- Open Watcom v2 C Compiler
+- Windows/Linux/Mac（クロスコンパイル）
+
+## インストール
+
+### ビルド済みバイナリ
+```batch
+# build/bin/ ディレクトリに以下が含まれます
+djc.exe         - 統合コンパイラ
+djvm.exe        - 仮想マシン（未実装）
+mkdjc.exe       - .djc生成ツール
+java2djc.exe    - .class変換ツール
 ```
 
-### 2. Compile with javac
+### ソースからビルド
+```batch
+# 環境変数設定
+set WATCOM=C:\WATCOM
+set PATH=C:\WATCOM\binnt;C:\WATCOM\binw;%PATH%
+set INCLUDE=C:\WATCOM\h;C:\WATCOM\h\nt
 
-```bash
-javac HelloWorld.java
-```
-
-### 3. Convert to .djc Format
-
-```bash
-djpreproc HelloWorld.class HelloWorld.djc
-```
-
-### 4. Run on DOS
-
-```bash
-dosjava HelloWorld.djc
-```
-
-Output:
-```
-Hello, DOS!
-```
-
-## Project Structure
-
-```
-dosjava/
-├── README.md                    # This file
-├── TECHNICAL_SPEC.md           # Detailed technical specification
-├── PROJECT_STRUCTURE.md        # Project organization
-├── IMPLEMENTATION_ROADMAP.md   # Step-by-step implementation guide
-├── src/                        # VM source code
-├── preprocessor/               # .class to .djc converter
-├── tests/                      # Test programs
-├── examples/                   # Example programs
-├── docs/                       # Additional documentation
-└── Makefile                    # Build system
-```
-
-## Supported Java Features
-
-### Data Types
-- **Primitives**: `int` (16-bit), `boolean`, `char`
-- **Objects**: `Object`, `String`, `Integer`, `Boolean`
-- **Arrays**: Basic array support (limited)
-
-### Language Constructs
-- Classes (single inheritance)
-- Methods (static and instance)
-- Fields (static and instance)
-- Control flow: `if/else`, `while`, `for`
-- Operators: arithmetic, comparison, logical
-
-### Standard Library
-- `java.lang.Object` - Base class
-- `java.lang.String` - String operations
-- `java.lang.System` - System.out.print/println
-- `java.lang.Integer` - Integer wrapper
-- `java.lang.Boolean` - Boolean wrapper
-
-## NOT Supported
-
-- `long`, `float`, `double` types
-- Interfaces and abstract classes
-- Exception handling (try/catch)
-- Multithreading
-- Reflection
-- Inner classes
-- Generics
-- Annotations
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    DOS Java System                       │
-├─────────────────────────────────────────────────────────┤
-│                                                           │
-│  ┌──────────────┐         ┌──────────────────────────┐  │
-│  │ Preprocessor │────────>│  Lightweight Bytecode    │  │
-│  │ (.class →    │         │  Format (.djc)           │  │
-│  │  .djc)       │         └──────────────────────────┘  │
-│  └──────────────┘                    │                   │
-│                                      ▼                   │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │           DOS Java Virtual Machine                │  │
-│  ├───────────────────────────────────────────────────┤  │
-│  │  Class Loader  │  Bytecode Interpreter            │  │
-│  │  Memory Mgr    │  Method Invocation               │  │
-│  │  GC (Simple)   │  Stack Management                │  │
-│  └───────────────────────────────────────────────────┘  │
-│                          │                               │
-│                          ▼                               │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │        Minimal java.lang Package (C impl)         │  │
-│  │  Object, String, System, Integer, Boolean, etc.   │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                           │
-└─────────────────────────────────────────────────────────┘
-```
-
-## Building from Source
-
-### Prerequisites
-
-1. Install Open Watcom v2:
-   - Download from: https://github.com/open-watcom/open-watcom-v2
-   - Add to PATH
-
-2. Verify installation:
-   ```bash
-   wcc -?
-   ```
-
-### Build VM
-
-```bash
-# On DOS or with Open Watcom cross-compiler
+# ビルド
 cd dosjava
-wmake
+wmake all
 ```
 
-This produces:
-- `dosjava.exe` - DOS Java VM
-- `djpreproc.exe` - Preprocessor tool
+## クイックスタート
 
-### Build Preprocessor (on host system)
+### 1. Hello Worldプログラム
 
-```bash
-cd preprocessor
-make
-```
-
-## Usage
-
-### Basic Usage
-
-```bash
-dosjava <program.djc>
-```
-
-### Preprocessor Usage
-
-```bash
-djpreproc <input.class> [-o <output.djc>]
-```
-
-Options:
-- `-o <file>` - Specify output file (default: same name with .djc extension)
-- `-v` - Verbose output
-- `-d` - Debug mode (show translation details)
-
-### Examples
-
-```bash
-# Convert and run
-djpreproc HelloWorld.class
-dosjava HelloWorld.djc
-
-# With custom output name
-djpreproc MyApp.class -o app.djc
-dosjava app.djc
-
-# Verbose mode
-djpreproc Complex.class -v -o complex.djc
-```
-
-## Example Programs
-
-### Hello World
-
+`Hello.java`を作成:
 ```java
-class HelloWorld {
+class Hello {
     public static void main() {
-        System.out.println("Hello, DOS!");
+        int x = 42;
+        return;
     }
 }
 ```
 
-### Arithmetic
+### 2. コンパイル
 
+```batch
+djc Hello.java
+```
+
+出力: `Hello.djc`
+
+### 3. 実行（将来実装予定）
+
+```batch
+djvm Hello.djc
+```
+
+## 使用方法
+
+### djc（統合コンパイラ）
+
+```batch
+djc [options] <source.java>
+```
+
+#### オプション
+- `-o <file>` - 出力ファイル指定（デフォルト: `<source>.djc`）
+- `-k` - 中間ファイル保持（.tok, .ast, .sym）
+- `-v` - 詳細出力
+- `-h, --help` - ヘルプ表示
+- `--version` - バージョン情報
+
+#### 例
+```batch
+# 基本的な使用
+djc Hello.java
+
+# 出力ファイル指定
+djc -o test.djc Test.java
+
+# 詳細出力と中間ファイル保持
+djc -k -v Hello.java
+```
+
+### コンパイルプロセス
+
+```
+source.java
+    ↓
+[Lexer] → source.tok (トークン)
+    ↓
+[Parser] → source.ast (抽象構文木)
+    ↓
+[Semantic] → source.sym (シンボルテーブル)
+    ↓
+[CodeGen] → source.djc (バイトコード)
+```
+
+## サンプルプログラム
+
+### 算術演算
 ```java
-class Calculator {
+class Arithmetic {
     public static void main() {
         int a = 10;
         int b = 20;
         int sum = a + b;
         int product = a * b;
-        
-        System.out.print("Sum: ");
-        System.out.println(sum);
-        System.out.print("Product: ");
-        System.out.println(product);
+        return;
     }
 }
 ```
 
-### Loops
-
+### 条件分岐
 ```java
-class Counter {
+class Conditional {
     public static void main() {
-        int i = 1;
-        while (i <= 10) {
-            System.out.println(i);
+        int x = 10;
+        int result = 0;
+        
+        if (x > 5) {
+            result = 100;
+        }
+        
+        return;
+    }
+}
+```
+
+### ループ
+```java
+class Loop {
+    public static void main() {
+        int i = 0;
+        int sum = 0;
+        
+        while (i < 10) {
+            sum = sum + i;
             i = i + 1;
         }
+        
+        return;
     }
 }
 ```
 
-### Objects
-
+### フィボナッチ数列
 ```java
-class Point {
-    int x;
-    int y;
-    
-    public Point(int x, int y) {
-        this.x = x;
-        this.y = y;
-    }
-    
-    public int getX() {
-        return this.x;
-    }
-    
-    public int getY() {
-        return this.y;
-    }
-}
-
-class TestPoint {
+class Fibonacci {
     public static void main() {
-        Point p = new Point(10, 20);
-        System.out.println(p.getX());
-        System.out.println(p.getY());
+        int n = 10;
+        int a = 0;
+        int b = 1;
+        int i = 0;
+        
+        while (i < n) {
+            int temp = a + b;
+            a = b;
+            b = temp;
+            i = i + 1;
+        }
+        
+        return;
     }
 }
 ```
 
-## Memory Constraints
+## プロジェクト構造
 
-### Small Memory Model
-- **Code Segment**: 64KB maximum
-- **Data Segment**: 64KB maximum
-- **Heap**: ~10-14KB for objects
-- **Stack**: ~20KB for method calls
+```
+dosjava/
+├── src/                    # ソースコード
+│   ├── vm/                # 仮想マシン
+│   ├── runtime/           # ランタイムライブラリ
+│   └── format/            # .djcフォーマット
+├── tools/                 # ツール
+│   └── compiler/          # コンパイラ
+├── tests/                 # テスト
+│   ├── e2e/              # エンドツーエンドテスト
+│   ├── lexer/            # レキサーテスト
+│   ├── parser/           # パーサーテスト
+│   └── semantic/         # 意味解析テスト
+├── build/                 # ビルド出力
+│   ├── bin/              # 実行ファイル
+│   └── obj/              # オブジェクトファイル
+├── Makefile              # ビルドスクリプト
+└── README.md             # このファイル
+```
 
-### Recommendations
-- Keep classes small and focused
-- Minimize object creation
-- Reuse objects when possible
-- Avoid deep recursion
-- Use primitives instead of wrappers when possible
+## テスト
 
-## Performance Tips
+### エンドツーエンドテスト実行
+```batch
+cd tests\e2e
+run_tests.bat
+```
 
-1. **Minimize Object Creation**
-   - Objects are expensive in limited memory
-   - Reuse objects when possible
+### テストカテゴリ
+- **基本**: Hello World、最小プログラム
+- **算術**: 加算、複雑な式
+- **制御**: if文、whileループ
+- **複雑**: フィボナッチ、階乗
 
-2. **Use Static Methods**
-   - Static methods have less overhead
-   - No object allocation needed
+## ドキュメント
 
-3. **Avoid String Concatenation in Loops**
-   - Each concatenation creates a new string
-   - Build strings outside loops when possible
+- [QUICKSTART.md](QUICKSTART.md) - 5分で始めるガイド
+- [ARCHITECTURE.md](ARCHITECTURE.md) - システムアーキテクチャ
+- [BUILD.md](BUILD.md) - ビルド手順
+- [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md) - 技術仕様
+- [PHASE5_PLAN.md](PHASE5_PLAN.md) - Phase 5実装計画
 
-4. **Keep Methods Small**
-   - Smaller methods use less stack space
-   - Easier for the interpreter to optimize
+## トラブルシューティング
 
-## Troubleshooting
+### コンパイルエラー
+```
+Error: Input file not found: Hello.java
+```
+→ ファイル名とパスを確認してください
 
-### "Out of memory" Error
-- Reduce object creation
-- Simplify data structures
-- Consider breaking program into smaller parts
+### 構文エラー
+```
+Compilation failed in phase: Parsing
+Error: Parse error at line 3, column 16
+```
+→ 構文を確認してください（セミコロン忘れなど）
 
-### "Class not found" Error
-- Verify .djc file exists
-- Check file path
-- Ensure preprocessor completed successfully
+### 型エラー
+```
+Compilation failed in phase: Semantic analysis
+Error: Type mismatch
+```
+→ 型の互換性を確認してください
 
-### "Invalid bytecode" Error
-- Recompile Java source
-- Re-run preprocessor
-- Check for unsupported Java features
+## 制限事項
 
-### Program Crashes
-- Check for stack overflow (deep recursion)
-- Verify array bounds
-- Enable debug mode for more information
+### メモリ制限
+- コード: 64KB
+- データ: 64KB
+- スタック: 4-8KB
+- ヒープ: ~40KB
 
-## Development Status
+### 言語制限
+- オブジェクト指向機能なし
+- 配列なし
+- 文字列リテラルなし（現在）
+- float/double型なし
 
-This is an educational/experimental project. Current status:
+## 今後の予定
 
-- [x] Technical specification complete
-- [x] Architecture designed
-- [x] Implementation roadmap created
-- [ ] Core VM implementation
-- [ ] Runtime library implementation
-- [ ] Preprocessor implementation
-- [ ] Testing and optimization
-- [ ] Documentation completion
+- [ ] 仮想マシン（djvm.exe）の実装
+- [ ] 文字列リテラルのサポート
+- [ ] 配列のサポート
+- [ ] より多くのランタイムライブラリ
+- [ ] 最適化
+- [ ] デバッガ
 
-## Contributing
+## ライセンス
 
-This project is designed as a learning exercise for understanding:
-- Virtual machine implementation
-- Bytecode interpretation
-- Memory management in constrained environments
-- 16-bit DOS programming
-- Cross-compilation with Open Watcom
+MIT License
 
-Contributions, suggestions, and improvements are welcome!
+## 貢献
 
-## License
+プルリクエストを歓迎します。大きな変更の場合は、まずissueを開いて変更内容を議論してください。
 
-[To be determined - suggest MIT or similar permissive license]
+## 作者
 
-## References
+DOS Java Compiler Project
 
-- [Java Virtual Machine Specification](https://docs.oracle.com/javase/specs/jvms/se8/html/)
-- [Open Watcom v2 Documentation](https://github.com/open-watcom/open-watcom-v2/wiki)
-- [DOS Programming Reference](http://www.ctyme.com/intr/int.htm)
-- [8086 Assembly Language](https://en.wikipedia.org/wiki/X86_assembly_language)
+## 謝辞
 
-## Acknowledgments
-
-Inspired by:
-- Classic Java implementations (Java 1.0/1.1)
-- Embedded Java (Java ME/J2ME)
-- Retro computing enthusiasts
-- DOS programming community
-
-## Contact
-
-[Project maintainer information to be added]
-
----
-
-**Note**: This is a minimal Java implementation designed for educational purposes and retro computing. It is not intended to be a full Java runtime or to run production applications.
+- Open Watcom Project
+- Java Language Specification
+- DOS開発コミュニティ
