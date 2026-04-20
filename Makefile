@@ -40,7 +40,7 @@ TEST_OBJS = $(OBJ_DIR)/test_memory.obj
 COMPILER_OBJS = $(OBJ_DIR)/lexer.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/codegen.obj
 
 # Targets
-all: test_memory test_interpreter mkdjc java2djc test_lexer test_parser test_semantic test_codegen djc
+all: test_memory test_interpreter mkdjc java2djc test_lexer test_parser test_semantic test_codegen djc djvm
 
 # Test memory program
 test_memory: $(BIN_DIR)/test_mem.exe
@@ -60,6 +60,9 @@ test_parser: $(BIN_DIR)/test_parser.exe
 # Java to .djc converter
 java2djc: $(BIN_DIR)/java2djc.exe
 
+# DOS Java Virtual Machine
+djvm: $(BIN_DIR)/djvm.exe
+
 $(BIN_DIR)/test_mem.exe: $(TEST_OBJS) $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS)
 	@echo Linking test_mem.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(TEST_OBJS) $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) }
@@ -76,6 +79,10 @@ $(BIN_DIR)/java2djc.exe: $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORM
 	@echo Linking java2djc.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) }
 
+$(BIN_DIR)/djvm.exe: $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS)
+	@echo Linking djvm.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) }
+
 # Compile rules - VM
 $(OBJ_DIR)/memory.obj: $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/memory.h
 	@echo Compiling memory.c...
@@ -88,6 +95,10 @@ $(OBJ_DIR)/stack.obj: $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/stack.h
 $(OBJ_DIR)/interpreter.obj: $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/interpreter.h
 	@echo Compiling interpreter.c...
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/interpreter.c
+
+$(OBJ_DIR)/djvm.obj: $(SRC_DIR)/vm/djvm.c $(SRC_DIR)/vm/interpreter.h
+	@echo Compiling djvm.c...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/djvm.c
 
 # Compile rules - Format
 $(OBJ_DIR)/djc.obj: $(SRC_DIR)/format/djc.c $(SRC_DIR)/format/djc.h
