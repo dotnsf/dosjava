@@ -239,36 +239,47 @@ int parse_arguments(int argc, char* argv[], CompilerContext* ctx) {
  */
 
 int run_lexer_phase(CompilerContext* ctx) {
-    Lexer lexer;
+    Lexer* lexer;
     Token token;
     int result;
     
+    /* Allocate lexer on heap to avoid stack overflow */
+    lexer = (Lexer*)malloc(sizeof(Lexer));
+    if (!lexer) {
+        strcpy(ctx->error_message, "Out of memory (lexer)");
+        ctx->has_error = 1;
+        return EXIT_ERROR;
+    }
+    
     /* Initialize lexer */
-    result = lexer_init(&lexer, ctx->source_file, ctx->tok_file);
+    result = lexer_init(lexer, ctx->source_file, ctx->tok_file);
     if (result != 0) {
         strcpy(ctx->error_message, "Failed to initialize lexer");
         ctx->has_error = 1;
+        free(lexer);
         return EXIT_ERROR;
     }
     
     /* Tokenize entire file */
     ctx->token_count = 0;
     while (1) {
-        result = lexer_next_token(&lexer, &token);
+        result = lexer_next_token(lexer, &token);
         if (result != 0) {
             sprintf(ctx->error_message, "Lexical error at line %u, column %u",
-                    lexer.line, lexer.column);
+                    lexer->line, lexer->column);
             ctx->has_error = 1;
-            lexer_cleanup(&lexer);
+            lexer_cleanup(lexer);
+            free(lexer);
             return EXIT_ERROR;
         }
         
         /* Write token to output file */
-        result = lexer_write_token(&lexer, &token);
+        result = lexer_write_token(lexer, &token);
         if (result != 0) {
             strcpy(ctx->error_message, "Failed to write token");
             ctx->has_error = 1;
-            lexer_cleanup(&lexer);
+            lexer_cleanup(lexer);
+            free(lexer);
             return EXIT_ERROR;
         }
         
@@ -279,105 +290,139 @@ int run_lexer_phase(CompilerContext* ctx) {
         }
     }
     
-    ctx->line_count = lexer.line;
+    ctx->line_count = lexer->line;
     
     /* Cleanup */
-    lexer_cleanup(&lexer);
+    lexer_cleanup(lexer);
+    free(lexer);
     
     return EXIT_SUCCESS;
 }
 
 int run_parser_phase(CompilerContext* ctx) {
-    Parser parser;
+    Parser* parser;
     uint16_t root_node;
     int result;
     
+    /* Allocate parser on heap to avoid stack overflow */
+    parser = (Parser*)malloc(sizeof(Parser));
+    if (!parser) {
+        strcpy(ctx->error_message, "Out of memory (parser)");
+        ctx->has_error = 1;
+        return EXIT_ERROR;
+    }
+    
     /* Initialize parser */
-    result = parser_init(&parser, ctx->tok_file, ctx->ast_file);
+    result = parser_init(parser, ctx->tok_file, ctx->ast_file);
     if (result != 0) {
         strcpy(ctx->error_message, "Failed to initialize parser");
         ctx->has_error = 1;
+        free(parser);
         return EXIT_ERROR;
     }
     
     /* Parse the program */
-    root_node = parser_parse(&parser);
+    root_node = parser_parse(parser);
     if (root_node == 0) {
         strcpy(ctx->error_message, "Parse error");
         ctx->has_error = 1;
-        parser_cleanup(&parser);
+        parser_cleanup(parser);
+        free(parser);
         return EXIT_ERROR;
     }
     
-    ctx->node_count = parser.total_nodes;
+    ctx->node_count = parser->total_nodes;
     
     /* Cleanup */
-    parser_cleanup(&parser);
+    parser_cleanup(parser);
+    free(parser);
     
     return EXIT_SUCCESS;
 }
 
 int run_semantic_phase(CompilerContext* ctx) {
-    SemanticAnalyzer analyzer;
+    SemanticAnalyzer* analyzer;
     int result;
     
+    /* Allocate semantic analyzer on heap to avoid stack overflow */
+    analyzer = (SemanticAnalyzer*)malloc(sizeof(SemanticAnalyzer));
+    if (!analyzer) {
+        strcpy(ctx->error_message, "Out of memory (semantic analyzer)");
+        ctx->has_error = 1;
+        return EXIT_ERROR;
+    }
+    
     /* Initialize semantic analyzer */
-    result = semantic_init(&analyzer, ctx->ast_file, ctx->sym_file);
+    result = semantic_init(analyzer, ctx->ast_file, ctx->sym_file);
     if (result != 0) {
         strcpy(ctx->error_message, "Failed to initialize semantic analyzer");
         ctx->has_error = 1;
+        free(analyzer);
         return EXIT_ERROR;
     }
     
     /* Analyze the AST */
-    result = semantic_analyze(&analyzer);
+    result = semantic_analyze(analyzer);
     if (result != 0) {
-        if (analyzer.error_count > 0) {
+        if (analyzer->error_count > 0) {
             strncpy(ctx->error_message, "Semantic errors detected", MAX_ERROR_LEN - 1);
             ctx->error_message[MAX_ERROR_LEN - 1] = '\0';
             /* Print accumulated errors */
-            semantic_print_errors(&analyzer);
+            semantic_print_errors(analyzer);
         } else {
             strcpy(ctx->error_message, "Semantic analysis failed");
         }
         ctx->has_error = 1;
-        semantic_cleanup(&analyzer);
+        semantic_cleanup(analyzer);
+        free(analyzer);
         return EXIT_ERROR;
     }
     
-    ctx->symbol_count = analyzer.symtable->symbol_count;
+    ctx->symbol_count = analyzer->symtable->symbol_count;
     
     /* Cleanup */
-    semantic_cleanup(&analyzer);
+    semantic_cleanup(analyzer);
+    free(analyzer);
     
     return EXIT_SUCCESS;
 }
 
 int run_codegen_phase(CompilerContext* ctx) {
-    CodeGenerator codegen;
+    CodeGenerator* codegen;
     int result;
     
+    /* Allocate code generator on heap to avoid stack overflow */
+    codegen = (CodeGenerator*)malloc(sizeof(CodeGenerator));
+    if (!codegen) {
+        strcpy(ctx->error_message, "Out of memory (code generator)");
+        ctx->has_error = 1;
+        return EXIT_ERROR;
+    }
+    
     /* Initialize code generator */
-    result = codegen_init(&codegen, ctx->ast_file, ctx->sym_file, ctx->output_file);
+    result = codegen_init(codegen, ctx->ast_file, ctx->sym_file, ctx->output_file);
     if (result != 0) {
         strcpy(ctx->error_message, "Failed to initialize code generator");
         ctx->has_error = 1;
+        free(codegen);
         return EXIT_ERROR;
     }
     
     /* Generate bytecode */
-    result = codegen_generate(&codegen);
+    result = codegen_generate(codegen);
     if (result != 0) {
         strcpy(ctx->error_message, "Code generation failed");
         ctx->has_error = 1;
-        codegen_cleanup(&codegen);
+        codegen_cleanup(codegen);
+        free(codegen);
         return EXIT_ERROR;
     }
     
-    ctx->bytecode_size = codegen.bytecode->size;
+    ctx->bytecode_size = codegen->bytecode->size;
     
     /* Cleanup */
-    codegen_cleanup(&codegen);
+    codegen_cleanup(codegen);
+    free(codegen);
     
     return EXIT_SUCCESS;
 }

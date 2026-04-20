@@ -70,21 +70,27 @@ typedef enum {
 
 /* Type kinds */
 typedef enum {
-    TYPE_VOID,
-    TYPE_INT,
-    TYPE_BOOLEAN,
-    TYPE_CLASS
+    TYPE_VOID = 0,
+    TYPE_INT = 1,
+    TYPE_BOOLEAN = 2,
+    TYPE_CLASS = 3
 } TypeKind;
 
 /* Type information */
+#pragma pack(push, 1)
 typedef struct {
-    TypeKind kind;
+    uint16_t kind;          /* TypeKind as uint16_t for consistent size */
     uint16_t class_name;    /* Offset in string pool for TYPE_CLASS */
 } TypeInfo;
+#pragma pack(pop)
+
+/* Compile-time assertion to ensure TypeInfo is exactly 4 bytes */
+typedef char TypeInfo_size_check[sizeof(TypeInfo) == 4 ? 1 : -1];
 
 /* AST Node structure */
+#pragma pack(push, 1)
 typedef struct ASTNode {
-    NodeType type;
+    uint16_t type;  /* NodeType as uint16_t for consistent size */
     uint16_t line;
     uint16_t column;
     
@@ -237,6 +243,7 @@ typedef struct ASTNode {
     /* Next sibling (for lists) */
     uint16_t next_sibling;
 } ASTNode;
+#pragma pack(pop)
 
 /**
  * Get node type name (for debugging)

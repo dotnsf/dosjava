@@ -24,6 +24,9 @@ int semantic_init(SemanticAnalyzer* analyzer, const char* ast_file, const char* 
     /* Clear structure */
     memset(analyzer, 0, sizeof(SemanticAnalyzer));
     
+    /* Save symbol file path */
+    analyzer->symbol_file = symbol_file;
+    
     /* Open AST file */
     analyzer->ast_file = fopen(ast_file, "rb");
     if (!analyzer->ast_file) {
@@ -194,6 +197,8 @@ void semantic_print_errors(SemanticAnalyzer* analyzer) {
 
 /* Perform semantic analysis */
 int semantic_analyze(SemanticAnalyzer* analyzer) {
+    FILE* sym_file;
+    
     if (!analyzer) {
         return -1;
     }
@@ -206,6 +211,11 @@ int semantic_analyze(SemanticAnalyzer* analyzer) {
     /* Pass 2: Type check and resolve */
     if (check_semantics(analyzer) != 0) {
         return -1;
+    }
+    
+    /* Write symbol table to file if no errors */
+    if (!analyzer->has_error && analyzer->symbol_file) {
+        symtable_write(analyzer->symtable, analyzer->symbol_file);
     }
     
     return analyzer->has_error ? -1 : 0;
@@ -587,7 +597,7 @@ int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node) {
             return check_return_stmt(analyzer, stmt_node);
         
         case NODE_EXPR_STMT: {
-            TypeInfo expr_type;
+            TypeInfo expr_type = {0};
             ASTNode* expr_node = semantic_get_node(analyzer, stmt_node->data.expr_stmt.expr);
             if (expr_node) {
                 return check_expression(analyzer, expr_node, &expr_type);
@@ -640,12 +650,18 @@ int check_block(SemanticAnalyzer* analyzer, ASTNode* block_node) {
 int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     Symbol var_sym;
     const char* var_name;
-    TypeInfo init_type;
+    TypeInfo init_type = {0};
+    TypeInfo var_type;  /* Copy of variable type to avoid buffer overwrite */
     ASTNode* init_expr;
+    uint16_t init_expr_index;
     
     if (!analyzer || !var_node) {
         return -1;
     }
+    
+    /* Save variable type before any other node reads */
+    var_type = var_node->data.var_decl.type;
+    init_expr_index = var_node->data.var_decl.init_expr;
     
     /* Get variable name */
     var_name = semantic_get_string(analyzer, var_node->data.var_decl.name);
@@ -661,12 +677,12 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     }
     
     /* Check initializer if present */
-    if (var_node->data.var_decl.init_expr != 0) {
-        init_expr = semantic_get_node(analyzer, var_node->data.var_decl.init_expr);
+    if (init_expr_index != 0) {
+        init_expr = semantic_get_node(analyzer, init_expr_index);
         if (init_expr) {
             if (check_expression(analyzer, init_expr, &init_type) == 0) {
                 /* Check type compatibility */
-                if (!types_compatible(var_node->data.var_decl.type, init_type)) {
+                if (!types_compatible(var_type, init_type)) {
                     semantic_error_node(analyzer, var_node, "Type mismatch in variable initialization");
                 }
             }
@@ -677,7 +693,7 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     memset(&var_sym, 0, sizeof(Symbol));
     var_sym.kind = SYM_LOCAL;
     var_sym.name_offset = var_node->data.var_decl.name;
-    var_sym.type = var_node->data.var_decl.type;
+    var_sym.type = var_type;  /* Use saved copy */
     var_sym.data.local_data.index = 0;  /* Will be assigned during code generation */
     
     /* Add variable to symbol table */
@@ -691,7 +707,7 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
 
 /* Check if statement */
 int check_if_stmt(SemanticAnalyzer* analyzer, ASTNode* if_node) {
-    TypeInfo cond_type;
+    TypeInfo cond_type = {0};
     ASTNode* cond_node;
     ASTNode* then_node;
     ASTNode* else_node;
@@ -729,7 +745,7 @@ int check_if_stmt(SemanticAnalyzer* analyzer, ASTNode* if_node) {
 
 /* Check while statement */
 int check_while_stmt(SemanticAnalyzer* analyzer, ASTNode* while_node) {
-    TypeInfo cond_type;
+    TypeInfo cond_type = {0};
     ASTNode* cond_node;
     ASTNode* body_node;
     
@@ -758,7 +774,7 @@ int check_while_stmt(SemanticAnalyzer* analyzer, ASTNode* while_node) {
 
 /* Check return statement */
 int check_return_stmt(SemanticAnalyzer* analyzer, ASTNode* return_node) {
-    TypeInfo expr_type;
+    TypeInfo expr_type = {0};
     ASTNode* expr_node;
     
     if (!analyzer || !return_node) {
@@ -856,7 +872,7 @@ int check_binary_op(SemanticAnalyzer* analyzer, ASTNode* binop_node, TypeInfo* r
 
 /* Check unary operation */
 int check_unary_op(SemanticAnalyzer* analyzer, ASTNode* unop_node, TypeInfo* result_type) {
-    TypeInfo operand_type;
+    TypeInfo operand_type = {0};
     ASTNode* operand_node;
     
     if (!analyzer || !unop_node || !result_type) {

@@ -203,7 +203,7 @@ $(OBJ_DIR)/djc_main.obj: tools/compiler/djc.c tools/compiler/djc.h
 
 $(BIN_DIR)/djc.exe: $(OBJ_DIR)/djc_main.obj $(COMPILER_OBJS) $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS)
 	@echo Linking djc.exe...
-	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/djc_main.obj $(COMPILER_OBJS) $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) }
+	$(LD) $(LDFLAGS) option stack=16384 name $@ file { $(OBJ_DIR)/djc_main.obj $(COMPILER_OBJS) $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) }
 
 djc: $(BIN_DIR)/djc.exe
 

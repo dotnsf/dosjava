@@ -20,6 +20,9 @@ static uint16_t parse_return_stmt(Parser* parser);
  * Initialize parser
  */
 int parser_init(Parser* parser, const char* token_file, const char* ast_file) {
+    long file_size;
+    long string_pool_offset;
+    
     /* Initialize all fields */
     parser->tokens = NULL;
     parser->ast_file = NULL;
@@ -35,6 +38,31 @@ int parser_init(Parser* parser, const char* token_file, const char* ast_file) {
         fprintf(stderr, "Error: Cannot open token file '%s'\n", token_file);
         return -1;
     }
+    
+    /* Read string pool size from header */
+    if (fread(&parser->pool_size, sizeof(uint16_t), 1, parser->tokens) != 1) {
+        fprintf(stderr, "Error: Cannot read string pool size\n");
+        fclose(parser->tokens);
+        return -1;
+    }
+    
+    /* Calculate string pool offset (at end of file) */
+    fseek(parser->tokens, 0, SEEK_END);
+    file_size = ftell(parser->tokens);
+    string_pool_offset = file_size - parser->pool_size;
+    
+    /* Read string pool from end of file */
+    if (parser->pool_size > 0) {
+        fseek(parser->tokens, string_pool_offset, SEEK_SET);
+        if (fread(parser->string_pool, 1, parser->pool_size, parser->tokens) != parser->pool_size) {
+            fprintf(stderr, "Error: Cannot read string pool\n");
+            fclose(parser->tokens);
+            return -1;
+        }
+    }
+    
+    /* Reset to token data (after header) */
+    fseek(parser->tokens, sizeof(uint16_t), SEEK_SET);
     
     /* Open AST output file */
     parser->ast_file = fopen(ast_file, "wb");
@@ -202,16 +230,37 @@ int parser_flush_nodes(Parser* parser) {
 uint16_t parser_parse(Parser* parser) {
     uint16_t program_node;
     uint16_t class_node;
+    FILE* temp_file;
+    FILE* original_ast_file;
+    size_t nodes_size;
+    uint8_t* nodes_buffer;
+    
+    /* Save original AST file pointer */
+    original_ast_file = parser->ast_file;
+    
+    /* Create temporary file for nodes */
+    temp_file = tmpfile();
+    if (!temp_file) {
+        fprintf(stderr, "Error: Cannot create temporary file\n");
+        return 0;
+    }
+    
+    /* Temporarily redirect node output to temp file */
+    parser->ast_file = temp_file;
     
     /* Allocate program node */
     program_node = parser_alloc_node(parser, NODE_PROGRAM);
     if (program_node == 0) {
+        fclose(temp_file);
+        parser->ast_file = original_ast_file;
         return 0;
     }
     
     /* Parse class */
     class_node = parse_class(parser);
     if (class_node == 0) {
+        fclose(temp_file);
+        parser->ast_file = original_ast_file;
         return 0;
     }
     
@@ -220,13 +269,56 @@ uint16_t parser_parse(Parser* parser) {
     /* Expect EOF */
     if (!parser_match(parser, TOK_EOF)) {
         parser_error(parser, "Expected end of file");
+        fclose(temp_file);
+        parser->ast_file = original_ast_file;
         return 0;
     }
     
-    /* Flush remaining nodes */
+    /* Flush remaining nodes to temp file */
     if (parser_flush_nodes(parser) < 0) {
+        fclose(temp_file);
+        parser->ast_file = original_ast_file;
         return 0;
     }
+    
+    /* Read all nodes from temp file */
+    nodes_size = parser->total_nodes * sizeof(ASTNode);
+    nodes_buffer = (uint8_t*)malloc(nodes_size);
+    if (!nodes_buffer) {
+        fprintf(stderr, "Error: Out of memory\n");
+        fclose(temp_file);
+        parser->ast_file = original_ast_file;
+        return 0;
+    }
+    
+    fseek(temp_file, 0, SEEK_SET);
+    if (fread(nodes_buffer, 1, nodes_size, temp_file) != nodes_size) {
+        fprintf(stderr, "Error: Failed to read nodes from temp file\n");
+        free(nodes_buffer);
+        fclose(temp_file);
+        parser->ast_file = original_ast_file;
+        return 0;
+    }
+    
+    fclose(temp_file);
+    
+    /* Restore original AST file pointer */
+    parser->ast_file = original_ast_file;
+    
+    /* Now write to actual AST file in correct order */
+    /* Write header */
+    fwrite(&parser->total_nodes, sizeof(uint16_t), 1, parser->ast_file);
+    fwrite(&parser->pool_size, sizeof(uint16_t), 1, parser->ast_file);
+    
+    /* Write string pool */
+    if (parser->pool_size > 0) {
+        fwrite(parser->string_pool, 1, parser->pool_size, parser->ast_file);
+    }
+    
+    /* Write nodes */
+    fwrite(nodes_buffer, 1, nodes_size, parser->ast_file);
+    
+    free(nodes_buffer);
     
     return program_node;
 }
@@ -395,16 +487,19 @@ uint16_t parse_method(Parser* parser, int is_public, int is_static, TypeInfo ret
 int parse_type(Parser* parser, TypeInfo* type) {
     if (parser_consume(parser, TOK_VOID)) {
         type->kind = TYPE_VOID;
+        type->class_name = 0;
         return 0;
     }
     
     if (parser_consume(parser, TOK_INT)) {
         type->kind = TYPE_INT;
+        type->class_name = 0;
         return 0;
     }
     
     if (parser_consume(parser, TOK_BOOLEAN)) {
         type->kind = TYPE_BOOLEAN;
+        type->class_name = 0;
         return 0;
     }
     

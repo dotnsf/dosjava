@@ -1,0 +1,1 @@
+tools\compiler\semantic.c(200): Warning! W202: Symbol 'sym_file' has been defined, but not referenced

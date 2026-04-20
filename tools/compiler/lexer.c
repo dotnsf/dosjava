@@ -46,6 +46,8 @@ static TokenType lexer_lookup_keyword(const char* str);
  * Initialize lexer
  */
 int lexer_init(Lexer* lexer, const char* source_file, const char* token_file) {
+    uint16_t placeholder;
+    
     /* Initialize all fields */
     lexer->source = NULL;
     lexer->tokens = NULL;
@@ -71,6 +73,10 @@ int lexer_init(Lexer* lexer, const char* source_file, const char* token_file) {
         fclose(lexer->source);
         return -1;
     }
+    
+    /* Write placeholder for string pool size (will be updated in cleanup) */
+    placeholder = 0;
+    fwrite(&placeholder, sizeof(uint16_t), 1, lexer->tokens);
     
     /* Read first character */
     if (lexer_read_char(lexer) < 0) {
@@ -637,6 +643,16 @@ void lexer_cleanup(Lexer* lexer) {
         lexer->source = NULL;
     }
     if (lexer->tokens) {
+        /* Write string pool size at beginning of file */
+        fseek(lexer->tokens, 0, SEEK_SET);
+        fwrite(&lexer->pool_size, sizeof(uint16_t), 1, lexer->tokens);
+        
+        /* Write string pool data at end of file */
+        fseek(lexer->tokens, 0, SEEK_END);
+        if (lexer->pool_size > 0) {
+            fwrite(lexer->string_pool, 1, lexer->pool_size, lexer->tokens);
+        }
+        
         fclose(lexer->tokens);
         lexer->tokens = NULL;
     }

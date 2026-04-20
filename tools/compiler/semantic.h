@@ -24,6 +24,7 @@
 typedef struct {
     /* Input */
     FILE* ast_file;             /* AST input file */
+    const char* symbol_file;    /* Symbol table output file path */
     ASTNode nodes[128];         /* Node buffer (4KB) */
     uint16_t node_count;        /* Nodes in buffer */
     uint16_t total_nodes;       /* Total nodes read */

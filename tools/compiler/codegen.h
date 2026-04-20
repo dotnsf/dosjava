@@ -30,8 +30,9 @@ typedef struct {
 
 /* Bytecode buffer */
 typedef struct {
-    uint8_t data[32768];    /* Bytecode data (32KB max) */
+    uint8_t* data;          /* Bytecode data (allocated separately) */
     uint16_t size;          /* Current size */
+    uint16_t capacity;      /* Buffer capacity */
 } ByteBuffer;
 
 /* Constant pool builder */

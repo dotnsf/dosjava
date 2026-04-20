@@ -16,6 +16,7 @@ static int load_symbol_table(CodeGenerator* codegen, const char* symbol_file);
 /* Initialize code generator */
 int codegen_init(CodeGenerator* codegen, const char* ast_file, const char* symbol_file, const char* output_file) {
     if (!codegen || !ast_file || !symbol_file || !output_file) {
+        fprintf(stderr, "CODEGEN DEBUG: Invalid parameters\n");
         return -1;
     }
     
@@ -65,7 +66,7 @@ int codegen_init(CodeGenerator* codegen, const char* ast_file, const char* symbo
     }
     memset(codegen->constants, 0, sizeof(ConstantPool));
     
-    /* Allocate bytecode buffer */
+    /* Allocate bytecode buffer structure */
     codegen->bytecode = (ByteBuffer*)malloc(sizeof(ByteBuffer));
     if (!codegen->bytecode) {
         free(codegen->constants);
@@ -77,6 +78,19 @@ int codegen_init(CodeGenerator* codegen, const char* ast_file, const char* symbo
     }
     memset(codegen->bytecode, 0, sizeof(ByteBuffer));
     
+    /* Allocate bytecode data separately (8KB - reduced for DOS memory constraints) */
+    codegen->bytecode->capacity = 8192;
+    codegen->bytecode->data = (uint8_t*)malloc(codegen->bytecode->capacity);
+    if (!codegen->bytecode->data) {
+        free(codegen->bytecode);
+        free(codegen->constants);
+        fclose(codegen->ast_file);
+        fclose(codegen->output_file);
+        symtable_cleanup(codegen->symtable);
+        free(codegen->symtable);
+        return -1;
+    }
+    codegen->bytecode->size = 0;
     return 0;
 }
 
@@ -104,6 +118,9 @@ void codegen_cleanup(CodeGenerator* codegen) {
     }
     
     if (codegen->bytecode) {
+        if (codegen->bytecode->data) {
+            free(codegen->bytecode->data);
+        }
         free(codegen->bytecode);
     }
     
@@ -340,6 +357,19 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
     memset(codegen->context->code, 0, sizeof(ByteBuffer));
     memset(codegen->context->labels, 0, sizeof(LabelList));
     
+    /* Allocate code buffer data separately (8KB - reduced for DOS memory constraints) */
+    codegen->context->code->capacity = 8192;
+    codegen->context->code->data = (uint8_t*)malloc(codegen->context->code->capacity);
+    if (!codegen->context->code->data) {
+        codegen_error(codegen, "Failed to allocate method code buffer");
+        free(codegen->context->labels);
+        free(codegen->context->code);
+        free(codegen->context);
+        codegen->context = NULL;
+        return -1;
+    }
+    codegen->context->code->size = 0;
+    
     /* Generate method body */
     body_node = codegen_get_node(codegen, method_node->data.method.body);
     if (body_node) {
@@ -356,7 +386,7 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
     
     /* Copy method code to main bytecode buffer */
     code_start = codegen->bytecode->size;
-    if (code_start + codegen->context->code->size > 32768) {
+    if (code_start + codegen->context->code->size > codegen->bytecode->capacity) {
         codegen_error(codegen, "Bytecode size exceeds maximum");
         return -1;
     }
@@ -382,7 +412,12 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
     }
     
     /* Cleanup context */
-    free(codegen->context->code);
+    if (codegen->context->code) {
+        if (codegen->context->code->data) {
+            free(codegen->context->code->data);
+        }
+        free(codegen->context->code);
+    }
     free(codegen->context->labels);
     free(codegen->context);
     codegen->context = NULL;
@@ -850,7 +885,7 @@ int emit_opcode(CodeGenerator* codegen, uint8_t opcode) {
         return -1;
     }
     
-    if (codegen->context->code->size >= 32768) {
+    if (codegen->context->code->size >= codegen->context->code->capacity) {
         codegen_error(codegen, "Code size exceeds maximum");
         return -1;
     }
@@ -865,7 +900,7 @@ int emit_u1(CodeGenerator* codegen, uint8_t value) {
         return -1;
     }
     
-    if (codegen->context->code->size >= 32768) {
+    if (codegen->context->code->size >= codegen->context->code->capacity) {
         codegen_error(codegen, "Code size exceeds maximum");
         return -1;
     }
@@ -880,7 +915,7 @@ int emit_u2(CodeGenerator* codegen, uint16_t value) {
         return -1;
     }
     
-    if (codegen->context->code->size + 1 >= 32768) {
+    if (codegen->context->code->size + 1 >= codegen->context->code->capacity) {
         codegen_error(codegen, "Code size exceeds maximum");
         return -1;
     }
