@@ -13,7 +13,8 @@ AR = wlib
 # -zq: Quiet mode
 # -od: Disable optimizations (for debugging)
 # -d2: Full debugging info
-CFLAGS = -ms -0 -w4 -zq -od -d2
+# -i: Include path
+CFLAGS = -ms -0 -w4 -zq -od -d2 -i=C:\WATCOM\h
 
 # Linker flags
 LDFLAGS = system dos
@@ -81,7 +82,7 @@ $(BIN_DIR)/java2djc.exe: $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORM
 
 $(BIN_DIR)/djvm.exe: $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS)
 	@echo Linking djvm.exe...
-	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) }
+	$(LD) $(LDFLAGS) option stack=16384 name $@ file { $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) }
 
 # Compile rules - VM
 $(OBJ_DIR)/memory.obj: $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/memory.h
@@ -201,9 +202,9 @@ $(OBJ_DIR)/test_codegen.obj: tools/compiler/test_codegen.c tools/compiler/codege
 	@echo Compiling test_codegen.c...
 	$(CC) $(CFLAGS) -fo=$@ tools/compiler/test_codegen.c
 
-$(BIN_DIR)/test_codegen.exe: $(OBJ_DIR)/test_codegen.obj $(OBJ_DIR)/codegen.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS)
+$(BIN_DIR)/test_codegen.exe: $(OBJ_DIR)/test_codegen.obj $(OBJ_DIR)/codegen.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj $(FORMAT_OBJS) $(OBJ_DIR)/memory.obj
 	@echo Linking test_codegen.exe...
-	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_codegen.obj $(OBJ_DIR)/codegen.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) }
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_codegen.obj $(OBJ_DIR)/codegen.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj $(FORMAT_OBJS) $(OBJ_DIR)/memory.obj }
 
 test_codegen: $(BIN_DIR)/test_codegen.exe
 
@@ -212,9 +213,9 @@ $(OBJ_DIR)/djc_main.obj: tools/compiler/djc.c tools/compiler/djc.h
 	@echo Compiling djc.c...
 	$(CC) $(CFLAGS) -fo=$@ tools/compiler/djc.c
 
-$(BIN_DIR)/djc.exe: $(OBJ_DIR)/djc_main.obj $(COMPILER_OBJS) $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS)
+$(BIN_DIR)/djc.exe: $(OBJ_DIR)/djc_main.obj $(COMPILER_OBJS) $(FORMAT_OBJS) $(OBJ_DIR)/memory.obj
 	@echo Linking djc.exe...
-	$(LD) $(LDFLAGS) option stack=16384 name $@ file { $(OBJ_DIR)/djc_main.obj $(COMPILER_OBJS) $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) }
+	$(LD) $(LDFLAGS) option stack=16384 name $@ file { $(OBJ_DIR)/djc_main.obj $(COMPILER_OBJS) $(FORMAT_OBJS) $(OBJ_DIR)/memory.obj }
 
 djc: $(BIN_DIR)/djc.exe
 

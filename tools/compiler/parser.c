@@ -409,6 +409,10 @@ uint16_t parse_member(Parser* parser) {
     is_public = 0;
     is_static = 0;
     
+    /* Initialize return_type to void by default */
+    return_type.kind = TYPE_VOID;
+    return_type.class_name = 0;
+    
     /* Check for 'public' */
     if (parser_consume(parser, TOK_PUBLIC)) {
         is_public = 1;
@@ -419,10 +423,14 @@ uint16_t parse_member(Parser* parser) {
         is_static = 1;
     }
     
-    /* Parse return type */
-    if (parse_type(parser, &return_type) < 0) {
-        return 0;
+    /* Parse return type (optional - defaults to void) */
+    if (parser_match(parser, TOK_VOID) || parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN)) {
+        if (parse_type(parser, &return_type) < 0) {
+            return 0;
+        }
     }
+    
+    printf("DEBUG: parse_member: return_type.kind = %d\n", return_type.kind);
     
     /* For MVP, only support methods */
     return parse_method(parser, is_public, is_static, return_type);
@@ -1158,7 +1166,7 @@ uint16_t parse_unary(Parser* parser) {
 
 /**
  * Parse postfix expression
- * Postfix -> Primary ('.' ID '(' ArgList? ')')*
+ * Postfix -> Primary ('.' ID '(' ArgList? ')' | '(' ArgList? ')')*
  */
 uint16_t parse_postfix(Parser* parser) {
     uint16_t expr;
@@ -1169,6 +1177,42 @@ uint16_t parse_postfix(Parser* parser) {
     expr = parse_primary(parser);
     if (expr == 0) {
         return 0;
+    }
+    
+    /* Check for direct method call: identifier '(' ... ')' */
+    if (parser->nodes[expr - parser->total_nodes - 1].type == NODE_IDENTIFIER &&
+        parser_match(parser, TOK_LPAREN)) {
+        /* This is a simple method call like helper() */
+        parser_next_token(parser);  /* consume '(' */
+        
+        /* Allocate call node */
+        call_node = parser_alloc_node(parser, NODE_CALL);
+        if (call_node == 0) {
+            return 0;
+        }
+        
+        /* Parse arguments (simplified: only one argument for MVP) */
+        arg_node = 0;
+        if (!parser_match(parser, TOK_RPAREN)) {
+            arg_node = parse_expression(parser);
+            if (arg_node == 0) {
+                return 0;
+            }
+        }
+        
+        /* Expect ')' */
+        if (parser_expect(parser, TOK_RPAREN) < 0) {
+            return 0;
+        }
+        
+        /* Fill call node - for simple calls, object is 0 (static call) */
+        parser->nodes[call_node - parser->total_nodes - 1].data.call.object = 0;
+        parser->nodes[call_node - parser->total_nodes - 1].data.call.method_name =
+            parser->nodes[expr - parser->total_nodes - 1].data.identifier.name;
+        parser->nodes[call_node - parser->total_nodes - 1].data.call.arg_count = (arg_node != 0) ? 1 : 0;
+        parser->nodes[call_node - parser->total_nodes - 1].data.call.first_arg = arg_node;
+        
+        expr = call_node;
     }
     
     while (parser_consume(parser, TOK_DOT)) {

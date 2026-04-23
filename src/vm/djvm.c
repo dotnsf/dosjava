@@ -126,12 +126,26 @@ int execute_method(DJCFile* djc_file, DJCMethod* method, VMOptions* options) {
     ExecutionContext ctx;
     int result;
     
-    if (options->verbose) {
+    /* Always print method info in debug mode */
+    if (options->verbose || options->debug) {
+        uint8_t* code;
+        uint16_t i;
+        
         printf("Executing method: %s\n", djc_get_utf8(djc_file, method->name_index));
         printf("  Code offset: %u\n", method->code_offset);
         printf("  Code length: %u\n", method->code_length);
         printf("  Max stack:   %u\n", method->max_stack);
         printf("  Max locals:  %u\n", method->max_locals);
+        
+        /* Dump bytecode in hex */
+        code = djc_get_method_code(djc_file, method);
+        if (code && method->code_length > 0) {
+            printf("  Bytecode: ");
+            for (i = 0; i < method->code_length; i++) {
+                printf("%02X ", code[i]);
+            }
+            printf("\n");
+        }
         printf("\n");
     }
     
@@ -243,8 +257,8 @@ int main(int argc, char* argv[]) {
         printf("\n");
     }
     
-    /* Find method */
-    method = djc_find_method(djc_file, options.method_name);
+    /* Find method by name */
+    method = djc_find_method_by_name(djc_file, options.method_name);
     if (method == NULL) {
         fprintf(stderr, "ERROR: Method not found: %s\n", options.method_name);
         djc_close(djc_file);

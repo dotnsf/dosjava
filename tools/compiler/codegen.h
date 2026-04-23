@@ -215,6 +215,23 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node);
  */
 int generate_identifier(CodeGenerator* codegen, ASTNode* id_node);
 
+/**
+ * Generate code for method call
+ * @param codegen Code generator state
+ * @param call_node Method call AST node
+ * @return 0 on success, -1 on error
+ */
+int generate_method_call(CodeGenerator* codegen, ASTNode* call_node);
+
+/**
+ * Find or create method index
+ * @param codegen Code generator state
+ * @param method_name Method name
+ * @param is_native 1 if native method, 0 otherwise
+ * @return Method index, or 0xFFFF on error
+ */
+uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int is_native);
+
 /* Bytecode emission */
 
 /**

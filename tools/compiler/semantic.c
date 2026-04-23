@@ -151,6 +151,42 @@ const char* semantic_get_string(SemanticAnalyzer* analyzer, uint16_t offset) {
     return &analyzer->string_pool[offset];
 }
 
+/* Add string to pool and return offset */
+uint16_t semantic_add_string(SemanticAnalyzer* analyzer, const char* str) {
+    uint16_t offset;
+    uint16_t len;
+    
+    if (!analyzer || !str) {
+        return 0xFFFF;
+    }
+    
+    len = strlen(str) + 1;  /* Include null terminator */
+    
+    /* Check if string already exists in pool */
+    for (offset = 0; offset < analyzer->pool_size; ) {
+        if (strcmp(&analyzer->string_pool[offset], str) == 0) {
+            return offset;  /* String already exists */
+        }
+        offset += strlen(&analyzer->string_pool[offset]) + 1;
+    }
+    
+    /* Check if there's enough space */
+    if (analyzer->pool_size + len > 2048) {
+        return 0xFFFF;  /* Pool full */
+    }
+    
+    /* Add string to pool */
+    offset = analyzer->pool_size;
+    strcpy(&analyzer->string_pool[offset], str);
+    analyzer->pool_size += len;
+    
+    printf("DEBUG: semantic_add_string: Added '%s' at offset %u, new pool_size=%u\n",
+           str, offset, analyzer->pool_size);
+    fflush(stdout);
+    
+    return offset;
+}
+
 /* Report semantic error */
 void semantic_error(SemanticAnalyzer* analyzer, uint16_t line, uint16_t col, const char* message) {
     char buffer[256];
@@ -197,8 +233,6 @@ void semantic_print_errors(SemanticAnalyzer* analyzer) {
 
 /* Perform semantic analysis */
 int semantic_analyze(SemanticAnalyzer* analyzer) {
-    FILE* sym_file;
-    
     if (!analyzer) {
         return -1;
     }
@@ -211,6 +245,15 @@ int semantic_analyze(SemanticAnalyzer* analyzer) {
     /* Pass 2: Type check and resolve */
     if (check_semantics(analyzer) != 0) {
         return -1;
+    }
+    
+    /* Update symbol table string pool before writing */
+    if (!analyzer->has_error) {
+        /* Copy updated string pool to symbol table */
+        memcpy(analyzer->symtable->string_pool, analyzer->string_pool, analyzer->pool_size);
+        analyzer->symtable->pool_size = analyzer->pool_size;
+        printf("DEBUG: Updated symbol table string pool: %u bytes\n", analyzer->pool_size);
+        fflush(stdout);
     }
     
     /* Write symbol table to file if no errors */
@@ -665,6 +708,9 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     
     /* Get variable name */
     var_name = semantic_get_string(analyzer, var_node->data.var_decl.name);
+    printf("DEBUG: check_var_decl: Checking variable '%s'\n", var_name ? var_name : "(null)");
+    fflush(stdout);
+    
     if (!var_name) {
         semantic_error_node(analyzer, var_node, "Invalid variable name");
         return -1;
@@ -692,15 +738,24 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     /* Create variable symbol */
     memset(&var_sym, 0, sizeof(Symbol));
     var_sym.kind = SYM_LOCAL;
-    var_sym.name_offset = var_node->data.var_decl.name;
+    /* Add variable name to string pool and use the new offset */
+    var_sym.name_offset = semantic_add_string(analyzer, var_name);
+    if (var_sym.name_offset == 0xFFFF) {
+        semantic_error_node(analyzer, var_node, "String pool full");
+        return -1;
+    }
     var_sym.type = var_type;  /* Use saved copy */
     var_sym.data.local_data.index = 0;  /* Will be assigned during code generation */
     
     /* Add variable to symbol table */
+    printf("DEBUG: check_var_decl: Adding symbol '%s' to symbol table\n", var_name);
+    fflush(stdout);
     if (symtable_add_symbol(analyzer->symtable, &var_sym) == 0xFFFF) {
         semantic_error_node(analyzer, var_node, "Failed to add variable symbol");
         return -1;
     }
+    printf("DEBUG: check_var_decl: Symbol '%s' added successfully\n", var_name);
+    fflush(stdout);
     
     return 0;
 }

@@ -56,11 +56,15 @@ static int read_header(FILE* fp, DJCHeader* header) {
 static int read_constants(FILE* fp, DJCFile* file) {
     uint16_t i;
     DJCConstant* constant;
+    long pos_before, pos_after;
     
     if (file->header.constant_pool_count == 0) {
         file->constants = NULL;
         return 0;
     }
+    
+    pos_before = ftell(fp);
+    printf("DEBUG: read_constants: File position before reading constants: 0x%lX\n", pos_before);
     
     /* Allocate constant pool */
     file->constants = (DJCConstant*)memory_alloc(
@@ -112,6 +116,10 @@ static int read_constants(FILE* fp, DJCFile* file) {
         }
     }
     
+    pos_after = ftell(fp);
+    printf("DEBUG: read_constants: File position after reading constants: 0x%lX\n", pos_after);
+    printf("DEBUG: read_constants: Bytes read: %ld\n", pos_after - pos_before);
+    
     return 0;
 }
 
@@ -121,11 +129,15 @@ static int read_constants(FILE* fp, DJCFile* file) {
 static int read_methods(FILE* fp, DJCFile* file) {
     uint16_t i;
     DJCMethod* method;
+    long pos_before, pos_after;
     
     if (file->header.method_count == 0) {
         file->methods = NULL;
         return 0;
     }
+    
+    pos_before = ftell(fp);
+    printf("DEBUG: read_methods: File position before reading methods: 0x%lX\n", pos_before);
     
     /* Allocate method array */
     file->methods = (DJCMethod*)memory_alloc(
@@ -145,7 +157,14 @@ static int read_methods(FILE* fp, DJCFile* file) {
         method->max_stack = read_uint8(fp);
         method->max_locals = read_uint8(fp);
         method->flags = read_uint8(fp);
+        
+        printf("DEBUG: Method[%u]: name_idx=%u, code_offset=%u, code_length=%u\n",
+               i, method->name_index, method->code_offset, method->code_length);
     }
+    
+    pos_after = ftell(fp);
+    printf("DEBUG: read_methods: File position after reading methods: 0x%lX\n", pos_after);
+    printf("DEBUG: read_methods: Bytes read: %ld\n", pos_after - pos_before);
     
     return 0;
 }
@@ -185,10 +204,16 @@ static int read_fields(FILE* fp, DJCFile* file) {
  * Read bytecode section from file
  */
 static int read_bytecode(FILE* fp, DJCFile* file) {
+    long pos_before;
+    uint16_t i;
+    
     if (file->header.code_size == 0) {
         file->bytecode = NULL;
         return 0;
     }
+    
+    pos_before = ftell(fp);
+    printf("DEBUG: read_bytecode: File position before reading bytecode: 0x%lX\n", pos_before);
     
     /* Allocate bytecode buffer */
     file->bytecode = (uint8_t*)memory_alloc(file->header.code_size);
@@ -200,6 +225,13 @@ static int read_bytecode(FILE* fp, DJCFile* file) {
     if (fread(file->bytecode, 1, file->header.code_size, fp) != file->header.code_size) {
         return -1;
     }
+    
+    printf("DEBUG: read_bytecode: Read %u bytes of bytecode\n", file->header.code_size);
+    printf("DEBUG: read_bytecode: First 10 bytes: ");
+    for (i = 0; i < 10 && i < file->header.code_size; i++) {
+        printf("%02X ", file->bytecode[i]);
+    }
+    printf("\n");
     
     return 0;
 }
@@ -336,27 +368,6 @@ const char* djc_get_utf8(DJCFile* file, uint16_t index) {
 }
 
 /**
- * Find a method by name
- */
-DJCMethod* djc_find_method(DJCFile* file, const char* name) {
-    uint16_t i;
-    const char* method_name;
-    
-    if (file == NULL || name == NULL) {
-        return NULL;
-    }
-    
-    for (i = 0; i < file->header.method_count; i++) {
-        method_name = djc_get_utf8(file, file->methods[i].name_index);
-        if (method_name != NULL && strcmp(method_name, name) == 0) {
-            return &file->methods[i];
-        }
-    }
-    
-    return NULL;
-}
-
-/**
  * Get bytecode for a method
  */
 uint8_t* djc_get_method_code(DJCFile* file, DJCMethod* method) {
@@ -369,6 +380,38 @@ uint8_t* djc_get_method_code(DJCFile* file, DJCMethod* method) {
     }
     
     return &file->bytecode[method->code_offset];
+}
+
+/**
+ * Find method by index
+ */
+DJCMethod* djc_find_method(DJCFile* file, uint16_t method_index) {
+    if (file == NULL || method_index >= file->header.method_count) {
+        return NULL;
+    }
+    return &file->methods[method_index];
+}
+
+/**
+ * Find method by name
+ */
+DJCMethod* djc_find_method_by_name(DJCFile* file, const char* method_name) {
+    uint16_t i;
+    const char* name;
+    
+    if (file == NULL || method_name == NULL) {
+        return NULL;
+    }
+    
+    /* Search through all methods */
+    for (i = 0; i < file->header.method_count; i++) {
+        name = djc_get_utf8(file, file->methods[i].name_index);
+        if (name != NULL && strcmp(name, method_name) == 0) {
+            return &file->methods[i];
+        }
+    }
+    
+    return NULL;
 }
 
 // Made with Bob

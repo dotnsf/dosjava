@@ -5,6 +5,97 @@
 #include <stdio.h>
 #include <string.h>
 
+/* ===== Stack Helper Functions ===== */
+
+/**
+ * Push value onto shared stack
+ */
+static inline int stack_push_shared(ExecutionContext* ctx, uint16_t value) {
+    if (ctx->stack_pointer >= SHARED_STACK_SIZE) {
+        printf("DEBUG: Stack overflow! SP=%u, SIZE=%u\n", ctx->stack_pointer, SHARED_STACK_SIZE);
+        return -1;  /* Stack overflow */
+    }
+    ctx->shared_stack[ctx->stack_pointer++] = value;
+    return 0;
+}
+
+/**
+ * Pop value from shared stack
+ */
+static inline uint16_t stack_pop_shared(ExecutionContext* ctx) {
+    if (ctx->stack_pointer == 0) {
+        return 0;  /* Stack underflow */
+    }
+    return ctx->shared_stack[--ctx->stack_pointer];
+}
+
+/**
+ * Peek at top of shared stack
+ */
+static inline uint16_t stack_peek_shared(ExecutionContext* ctx) {
+    if (ctx->stack_pointer == 0) {
+        return 0;
+    }
+    return ctx->shared_stack[ctx->stack_pointer - 1];
+}
+
+/**
+ * Duplicate top of shared stack
+ */
+static inline int stack_dup_shared(ExecutionContext* ctx) {
+    if (ctx->stack_pointer == 0 || ctx->stack_pointer >= SHARED_STACK_SIZE) {
+        return -1;
+    }
+    ctx->shared_stack[ctx->stack_pointer] = ctx->shared_stack[ctx->stack_pointer - 1];
+    ctx->stack_pointer++;
+    return 0;
+}
+
+/* ===== Local Variable Helper Functions ===== */
+
+/**
+ * Get current frame pointer
+ */
+static inline uint16_t get_frame_pointer(ExecutionContext* ctx) {
+    if (ctx->call_depth == 0) {
+        return 0;
+    }
+    return ctx->call_frames[ctx->call_depth - 1].frame_pointer;
+}
+
+/**
+ * Get current local base
+ */
+static inline uint16_t get_local_base(ExecutionContext* ctx) {
+    if (ctx->call_depth == 0) {
+        return 0;
+    }
+    return ctx->call_frames[ctx->call_depth - 1].local_base;
+}
+
+/**
+ * Load local variable
+ */
+static inline uint16_t load_local(ExecutionContext* ctx, uint8_t index) {
+    uint16_t base = get_local_base(ctx);
+    if (base + index >= SHARED_LOCALS_SIZE) {
+        return 0;  /* Out of bounds */
+    }
+    return ctx->shared_locals[base + index];
+}
+
+/**
+ * Store local variable
+ */
+static inline void store_local(ExecutionContext* ctx, uint8_t index, uint16_t value) {
+    uint16_t base = get_local_base(ctx);
+    if (base + index < SHARED_LOCALS_SIZE) {
+        ctx->shared_locals[base + index] = value;
+    }
+}
+
+/* ===== Context Management ===== */
+
 /**
  * Initialize execution context
  */
@@ -30,30 +121,24 @@ int interpreter_init_context(ExecutionContext* ctx, DJCFile* djc_file, DJCMethod
     ctx->djc_file = djc_file;
     ctx->running = 1;
     
-    /* Allocate operand stack */
-    ctx->stack = (Stack*)memory_alloc(sizeof(Stack));
-    if (ctx->stack == NULL) {
-        return -1;
-    }
+    /* Initialize shared stack */
+    ctx->stack_pointer = 0;
     
-    if (stack_init(ctx->stack, method->max_stack) != 0) {
-        memory_free(ctx->stack);
-        return -1;
-    }
+    /* Initialize shared locals */
+    ctx->local_pointer = 0;
     
-    /* Allocate local variables */
-    ctx->local_count = method->max_locals;
-    if (ctx->local_count > 0) {
-        ctx->locals = (uint16_t*)memory_alloc(sizeof(uint16_t) * ctx->local_count);
-        if (ctx->locals == NULL) {
-            stack_free(ctx->stack);
-            memory_free(ctx->stack);
-            return -1;
+    /* Allocate space for main method locals */
+    if (method->max_locals > 0) {
+        if (method->max_locals > SHARED_LOCALS_SIZE) {
+            return -1;  /* Too many locals */
         }
-        
+        ctx->local_pointer = method->max_locals;
         /* Initialize locals to 0 */
-        memset(ctx->locals, 0, sizeof(uint16_t) * ctx->local_count);
+        memset(ctx->shared_locals, 0, method->max_locals * sizeof(uint16_t));
     }
+    
+    /* Initialize call frames */
+    ctx->call_depth = 0;
     
     return 0;
 }
@@ -66,38 +151,28 @@ void interpreter_free_context(ExecutionContext* ctx) {
         return;
     }
     
-    if (ctx->stack != NULL) {
-        stack_free(ctx->stack);
-        memory_free(ctx->stack);
-        ctx->stack = NULL;
-    }
-    
-    if (ctx->locals != NULL) {
-        memory_free(ctx->locals);
-        ctx->locals = NULL;
-    }
+    /* Nothing to free - all memory is static */
+    ctx->running = 0;
 }
 
 /**
- * Get local variable
+ * Get local variable (legacy interface)
  */
 uint16_t interpreter_get_local(ExecutionContext* ctx, uint16_t index) {
-    if (ctx == NULL || ctx->locals == NULL || index >= ctx->local_count) {
+    if (ctx == NULL) {
         return 0;
     }
-    
-    return ctx->locals[index];
+    return load_local(ctx, (uint8_t)index);
 }
 
 /**
- * Set local variable
+ * Set local variable (legacy interface)
  */
 void interpreter_set_local(ExecutionContext* ctx, uint16_t index, uint16_t value) {
-    if (ctx == NULL || ctx->locals == NULL || index >= ctx->local_count) {
+    if (ctx == NULL) {
         return;
     }
-    
-    ctx->locals[index] = value;
+    store_local(ctx, (uint8_t)index, value);
 }
 
 /**
@@ -166,167 +241,224 @@ int interpreter_step(ExecutionContext* ctx) {
             /* Push constant from pool */
             index16 = interpreter_read_u16(ctx);
             /* TODO: Get constant from pool and push */
-            stack_push(ctx->stack, index16);
+            if (stack_push_shared(ctx, index16) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_PUSH_INT:
             /* Push immediate integer */
             value1 = interpreter_read_u16(ctx);
-            stack_push(ctx->stack, value1);
+            if (stack_push_shared(ctx, value1) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_POP:
             /* Pop and discard */
-            stack_pop(ctx->stack);
+            stack_pop_shared(ctx);
             break;
         
         case OP_DUP:
             /* Duplicate top of stack */
-            stack_dup(ctx->stack);
+            if (stack_dup_shared(ctx) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_LOAD_LOCAL:
             /* Load local variable */
             index8 = interpreter_read_u8(ctx);
-            value1 = interpreter_get_local(ctx, index8);
-            stack_push(ctx->stack, value1);
+            value1 = load_local(ctx, index8);
+            if (stack_push_shared(ctx, value1) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_STORE_LOCAL:
             /* Store to local variable */
             index8 = interpreter_read_u8(ctx);
-            value1 = stack_pop(ctx->stack);
-            interpreter_set_local(ctx, index8, value1);
+            value1 = stack_pop_shared(ctx);
+            store_local(ctx, index8, value1);
             break;
         
         case OP_LOAD_0:
-            value1 = interpreter_get_local(ctx, 0);
-            stack_push(ctx->stack, value1);
+            value1 = load_local(ctx, 0);
+            if (stack_push_shared(ctx, value1) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_LOAD_1:
-            value1 = interpreter_get_local(ctx, 1);
-            stack_push(ctx->stack, value1);
+            value1 = load_local(ctx, 1);
+            if (stack_push_shared(ctx, value1) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_LOAD_2:
-            value1 = interpreter_get_local(ctx, 2);
-            stack_push(ctx->stack, value1);
+            value1 = load_local(ctx, 2);
+            if (stack_push_shared(ctx, value1) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_STORE_0:
-            value1 = stack_pop(ctx->stack);
-            interpreter_set_local(ctx, 0, value1);
+            value1 = stack_pop_shared(ctx);
+            store_local(ctx, 0, value1);
             break;
         
         case OP_STORE_1:
-            value1 = stack_pop(ctx->stack);
-            interpreter_set_local(ctx, 1, value1);
+            value1 = stack_pop_shared(ctx);
+            store_local(ctx, 1, value1);
             break;
         
         case OP_STORE_2:
-            value1 = stack_pop(ctx->stack);
-            interpreter_set_local(ctx, 2, value1);
+            value1 = stack_pop_shared(ctx);
+            store_local(ctx, 2, value1);
             break;
         
         case OP_ADD:
             /* Integer addition */
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             result = value1 + value2;
-            stack_push(ctx->stack, result);
+            if (stack_push_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_SUB:
             /* Integer subtraction */
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             result = value1 - value2;
-            stack_push(ctx->stack, result);
+            if (stack_push_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_MUL:
             /* Integer multiplication */
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             result = value1 * value2;
-            stack_push(ctx->stack, result);
+            if (stack_push_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_DIV:
             /* Integer division */
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             if (value2 == 0) {
                 printf("ERROR: Division by zero\n");
                 return -1;
             }
             result = value1 / value2;
-            stack_push(ctx->stack, result);
+            if (stack_push_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_MOD:
             /* Integer modulo */
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             if (value2 == 0) {
                 printf("ERROR: Modulo by zero\n");
                 return -1;
             }
             result = value1 % value2;
-            stack_push(ctx->stack, result);
+            if (stack_push_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_NEG:
             /* Negate */
-            value1 = stack_pop(ctx->stack);
+            value1 = stack_pop_shared(ctx);
             result = (uint16_t)(-(int16_t)value1);
-            stack_push(ctx->stack, result);
+            if (stack_push_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_INC_LOCAL:
             /* Increment local variable */
             index8 = interpreter_read_u8(ctx);
             value1 = (uint16_t)((int8_t)interpreter_read_u8(ctx));
-            value2 = interpreter_get_local(ctx, index8);
+            value2 = load_local(ctx, index8);
             result = value2 + value1;
-            interpreter_set_local(ctx, index8, result);
+            store_local(ctx, index8, result);
             break;
         
         case OP_CMP_EQ:
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
-            stack_push(ctx->stack, (value1 == value2) ? 1 : 0);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
+            if (stack_push_shared(ctx, (value1 == value2) ? 1 : 0) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_CMP_NE:
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
-            stack_push(ctx->stack, (value1 != value2) ? 1 : 0);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
+            if (stack_push_shared(ctx, (value1 != value2) ? 1 : 0) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_CMP_LT:
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
-            stack_push(ctx->stack, ((int16_t)value1 < (int16_t)value2) ? 1 : 0);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
+            if (stack_push_shared(ctx, ((int16_t)value1 < (int16_t)value2) ? 1 : 0) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_CMP_LE:
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
-            stack_push(ctx->stack, ((int16_t)value1 <= (int16_t)value2) ? 1 : 0);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
+            if (stack_push_shared(ctx, ((int16_t)value1 <= (int16_t)value2) ? 1 : 0) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_CMP_GT:
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
-            stack_push(ctx->stack, ((int16_t)value1 > (int16_t)value2) ? 1 : 0);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
+            if (stack_push_shared(ctx, ((int16_t)value1 > (int16_t)value2) ? 1 : 0) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_CMP_GE:
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
-            stack_push(ctx->stack, ((int16_t)value1 >= (int16_t)value2) ? 1 : 0);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
+            if (stack_push_shared(ctx, ((int16_t)value1 >= (int16_t)value2) ? 1 : 0) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         
         case OP_GOTO:
@@ -338,7 +470,7 @@ int interpreter_step(ExecutionContext* ctx) {
         case OP_IF_TRUE:
             /* Jump if true */
             offset = (int16_t)interpreter_read_u16(ctx);
-            value1 = stack_pop(ctx->stack);
+            value1 = stack_pop_shared(ctx);
             if (value1 != 0) {
                 ctx->pc = ctx->code_start + offset;
             }
@@ -347,7 +479,7 @@ int interpreter_step(ExecutionContext* ctx) {
         case OP_IF_FALSE:
             /* Jump if false */
             offset = (int16_t)interpreter_read_u16(ctx);
-            value1 = stack_pop(ctx->stack);
+            value1 = stack_pop_shared(ctx);
             if (value1 == 0) {
                 ctx->pc = ctx->code_start + offset;
             }
@@ -356,8 +488,8 @@ int interpreter_step(ExecutionContext* ctx) {
         case OP_IF_EQ:
             /* Jump if equal */
             offset = (int16_t)interpreter_read_u16(ctx);
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             if (value1 == value2) {
                 ctx->pc = ctx->code_start + offset;
             }
@@ -366,8 +498,8 @@ int interpreter_step(ExecutionContext* ctx) {
         case OP_IF_NE:
             /* Jump if not equal */
             offset = (int16_t)interpreter_read_u16(ctx);
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             if (value1 != value2) {
                 ctx->pc = ctx->code_start + offset;
             }
@@ -376,8 +508,8 @@ int interpreter_step(ExecutionContext* ctx) {
         case OP_IF_LT:
             /* Jump if less than */
             offset = (int16_t)interpreter_read_u16(ctx);
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             if ((int16_t)value1 < (int16_t)value2) {
                 ctx->pc = ctx->code_start + offset;
             }
@@ -386,8 +518,8 @@ int interpreter_step(ExecutionContext* ctx) {
         case OP_IF_LE:
             /* Jump if less or equal */
             offset = (int16_t)interpreter_read_u16(ctx);
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             if ((int16_t)value1 <= (int16_t)value2) {
                 ctx->pc = ctx->code_start + offset;
             }
@@ -396,8 +528,8 @@ int interpreter_step(ExecutionContext* ctx) {
         case OP_IF_GT:
             /* Jump if greater than */
             offset = (int16_t)interpreter_read_u16(ctx);
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             if ((int16_t)value1 > (int16_t)value2) {
                 ctx->pc = ctx->code_start + offset;
             }
@@ -406,8 +538,8 @@ int interpreter_step(ExecutionContext* ctx) {
         case OP_IF_GE:
             /* Jump if greater or equal */
             offset = (int16_t)interpreter_read_u16(ctx);
-            value2 = stack_pop(ctx->stack);
-            value1 = stack_pop(ctx->stack);
+            value2 = stack_pop_shared(ctx);
+            value1 = stack_pop_shared(ctx);
             if ((int16_t)value1 >= (int16_t)value2) {
                 ctx->pc = ctx->code_start + offset;
             }
@@ -415,13 +547,13 @@ int interpreter_step(ExecutionContext* ctx) {
         
         case OP_PRINT_INT:
             /* Debug: print integer */
-            value1 = stack_pop(ctx->stack);
+            value1 = stack_pop_shared(ctx);
             system_print_int((int16_t)value1);
             break;
         
         case OP_PRINT_CHAR:
             /* Debug: print character */
-            value1 = stack_pop(ctx->stack);
+            value1 = stack_pop_shared(ctx);
             system_print_char((char)value1);
             break;
         
@@ -432,15 +564,150 @@ int interpreter_step(ExecutionContext* ctx) {
             ctx->running = 0;
             return 1;
         
-        case OP_RETURN:
-            /* Return void */
-            ctx->running = 0;
-            return 1;
+        case OP_INVOKE_STATIC: {
+            uint16_t method_index;
+            DJCMethod* method;
+            CallFrame* frame;
+            uint8_t* method_code;
+            const char* method_name;
+            
+            /* Read method index (2 bytes, little-endian) */
+            method_index = interpreter_read_u16(ctx);
+            
+            printf("DEBUG: INVOKE_STATIC method_index=%u\n", method_index);
+            
+            /* Check call depth */
+            if (ctx->call_depth >= MAX_CALL_DEPTH) {
+                printf("ERROR: Call stack overflow (max depth: %d)\n", MAX_CALL_DEPTH);
+                return -1;
+            }
+            
+            /* Look up method */
+            method = djc_find_method(ctx->djc_file, method_index);
+            if (method == NULL) {
+                printf("ERROR: Method not found (index: %d)\n", method_index);
+                return -1;
+            }
+            
+            /* Get method name for debugging */
+            method_name = djc_get_utf8(ctx->djc_file, method->name_index);
+            printf("DEBUG: Calling method '%s' (code_offset=%u, code_length=%u)\n",
+                   method_name ? method_name : "???",
+                   method->code_offset,
+                   method->code_length);
+            
+            /* Check if method is native */
+            if (method->flags & METHOD_NATIVE) {
+                /* TODO: Handle native methods in Phase 4.1 */
+                printf("ERROR: Native methods not yet supported\n");
+                return -1;
+            }
+            
+            /* Get method code */
+            method_code = djc_get_method_code(ctx->djc_file, method);
+            if (method_code == NULL) {
+                printf("ERROR: Failed to get method code\n");
+                return -1;
+            }
+            
+            /* Check if we have enough space for locals */
+            if (ctx->local_pointer + method->max_locals > SHARED_LOCALS_SIZE) {
+                printf("ERROR: Not enough space for local variables\n");
+                return -1;
+            }
+            
+            /* Save current state to call frame */
+            frame = &ctx->call_frames[ctx->call_depth];
+            frame->return_pc = ctx->pc;
+            frame->frame_pointer = ctx->stack_pointer;
+            frame->local_base = ctx->local_pointer;
+            frame->local_count = method->max_locals;
+            
+            /* Increment call depth */
+            ctx->call_depth++;
+            
+            /* Allocate space for new method's locals */
+            ctx->local_pointer += method->max_locals;
+            
+            /* Initialize new locals to 0 */
+            if (method->max_locals > 0) {
+                memset(&ctx->shared_locals[frame->local_base], 0,
+                       method->max_locals * sizeof(uint16_t));
+            }
+            
+            /* TODO: Handle method parameters (pop from stack, store to locals) */
+            /* For now, we assume no parameters */
+            
+            /* Set PC to method code */
+            ctx->pc = method_code;
+            ctx->code_start = method_code;
+            ctx->code_length = method->code_length;
+            
+            break;
+        }
         
-        case OP_RETURN_VALUE:
-            /* Return with value */
-            ctx->running = 0;
-            return 1;
+        case OP_RETURN: {
+            CallFrame* frame;
+            
+            /* Check if this is main method return */
+            if (ctx->call_depth == 0) {
+                ctx->running = 0;
+                return 1;
+            }
+            
+            /* Get call frame */
+            ctx->call_depth--;
+            frame = &ctx->call_frames[ctx->call_depth];
+            
+            /* Restore stack pointer (discard current frame's stack) */
+            ctx->stack_pointer = frame->frame_pointer;
+            
+            /* Restore local pointer (free current frame's locals) */
+            ctx->local_pointer = frame->local_base;
+            
+            /* Restore PC */
+            ctx->pc = frame->return_pc;
+            
+            /* Note: code_start and code_length are not restored */
+            /* This is OK because PC is absolute */
+            
+            break;
+        }
+        
+        case OP_RETURN_VALUE: {
+            CallFrame* frame;
+            uint16_t return_value;
+            
+            /* Pop return value */
+            return_value = stack_pop_shared(ctx);
+            
+            /* Check if this is main method return */
+            if (ctx->call_depth == 0) {
+                ctx->running = 0;
+                return 1;
+            }
+            
+            /* Get call frame */
+            ctx->call_depth--;
+            frame = &ctx->call_frames[ctx->call_depth];
+            
+            /* Restore stack pointer */
+            ctx->stack_pointer = frame->frame_pointer;
+            
+            /* Push return value onto caller's stack */
+            if (stack_push_shared(ctx, return_value) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            
+            /* Restore local pointer */
+            ctx->local_pointer = frame->local_base;
+            
+            /* Restore PC */
+            ctx->pc = frame->return_pc;
+            
+            break;
+        }
         
         case OP_HALT:
             /* Halt execution */
@@ -482,6 +749,8 @@ int interpreter_execute(ExecutionContext* ctx) {
 void interpreter_print_state(ExecutionContext* ctx) {
     uint16_t i;
     uint16_t offset;
+    uint16_t local_base;
+    uint8_t local_count;
     
     if (ctx == NULL) {
         printf("Context: NULL\n");
@@ -490,20 +759,35 @@ void interpreter_print_state(ExecutionContext* ctx) {
     
     printf("Execution Context:\n");
     printf("  Running: %s\n", ctx->running ? "yes" : "no");
+    printf("  Call Depth: %u / %u\n", ctx->call_depth, MAX_CALL_DEPTH);
     
     offset = (uint16_t)(ctx->pc - ctx->code_start);
     printf("  PC: %u / %u\n", offset, ctx->code_length);
     
-    printf("  Locals (%u):\n", ctx->local_count);
-    for (i = 0; i < ctx->local_count && i < 10; i++) {
-        printf("    [%u] = %u\n", i, ctx->locals[i]);
-    }
-    if (ctx->local_count > 10) {
-        printf("    ... (%u more)\n", ctx->local_count - 10);
+    /* Print current frame's locals */
+    local_base = get_local_base(ctx);
+    if (ctx->call_depth > 0) {
+        local_count = ctx->call_frames[ctx->call_depth - 1].local_count;
+    } else {
+        local_count = ctx->local_pointer;
     }
     
-    printf("  Stack:\n");
-    stack_print(ctx->stack);
+    printf("  Locals (base=%u, count=%u):\n", local_base, local_count);
+    for (i = 0; i < local_count && i < 10; i++) {
+        printf("    [%u] = %u\n", i, ctx->shared_locals[local_base + i]);
+    }
+    if (local_count > 10) {
+        printf("    ... (%u more)\n", local_count - 10);
+    }
+    
+    /* Print shared stack */
+    printf("  Stack (pointer=%u / %u):\n", ctx->stack_pointer, SHARED_STACK_SIZE);
+    for (i = 0; i < ctx->stack_pointer && i < 10; i++) {
+        printf("    [%u] = %u\n", i, ctx->shared_stack[i]);
+    }
+    if (ctx->stack_pointer > 10) {
+        printf("    ... (%u more)\n", ctx->stack_pointer - 10);
+    }
 }
 
 // Made with Bob

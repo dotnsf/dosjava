@@ -2,30 +2,62 @@
 #define INTERPRETER_H
 
 #include "../types.h"
-#include "stack.h"
 #include "../format/djc.h"
 
 /**
  * Bytecode Interpreter for DOS Java VM
- * 
+ *
  * Executes .djc bytecode using a fetch-decode-execute loop
+ * Uses shared stack design to minimize memory usage in DOS environment
  */
 
-/* Maximum local variables */
-#define MAX_LOCALS 256
+/* Maximum call depth (nested method calls) */
+#define MAX_CALL_DEPTH 4
+
+/* Shared stack size (2048 slots = 4KB) */
+#define SHARED_STACK_SIZE 2048
+
+/* Shared locals size (128 slots = 256 bytes) */
+#define SHARED_LOCALS_SIZE 128
 
 /**
- * Execution context for a method
+ * Call frame structure
+ * Stores state for each method invocation
  */
 typedef struct {
-    uint8_t* pc;                 /* Program counter */
-    uint8_t* code_start;         /* Start of method code */
-    uint16_t code_length;        /* Length of method code */
-    Stack* stack;                /* Operand stack */
-    uint16_t* locals;            /* Local variables */
-    uint16_t local_count;        /* Number of local variables */
-    DJCFile* djc_file;           /* Current .djc file */
-    uint8_t running;             /* 1 if executing, 0 if stopped */
+    uint8_t* return_pc;         /* Return address */
+    uint16_t frame_pointer;     /* Stack frame base offset */
+    uint16_t local_base;        /* Local variables base offset */
+    uint8_t local_count;        /* Number of locals in this frame */
+} CallFrame;
+
+/**
+ * Execution context for bytecode execution
+ * Uses shared stack design to minimize memory usage
+ */
+typedef struct {
+    /* Program counter */
+    uint8_t* pc;                /* Current instruction pointer */
+    uint8_t* code_start;        /* Start of method code */
+    uint16_t code_length;       /* Length of method code */
+    
+    /* DJC file reference */
+    DJCFile* djc_file;          /* Current .djc file */
+    
+    /* Shared operand stack */
+    uint16_t shared_stack[SHARED_STACK_SIZE];
+    uint16_t stack_pointer;     /* Current stack position */
+    
+    /* Shared local variables */
+    uint16_t shared_locals[SHARED_LOCALS_SIZE];
+    uint16_t local_pointer;     /* Current locals position */
+    
+    /* Call frames */
+    CallFrame call_frames[MAX_CALL_DEPTH];
+    uint8_t call_depth;         /* Current call depth (0-3) */
+    
+    /* Execution state */
+    int running;                /* 1 if executing, 0 if stopped */
 } ExecutionContext;
 
 /**

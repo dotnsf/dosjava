@@ -29,6 +29,7 @@
 #define METHOD_STATIC     0x01
 #define METHOD_PUBLIC     0x02
 #define METHOD_PRIVATE    0x04
+#define METHOD_NATIVE     0x08
 
 /* Field flags */
 #define FIELD_STATIC      0x01
@@ -118,20 +119,28 @@ void djc_close(DJCFile* file);
 DJCConstant* djc_get_constant(DJCFile* file, uint16_t index);
 
 /**
+ * Find method by index
+ * @param file DJC file
+ * @param method_index Method index
+ * @return Pointer to method, or NULL if not found
+ */
+DJCMethod* djc_find_method(DJCFile* file, uint16_t method_index);
+
+/**
+ * Find method by name
+ * @param file DJC file
+ * @param method_name Method name to search for
+ * @return Pointer to method, or NULL if not found
+ */
+DJCMethod* djc_find_method_by_name(DJCFile* file, const char* method_name);
+
+/**
  * Get a UTF8 string from the constant pool
  * @param file DJC file
  * @param index Constant index
  * @return Pointer to string, or NULL if invalid
  */
 const char* djc_get_utf8(DJCFile* file, uint16_t index);
-
-/**
- * Find a method by name
- * @param file DJC file
- * @param name Method name
- * @return Pointer to method, or NULL if not found
- */
-DJCMethod* djc_find_method(DJCFile* file, const char* name);
 
 /**
  * Get bytecode for a method
