@@ -76,11 +76,7 @@ int symtable_exit_scope(SymbolTable* table) {
     
     /* Pop scope */
     table->scope_level--;
-    
-    printf("DEBUG: symtable_exit_scope: Exited scope level %u, keeping %u symbols\n",
-           table->scope_level + 1, table->symbol_count);
-    fflush(stdout);
-    
+
     return 0;
 }
 
@@ -219,13 +215,12 @@ int symtable_write(SymbolTable* table, const char* filename) {
         return -1;
     }
     
-    printf("DEBUG: symtable_write: Writing %u symbols to '%s'\n", table->symbol_count, filename);
+    
     for (i = 0; i < table->symbol_count; i++) {
         const char* name = &table->string_pool[table->symbols[i].name_offset];
         printf("  [%u] kind=%d, name='%s'\n", i, table->symbols[i].kind, name);
     }
-    fflush(stdout);
-    
+
     file = fopen(filename, "wb");
     if (!file) {
         return -1;
@@ -260,7 +255,7 @@ int symtable_read(SymbolTable* table, const char* filename) {
     
     file = fopen(filename, "rb");
     if (!file) {
-        printf("DEBUG: symtable_read: Failed to open '%s'\n", filename);
+        
         return -1;
     }
     
@@ -274,8 +269,7 @@ int symtable_read(SymbolTable* table, const char* filename) {
         return -1;
     }
     
-    printf("DEBUG: symtable_read: symbol_count=%u, pool_size=%u\n",
-           table->symbol_count, table->pool_size);
+    
     
     /* Validate counts */
     if (table->symbol_count > 256 || table->pool_size > 2048) {
@@ -304,7 +298,7 @@ int symtable_read(SymbolTable* table, const char* filename) {
     table->scope_level = 0;
     
     /* Debug: Print loaded symbols */
-    printf("DEBUG: Loaded symbols:\n");
+    
     for (i = 0; i < table->symbol_count; i++) {
         const char* name = &table->string_pool[table->symbols[i].name_offset];
         printf("  [%u] kind=%d, name='%s'\n", i, table->symbols[i].kind, name);

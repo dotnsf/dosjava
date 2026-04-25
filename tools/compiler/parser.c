@@ -430,7 +430,7 @@ uint16_t parse_member(Parser* parser) {
         }
     }
     
-    printf("DEBUG: parse_member: return_type.kind = %d\n", return_type.kind);
+    
     
     /* For MVP, only support methods */
     return parse_method(parser, is_public, is_static, return_type);

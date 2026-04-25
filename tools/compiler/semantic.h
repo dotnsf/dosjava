@@ -121,9 +121,10 @@ int check_method_body(SemanticAnalyzer* analyzer, ASTNode* method_node);
  * Check statement
  * @param analyzer Semantic analyzer state
  * @param stmt_node Statement AST node
+ * @param stmt_idx Statement node index
  * @return 0 on success, -1 on error
  */
-int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node);
+int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node, uint16_t stmt_idx);
 
 /**
  * Check block statement
@@ -158,12 +159,12 @@ int check_if_stmt(SemanticAnalyzer* analyzer, ASTNode* if_node);
 int check_while_stmt(SemanticAnalyzer* analyzer, ASTNode* while_node);
 
 /**
- * Check return statement
+ * Check return statement using node index
  * @param analyzer Semantic analyzer state
- * @param return_node Return statement AST node
+ * @param return_idx Return statement node index
  * @return 0 on success, -1 on error
  */
-int check_return_stmt(SemanticAnalyzer* analyzer, ASTNode* return_node);
+int check_return_stmt_idx(SemanticAnalyzer* analyzer, uint16_t return_idx);
 
 /**
  * Check expression and return its type
@@ -209,6 +210,15 @@ int check_assignment(SemanticAnalyzer* analyzer, ASTNode* assign_node, TypeInfo*
  * @return 0 on success, -1 on error
  */
 int check_identifier(SemanticAnalyzer* analyzer, ASTNode* id_node, TypeInfo* result_type);
+
+/**
+ * Check method call
+ * @param analyzer Semantic analyzer state
+ * @param call_node Method call AST node
+ * @param result_type Output: method return type
+ * @return 0 on success, -1 on error
+ */
+int check_method_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_type);
 
 /* Type checking helpers */
 

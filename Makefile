@@ -258,5 +258,6 @@ test_parser: .SYMBOLIC
 test_semantic: .SYMBOLIC
 test_codegen: .SYMBOLIC
 djc: .SYMBOLIC
+djvm: .SYMBOLIC
 clean: .SYMBOLIC
 dirs: .SYMBOLIC

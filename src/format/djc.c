@@ -64,7 +64,7 @@ static int read_constants(FILE* fp, DJCFile* file) {
     }
     
     pos_before = ftell(fp);
-    printf("DEBUG: read_constants: File position before reading constants: 0x%lX\n", pos_before);
+    
     
     /* Allocate constant pool */
     file->constants = (DJCConstant*)memory_alloc(
@@ -117,8 +117,8 @@ static int read_constants(FILE* fp, DJCFile* file) {
     }
     
     pos_after = ftell(fp);
-    printf("DEBUG: read_constants: File position after reading constants: 0x%lX\n", pos_after);
-    printf("DEBUG: read_constants: Bytes read: %ld\n", pos_after - pos_before);
+    
+    
     
     return 0;
 }
@@ -137,7 +137,7 @@ static int read_methods(FILE* fp, DJCFile* file) {
     }
     
     pos_before = ftell(fp);
-    printf("DEBUG: read_methods: File position before reading methods: 0x%lX\n", pos_before);
+    
     
     /* Allocate method array */
     file->methods = (DJCMethod*)memory_alloc(
@@ -158,13 +158,12 @@ static int read_methods(FILE* fp, DJCFile* file) {
         method->max_locals = read_uint8(fp);
         method->flags = read_uint8(fp);
         
-        printf("DEBUG: Method[%u]: name_idx=%u, code_offset=%u, code_length=%u\n",
-               i, method->name_index, method->code_offset, method->code_length);
+        
     }
     
     pos_after = ftell(fp);
-    printf("DEBUG: read_methods: File position after reading methods: 0x%lX\n", pos_after);
-    printf("DEBUG: read_methods: Bytes read: %ld\n", pos_after - pos_before);
+    
+    
     
     return 0;
 }
@@ -213,7 +212,7 @@ static int read_bytecode(FILE* fp, DJCFile* file) {
     }
     
     pos_before = ftell(fp);
-    printf("DEBUG: read_bytecode: File position before reading bytecode: 0x%lX\n", pos_before);
+    
     
     /* Allocate bytecode buffer */
     file->bytecode = (uint8_t*)memory_alloc(file->header.code_size);
@@ -226,8 +225,8 @@ static int read_bytecode(FILE* fp, DJCFile* file) {
         return -1;
     }
     
-    printf("DEBUG: read_bytecode: Read %u bytes of bytecode\n", file->header.code_size);
-    printf("DEBUG: read_bytecode: First 10 bytes: ");
+    
+    
     for (i = 0; i < 10 && i < file->header.code_size; i++) {
         printf("%02X ", file->bytecode[i]);
     }

@@ -117,20 +117,13 @@ static int load_string_pool(SemanticAnalyzer* analyzer) {
 
 /* Get AST node */
 ASTNode* semantic_get_node(SemanticAnalyzer* analyzer, uint16_t node_index) {
-    uint16_t buffer_index;
     long file_pos;
     
     if (!analyzer || node_index == 0 || node_index > analyzer->total_nodes) {
         return NULL;
     }
     
-    /* Check if node is in buffer */
-    buffer_index = node_index - analyzer->total_nodes + analyzer->node_count - 1;
-    if (buffer_index < analyzer->node_count) {
-        return &analyzer->nodes[buffer_index];
-    }
-    
-    /* Read node from file */
+    /* Always read node from file to avoid pointer invalidation issues */
     file_pos = sizeof(uint16_t) * 2 + analyzer->pool_size + (node_index - 1) * sizeof(ASTNode);
     fseek(analyzer->ast_file, file_pos, SEEK_SET);
     
@@ -179,11 +172,7 @@ uint16_t semantic_add_string(SemanticAnalyzer* analyzer, const char* str) {
     offset = analyzer->pool_size;
     strcpy(&analyzer->string_pool[offset], str);
     analyzer->pool_size += len;
-    
-    printf("DEBUG: semantic_add_string: Added '%s' at offset %u, new pool_size=%u\n",
-           str, offset, analyzer->pool_size);
-    fflush(stdout);
-    
+
     return offset;
 }
 
@@ -252,8 +241,7 @@ int semantic_analyze(SemanticAnalyzer* analyzer) {
         /* Copy updated string pool to symbol table */
         memcpy(analyzer->symtable->string_pool, analyzer->string_pool, analyzer->pool_size);
         analyzer->symtable->pool_size = analyzer->pool_size;
-        printf("DEBUG: Updated symbol table string pool: %u bytes\n", analyzer->pool_size);
-        fflush(stdout);
+
     }
     
     /* Write symbol table to file if no errors */
@@ -344,10 +332,14 @@ int collect_class_symbols(SemanticAnalyzer* analyzer, ASTNode* class_node) {
     member_count = 0;
     
     while (member_idx != 0 && member_count < class_node->data.class_decl.member_count) {
+        uint16_t next_member_idx;
         member_node = semantic_get_node(analyzer, member_idx);
         if (!member_node) {
             break;
         }
+        
+        /* Save next_sibling before any function calls that might invalidate the pointer */
+        next_member_idx = member_node->next_sibling;
         
         if (member_node->type == NODE_METHOD) {
             if (collect_method_symbols(analyzer, member_node) != 0) {
@@ -359,7 +351,7 @@ int collect_class_symbols(SemanticAnalyzer* analyzer, ASTNode* class_node) {
             }
         }
         
-        member_idx = member_node->next_sibling;
+        member_idx = next_member_idx;
         member_count++;
     }
     
@@ -529,10 +521,14 @@ int check_semantics(SemanticAnalyzer* analyzer) {
     member_count = 0;
     
     while (member_idx != 0 && member_count < class_node->data.class_decl.member_count) {
+        uint16_t next_member_idx;
         member_node = semantic_get_node(analyzer, member_idx);
         if (!member_node) {
             break;
         }
+        
+        /* Save next_sibling before any function calls */
+        next_member_idx = member_node->next_sibling;
         
         if (member_node->type == NODE_METHOD) {
             if (check_method_body(analyzer, member_node) != 0) {
@@ -540,7 +536,7 @@ int check_semantics(SemanticAnalyzer* analyzer) {
             }
         }
         
-        member_idx = member_node->next_sibling;
+        member_idx = next_member_idx;
         member_count++;
     }
     
@@ -618,7 +614,7 @@ int check_method_body(SemanticAnalyzer* analyzer, ASTNode* method_node) {
 }
 
 /* Check statement */
-int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node) {
+int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node, uint16_t stmt_idx) {
     if (!analyzer || !stmt_node) {
         return -1;
     }
@@ -637,7 +633,7 @@ int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node) {
             return check_while_stmt(analyzer, stmt_node);
         
         case NODE_RETURN:
-            return check_return_stmt(analyzer, stmt_node);
+            return check_return_stmt_idx(analyzer, stmt_idx);
         
         case NODE_EXPR_STMT: {
             TypeInfo expr_type = {0};
@@ -659,6 +655,8 @@ int check_block(SemanticAnalyzer* analyzer, ASTNode* block_node) {
     uint16_t stmt_idx;
     ASTNode* stmt_node;
     uint16_t stmt_count;
+    uint16_t current_stmt_idx;
+    uint16_t next_idx;
     
     if (!analyzer || !block_node) {
         return -1;
@@ -672,14 +670,16 @@ int check_block(SemanticAnalyzer* analyzer, ASTNode* block_node) {
     stmt_count = 0;
     
     while (stmt_idx != 0 && stmt_count < block_node->data.block.stmt_count) {
+        current_stmt_idx = stmt_idx;
         stmt_node = semantic_get_node(analyzer, stmt_idx);
         if (!stmt_node) {
             break;
         }
         
-        check_statement(analyzer, stmt_node);
+        next_idx = stmt_node->next_sibling;
+        check_statement(analyzer, stmt_node, current_stmt_idx);
         
-        stmt_idx = stmt_node->next_sibling;
+        stmt_idx = next_idx;
         stmt_count++;
     }
     
@@ -709,8 +709,7 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     /* Get variable name */
     var_name = semantic_get_string(analyzer, var_node->data.var_decl.name);
     printf("DEBUG: check_var_decl: Checking variable '%s'\n", var_name ? var_name : "(null)");
-    fflush(stdout);
-    
+
     if (!var_name) {
         semantic_error_node(analyzer, var_node, "Invalid variable name");
         return -1;
@@ -748,15 +747,12 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     var_sym.data.local_data.index = 0;  /* Will be assigned during code generation */
     
     /* Add variable to symbol table */
-    printf("DEBUG: check_var_decl: Adding symbol '%s' to symbol table\n", var_name);
-    fflush(stdout);
+
     if (symtable_add_symbol(analyzer->symtable, &var_sym) == 0xFFFF) {
         semantic_error_node(analyzer, var_node, "Failed to add variable symbol");
         return -1;
     }
-    printf("DEBUG: check_var_decl: Symbol '%s' added successfully\n", var_name);
-    fflush(stdout);
-    
+
     return 0;
 }
 
@@ -766,10 +762,16 @@ int check_if_stmt(SemanticAnalyzer* analyzer, ASTNode* if_node) {
     ASTNode* cond_node;
     ASTNode* then_node;
     ASTNode* else_node;
+    uint16_t then_idx;
+    uint16_t else_idx;
     
     if (!analyzer || !if_node) {
         return -1;
     }
+    
+    /* Save indices early */
+    then_idx = if_node->data.if_stmt.then_stmt;
+    else_idx = if_node->data.if_stmt.else_stmt;
     
     /* Check condition */
     cond_node = semantic_get_node(analyzer, if_node->data.if_stmt.condition);
@@ -782,16 +784,16 @@ int check_if_stmt(SemanticAnalyzer* analyzer, ASTNode* if_node) {
     }
     
     /* Check then branch */
-    then_node = semantic_get_node(analyzer, if_node->data.if_stmt.then_stmt);
+    then_node = semantic_get_node(analyzer, then_idx);
     if (then_node) {
-        check_statement(analyzer, then_node);
+        check_statement(analyzer, then_node, then_idx);
     }
     
     /* Check else branch if present */
-    if (if_node->data.if_stmt.else_stmt != 0) {
-        else_node = semantic_get_node(analyzer, if_node->data.if_stmt.else_stmt);
+    if (else_idx != 0) {
+        else_node = semantic_get_node(analyzer, else_idx);
         if (else_node) {
-            check_statement(analyzer, else_node);
+            check_statement(analyzer, else_node, else_idx);
         }
     }
     
@@ -803,10 +805,14 @@ int check_while_stmt(SemanticAnalyzer* analyzer, ASTNode* while_node) {
     TypeInfo cond_type = {0};
     ASTNode* cond_node;
     ASTNode* body_node;
+    uint16_t body_idx;
     
     if (!analyzer || !while_node) {
         return -1;
     }
+    
+    /* Save body index early */
+    body_idx = while_node->data.while_stmt.body;
     
     /* Check condition */
     cond_node = semantic_get_node(analyzer, while_node->data.while_stmt.condition);
@@ -819,40 +825,58 @@ int check_while_stmt(SemanticAnalyzer* analyzer, ASTNode* while_node) {
     }
     
     /* Check body */
-    body_node = semantic_get_node(analyzer, while_node->data.while_stmt.body);
+    body_node = semantic_get_node(analyzer, body_idx);
     if (body_node) {
-        check_statement(analyzer, body_node);
+        check_statement(analyzer, body_node, body_idx);
     }
     
     return 0;
 }
 
-/* Check return statement */
-int check_return_stmt(SemanticAnalyzer* analyzer, ASTNode* return_node) {
+/* Check return statement using node index */
+int check_return_stmt_idx(SemanticAnalyzer* analyzer, uint16_t return_idx) {
     TypeInfo expr_type = {0};
+    ASTNode* return_node;
     ASTNode* expr_node;
+    uint16_t expr_idx;
     
-    if (!analyzer || !return_node) {
+    if (!analyzer || return_idx == 0) {
+        return -1;
+    }
+    
+    /* Get return node */
+    return_node = semantic_get_node(analyzer, return_idx);
+    if (!return_node) {
         return -1;
     }
     
     analyzer->has_return = 1;
     
+    /* Save expression index before any semantic_get_node calls */
+    expr_idx = return_node->data.return_stmt.expr;
+    
     /* Check return expression */
-    if (return_node->data.return_stmt.expr != 0) {
-        expr_node = semantic_get_node(analyzer, return_node->data.return_stmt.expr);
+    if (expr_idx != 0) {
+        expr_node = semantic_get_node(analyzer, expr_idx);
         if (expr_node) {
             if (check_expression(analyzer, expr_node, &expr_type) == 0) {
-                /* Check type compatibility with expected return type */
-                if (!types_compatible(analyzer->expected_return, expr_type)) {
-                    semantic_error_node(analyzer, return_node, "Return type mismatch");
+                /* Re-fetch return node to check type compatibility */
+                return_node = semantic_get_node(analyzer, return_idx);
+                if (return_node) {
+                    /* Check type compatibility with expected return type */
+                    if (!types_compatible(analyzer->expected_return, expr_type)) {
+                        semantic_error_node(analyzer, return_node, "Return type mismatch");
+                    }
                 }
             }
         }
     } else {
         /* Void return */
         if (!is_void_type(analyzer->expected_return)) {
-            semantic_error_node(analyzer, return_node, "Missing return value in non-void method");
+            return_node = semantic_get_node(analyzer, return_idx);
+            if (return_node) {
+                semantic_error_node(analyzer, return_node, "Missing return value in non-void method");
+            }
         }
     }
     
