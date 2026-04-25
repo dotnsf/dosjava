@@ -708,8 +708,6 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     
     /* Get variable name */
     var_name = semantic_get_string(analyzer, var_node->data.var_decl.name);
-    printf("DEBUG: check_var_decl: Checking variable '%s'\n", var_name ? var_name : "(null)");
-
     if (!var_name) {
         semantic_error_node(analyzer, var_node, "Invalid variable name");
         return -1;

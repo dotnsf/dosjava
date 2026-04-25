@@ -227,11 +227,6 @@ static int read_bytecode(FILE* fp, DJCFile* file) {
     
     
     
-    for (i = 0; i < 10 && i < file->header.code_size; i++) {
-        printf("%02X ", file->bytecode[i]);
-    }
-    printf("\n");
-    
     return 0;
 }
 

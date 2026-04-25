@@ -216,11 +216,6 @@ int symtable_write(SymbolTable* table, const char* filename) {
     }
     
     
-    for (i = 0; i < table->symbol_count; i++) {
-        const char* name = &table->string_pool[table->symbols[i].name_offset];
-        printf("  [%u] kind=%d, name='%s'\n", i, table->symbols[i].kind, name);
-    }
-
     file = fopen(filename, "wb");
     if (!file) {
         return -1;
@@ -296,13 +291,6 @@ int symtable_read(SymbolTable* table, const char* filename) {
     /* Initialize scope stack */
     table->scope_stack[0] = 0;
     table->scope_level = 0;
-    
-    /* Debug: Print loaded symbols */
-    
-    for (i = 0; i < table->symbol_count; i++) {
-        const char* name = &table->string_pool[table->symbols[i].name_offset];
-        printf("  [%u] kind=%d, name='%s'\n", i, table->symbols[i].kind, name);
-    }
     
     fclose(file);
     return 0;

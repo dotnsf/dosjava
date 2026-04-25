@@ -1,0 +1,2 @@
+tools\compiler\symtable.c(212): 警告！ W202: シンボル'i'が定義されましたが，参照されませんでした
+tools\compiler\symtable.c(245): 警告！ W202: シンボル'i'が定義されましたが，参照されませんでした

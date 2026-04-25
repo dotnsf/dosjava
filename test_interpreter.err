@@ -1,0 +1,4 @@
+src\test_interpreter.c(37): 警告！ W102: Parameter 2: 型が一致しません
+src\test_interpreter.c(37): 情報 I2003: 変換ソースの型は'char *'です
+src\test_interpreter.c(37): 情報 I2004: 変換ターゲットの型は'unsigned short'です
+src\test_interpreter.c(37): 情報 I2002: 'djc_find_method' はsrc\vm\..\format\djc.h(127)で定義されています
