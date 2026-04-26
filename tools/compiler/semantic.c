@@ -921,8 +921,6 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             ASTNode* call_node = expr_node;
             const char* method_name = semantic_get_string(analyzer, call_node->data.call.method_name);
             uint16_t object_idx = call_node->data.call.object;
-            printf("DEBUG SEMANTIC: Checking call to '%s', object=%u\n",
-                   method_name ? method_name : "(null)", object_idx);
             result_type->kind = TYPE_VOID;
             result_type->class_name = 0;
             return 0;

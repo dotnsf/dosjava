@@ -1253,9 +1253,6 @@ uint16_t parse_postfix(Parser* parser) {
             parser->nodes[call_node - parser->total_nodes - 1].data.call.arg_count = (arg_node != 0) ? 1 : 0;
             parser->nodes[call_node - parser->total_nodes - 1].data.call.first_arg = arg_node;
             
-            printf("DEBUG PARSER: Created method call node, object=%u, method_name_offset=%u, arg_count=%u\n",
-                   expr, field_name, (arg_node != 0) ? 1 : 0);
-            
             expr = call_node;
         } else {
             /* Field access */

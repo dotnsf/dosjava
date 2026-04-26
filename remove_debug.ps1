@@ -5,7 +5,8 @@ $files = @(
     "tools/compiler/parser.c",
     "tools/compiler/codegen.c",
     "tools/compiler/symtable.c",
-    "src/format/djc.c"
+    "src/format/djc.c",
+    "src/vm/interpreter.c"
 )
 
 foreach ($file in $files) {

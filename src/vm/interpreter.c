@@ -12,7 +12,7 @@
  */
 static inline int stack_push_shared(ExecutionContext* ctx, uint16_t value) {
     if (ctx->stack_pointer >= SHARED_STACK_SIZE) {
-        printf("DEBUG: Stack overflow! SP=%u, SIZE=%u\n", ctx->stack_pointer, SHARED_STACK_SIZE);
+        
         return -1;  /* Stack overflow */
     }
     ctx->shared_stack[ctx->stack_pointer++] = value;
@@ -270,13 +270,13 @@ int interpreter_step(ExecutionContext* ctx) {
         
         case OP_POP:
             /* Pop and discard */
-            printf("DEBUG: OP_POP - stack_pointer before: %u\n", ctx->stack_pointer);
+            
             if (ctx->stack_pointer == 0) {
                 printf("ERROR: OP_POP on empty stack!\n");
                 return -1;
             }
             stack_pop_shared(ctx);
-            printf("DEBUG: OP_POP - stack_pointer after: %u\n", ctx->stack_pointer);
+            
             break;
         
         case OP_DUP:
@@ -592,7 +592,7 @@ int interpreter_step(ExecutionContext* ctx) {
             /* Read method index (2 bytes, little-endian) */
             method_index = interpreter_read_u16(ctx);
             
-            printf("DEBUG: INVOKE_STATIC method_index=%u, call_depth=%u\n", method_index, ctx->call_depth);
+            
             
             /* Look up method */
             method = djc_find_method(ctx->djc_file, method_index);
@@ -603,13 +603,12 @@ int interpreter_step(ExecutionContext* ctx) {
             
             /* Get method name */
             method_name = djc_get_utf8(ctx->djc_file, method->name_index);
-            printf("DEBUG: Method name='%s', flags=0x%02X\n",
-                   method_name ? method_name : "???", method->flags);
+            
             
             /* Check if method is native */
             if (method->flags & METHOD_NATIVE) {
                 /* Handle native methods - don't increment call depth */
-                printf("DEBUG: Native method detected\n");
+                
                 if (method_name) {
                     /* Check for System.out.println */
                     if (strcmp(method_name, "println") == 0) {
@@ -617,13 +616,13 @@ int interpreter_step(ExecutionContext* ctx) {
                         uint16_t const_idx;
                         const char* str;
                         
-                        printf("DEBUG: println - stack_pointer before pop: %u\n", ctx->stack_pointer);
+                        
                         const_idx = stack_pop_shared(ctx);
-                        printf("DEBUG: println - popped const_idx: %u\n", const_idx);
+                        
                         str = djc_get_utf8(ctx->djc_file, const_idx);
                         if (str) {
                             system_println_cstr(str);
-                            printf("DEBUG: println - completed successfully\n");
+                            
                         } else {
                             printf("ERROR: Invalid string constant\n");
                             return -1;
@@ -638,7 +637,7 @@ int interpreter_step(ExecutionContext* ctx) {
             }
             
             /* Check call depth for non-native methods */
-            printf("DEBUG: Non-native method, checking call depth\n");
+            
             if (ctx->call_depth >= MAX_CALL_DEPTH) {
                 printf("ERROR: Call stack overflow (max depth: %d)\n", MAX_CALL_DEPTH);
                 return -1;
@@ -765,7 +764,7 @@ int interpreter_step(ExecutionContext* ctx) {
             return -1;
     }
     
-    printf("DEBUG: interpreter_step completed, opcode=0x%02X, returning 0\n", opcode);
+    
     return 0;
 }
 
@@ -784,19 +783,19 @@ int interpreter_execute(ExecutionContext* ctx) {
         uint16_t pc_offset = (uint16_t)(ctx->pc - ctx->code_start);
         uint8_t next_opcode = (ctx->pc < ctx->code_start + ctx->code_length) ? *ctx->pc : 0xFF;
         
-        printf("DEBUG: About to execute opcode 0x%02X at PC offset %u\n", next_opcode, pc_offset);
+        
         
         result = interpreter_step(ctx);
         
-        printf("DEBUG: interpreter_step returned %d, running=%d\n", result, ctx->running);
+        
         
         if (result != 0) {
-            printf("DEBUG: Exiting execute loop, result=%d\n", result);
+            
             return result;
         }
     }
     
-    printf("DEBUG: Execute loop finished normally, running=0\n");
+    
     return 0;
 }
 

@@ -1,0 +1,2 @@
+src\vm\interpreter.c(784): Warning! W202: Symbol 'next_opcode' has been defined, but not referenced
+src\vm\interpreter.c(783): Warning! W202: Symbol 'pc_offset' has been defined, but not referenced

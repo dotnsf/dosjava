@@ -5,14 +5,14 @@ rem Delete old HELLO.DJC if exists
 if exist HELLO.DJC del HELLO.DJC
 
 rem Compile hello.jav
-djc.exe ..\..\hello.jav > a
+djc.exe ..\..\hello.jav 
 if errorlevel 1 goto compile_error
 
 rem Check if HELLO.DJC was created
 if not exist HELLO.DJC goto no_output
 
 rem Execute HELLO.DJC
-djvm.exe HELLO.DJC > b
+djvm.exe HELLO.DJC 
 if errorlevel 1 goto runtime_error
 
 rem Success

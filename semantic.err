@@ -1,0 +1,2 @@
+tools\compiler\semantic.c(923): Warning! W202: Symbol 'object_idx' has been defined, but not referenced
+tools\compiler\semantic.c(922): Warning! W202: Symbol 'method_name' has been defined, but not referenced
