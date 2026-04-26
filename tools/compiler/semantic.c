@@ -898,6 +898,12 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             result_type->class_name = 0;
             return 0;
         
+        case NODE_LITERAL_STRING:
+            /* String literals are treated as String type */
+            result_type->kind = TYPE_CLASS;
+            result_type->class_name = 0;  /* TODO: Add "String" to constant pool */
+            return 0;
+        
         case NODE_IDENTIFIER:
             return check_identifier(analyzer, expr_node, result_type);
         
@@ -909,6 +915,18 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
         
         case NODE_ASSIGN:
             return check_assignment(analyzer, expr_node, result_type);
+        
+        case NODE_CALL: {
+            /* Method calls return void for now */
+            ASTNode* call_node = expr_node;
+            const char* method_name = semantic_get_string(analyzer, call_node->data.call.method_name);
+            uint16_t object_idx = call_node->data.call.object;
+            printf("DEBUG SEMANTIC: Checking call to '%s', object=%u\n",
+                   method_name ? method_name : "(null)", object_idx);
+            result_type->kind = TYPE_VOID;
+            result_type->class_name = 0;
+            return 0;
+        }
         
         default:
             semantic_error_node(analyzer, expr_node, "Unknown expression type");

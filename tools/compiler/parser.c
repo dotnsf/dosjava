@@ -553,7 +553,7 @@ uint16_t parse_block(Parser* parser) {
         }
         
         if (prev_stmt != 0) {
-            parser->nodes[prev_stmt - parser->total_nodes - 1].next_sibling = stmt_node;
+            parser->nodes[prev_stmt - 1].next_sibling = stmt_node;
         }
         
         prev_stmt = stmt_node;
@@ -566,8 +566,8 @@ uint16_t parse_block(Parser* parser) {
     }
     
     /* Fill block node */
-    parser->nodes[block_node - parser->total_nodes - 1].data.block.stmt_count = stmt_count;
-    parser->nodes[block_node - parser->total_nodes - 1].data.block.first_stmt = first_stmt;
+    parser->nodes[block_node - 1].data.block.stmt_count = stmt_count;
+    parser->nodes[block_node - 1].data.block.first_stmt = first_stmt;
     
     return block_node;
 }
@@ -1253,6 +1253,9 @@ uint16_t parse_postfix(Parser* parser) {
             parser->nodes[call_node - parser->total_nodes - 1].data.call.arg_count = (arg_node != 0) ? 1 : 0;
             parser->nodes[call_node - parser->total_nodes - 1].data.call.first_arg = arg_node;
             
+            printf("DEBUG PARSER: Created method call node, object=%u, method_name_offset=%u, arg_count=%u\n",
+                   expr, field_name, (arg_node != 0) ? 1 : 0);
+            
             expr = call_node;
         } else {
             /* Field access */
@@ -1286,6 +1289,19 @@ uint16_t parse_primary(Parser* parser) {
         }
         
         parser->nodes[node - parser->total_nodes - 1].data.literal_int.int_value = parser->current.value.int_value;
+        parser_next_token(parser);
+        
+        return node;
+    }
+    
+    /* String literal */
+    if (parser_match(parser, TOK_STRING)) {
+        node = parser_alloc_node(parser, NODE_LITERAL_STRING);
+        if (node == 0) {
+            return 0;
+        }
+        
+        parser->nodes[node - parser->total_nodes - 1].data.literal_string.str_offset = parser->current.value.str_offset;
         parser_next_token(parser);
         
         return node;

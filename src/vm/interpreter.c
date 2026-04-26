@@ -237,15 +237,27 @@ int interpreter_step(ExecutionContext* ctx) {
             /* No operation */
             break;
         
-        case OP_PUSH_CONST:
+        case OP_PUSH_CONST: {
             /* Push constant from pool */
+            const char* str_value;
+            
             index16 = interpreter_read_u16(ctx);
-            /* TODO: Get constant from pool and push */
+            
+            /* Get UTF8 string from constant pool */
+            str_value = djc_get_utf8(ctx->djc_file, index16);
+            if (str_value == NULL) {
+                printf("ERROR: Invalid constant index: %u\n", index16);
+                return -1;
+            }
+            
+            /* For now, push the constant index itself */
+            /* In Phase 4, we'll create proper string objects */
             if (stack_push_shared(ctx, index16) != 0) {
                 printf("ERROR: Stack overflow\n");
                 return -1;
             }
             break;
+        }
         
         case OP_PUSH_INT:
             /* Push immediate integer */
@@ -258,7 +270,13 @@ int interpreter_step(ExecutionContext* ctx) {
         
         case OP_POP:
             /* Pop and discard */
+            printf("DEBUG: OP_POP - stack_pointer before: %u\n", ctx->stack_pointer);
+            if (ctx->stack_pointer == 0) {
+                printf("ERROR: OP_POP on empty stack!\n");
+                return -1;
+            }
             stack_pop_shared(ctx);
+            printf("DEBUG: OP_POP - stack_pointer after: %u\n", ctx->stack_pointer);
             break;
         
         case OP_DUP:
@@ -574,13 +592,7 @@ int interpreter_step(ExecutionContext* ctx) {
             /* Read method index (2 bytes, little-endian) */
             method_index = interpreter_read_u16(ctx);
             
-            printf("DEBUG: INVOKE_STATIC method_index=%u\n", method_index);
-            
-            /* Check call depth */
-            if (ctx->call_depth >= MAX_CALL_DEPTH) {
-                printf("ERROR: Call stack overflow (max depth: %d)\n", MAX_CALL_DEPTH);
-                return -1;
-            }
+            printf("DEBUG: INVOKE_STATIC method_index=%u, call_depth=%u\n", method_index, ctx->call_depth);
             
             /* Look up method */
             method = djc_find_method(ctx->djc_file, method_index);
@@ -589,17 +601,46 @@ int interpreter_step(ExecutionContext* ctx) {
                 return -1;
             }
             
-            /* Get method name for debugging */
+            /* Get method name */
             method_name = djc_get_utf8(ctx->djc_file, method->name_index);
-            printf("DEBUG: Calling method '%s' (code_offset=%u, code_length=%u)\n",
-                   method_name ? method_name : "???",
-                   method->code_offset,
-                   method->code_length);
+            printf("DEBUG: Method name='%s', flags=0x%02X\n",
+                   method_name ? method_name : "???", method->flags);
             
             /* Check if method is native */
             if (method->flags & METHOD_NATIVE) {
-                /* TODO: Handle native methods in Phase 4.1 */
-                printf("ERROR: Native methods not yet supported\n");
+                /* Handle native methods - don't increment call depth */
+                printf("DEBUG: Native method detected\n");
+                if (method_name) {
+                    /* Check for System.out.println */
+                    if (strcmp(method_name, "println") == 0) {
+                        /* Pop string constant index from stack */
+                        uint16_t const_idx;
+                        const char* str;
+                        
+                        printf("DEBUG: println - stack_pointer before pop: %u\n", ctx->stack_pointer);
+                        const_idx = stack_pop_shared(ctx);
+                        printf("DEBUG: println - popped const_idx: %u\n", const_idx);
+                        str = djc_get_utf8(ctx->djc_file, const_idx);
+                        if (str) {
+                            system_println_cstr(str);
+                            printf("DEBUG: println - completed successfully\n");
+                        } else {
+                            printf("ERROR: Invalid string constant\n");
+                            return -1;
+                        }
+                        break;
+                    }
+                }
+                
+                printf("ERROR: Unsupported native method: %s\n",
+                       method_name ? method_name : "???");
+                return -1;
+            }
+            
+            /* Check call depth for non-native methods */
+            printf("DEBUG: Non-native method, checking call depth\n");
+            if (ctx->call_depth >= MAX_CALL_DEPTH) {
+                printf("ERROR: Call stack overflow (max depth: %d)\n", MAX_CALL_DEPTH);
                 return -1;
             }
             
@@ -619,6 +660,8 @@ int interpreter_step(ExecutionContext* ctx) {
             /* Save current state to call frame */
             frame = &ctx->call_frames[ctx->call_depth];
             frame->return_pc = ctx->pc;
+            frame->return_code_start = ctx->code_start;
+            frame->return_code_length = ctx->code_length;
             frame->frame_pointer = ctx->stack_pointer;
             frame->local_base = ctx->local_pointer;
             frame->local_count = method->max_locals;
@@ -665,8 +708,10 @@ int interpreter_step(ExecutionContext* ctx) {
             /* Restore local pointer (free current frame's locals) */
             ctx->local_pointer = frame->local_base;
             
-            /* Restore PC */
+            /* Restore PC and code context */
             ctx->pc = frame->return_pc;
+            ctx->code_start = frame->return_code_start;
+            ctx->code_length = frame->return_code_length;
             
             /* Note: code_start and code_length are not restored */
             /* This is OK because PC is absolute */
@@ -715,10 +760,12 @@ int interpreter_step(ExecutionContext* ctx) {
             return 1;
         
         default:
-            printf("ERROR: Unknown opcode: 0x%02X\n", opcode);
+            printf("ERROR: Unknown opcode: 0x%02X at PC offset %u\n", opcode,
+                   (uint16_t)(ctx->pc - ctx->code_start - 1));
             return -1;
     }
     
+    printf("DEBUG: interpreter_step completed, opcode=0x%02X, returning 0\n", opcode);
     return 0;
 }
 
@@ -734,12 +781,22 @@ int interpreter_execute(ExecutionContext* ctx) {
     
     /* Execute until return or error */
     while (ctx->running) {
+        uint16_t pc_offset = (uint16_t)(ctx->pc - ctx->code_start);
+        uint8_t next_opcode = (ctx->pc < ctx->code_start + ctx->code_length) ? *ctx->pc : 0xFF;
+        
+        printf("DEBUG: About to execute opcode 0x%02X at PC offset %u\n", next_opcode, pc_offset);
+        
         result = interpreter_step(ctx);
+        
+        printf("DEBUG: interpreter_step returned %d, running=%d\n", result, ctx->running);
+        
         if (result != 0) {
+            printf("DEBUG: Exiting execute loop, result=%d\n", result);
             return result;
         }
     }
     
+    printf("DEBUG: Execute loop finished normally, running=0\n");
     return 0;
 }
 

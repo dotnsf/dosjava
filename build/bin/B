@@ -1,0 +1,28 @@
+DEBUG: About to execute opcode 0x40 at PC offset 0
+DEBUG: INVOKE_STATIC method_index=0, call_depth=0
+DEBUG: Method name='helloworld', flags=0x03
+DEBUG: Non-native method, checking call depth
+DEBUG: Saving call frame: return_pc offset=3, frame_pointer=0, local_base=0
+DEBUG: interpreter_step completed, opcode=0x40, returning 0
+DEBUG: interpreter_step returned 0, running=1
+DEBUG: About to execute opcode 0x01 at PC offset 0
+DEBUG: interpreter_step completed, opcode=0x01, returning 0
+DEBUG: interpreter_step returned 0, running=1
+DEBUG: About to execute opcode 0x40 at PC offset 3
+DEBUG: INVOKE_STATIC method_index=2, call_depth=1
+DEBUG: Method name='println', flags=0x09
+DEBUG: Native method detected
+DEBUG: println - stack_pointer before pop: 1
+DEBUG: println - popped const_idx: 3
+Hello World!
+DEBUG: println - completed successfully
+DEBUG: interpreter_step completed, opcode=0x40, returning 0
+DEBUG: interpreter_step returned 0, running=1
+DEBUG: About to execute opcode 0x42 at PC offset 6
+DEBUG: Restoring from call frame: return_pc offset=3, frame_pointer=0
+DEBUG: After restore: PC offset=3, code_start=54ba, pc=54bd
+DEBUG: interpreter_step completed, opcode=0x42, returning 0
+DEBUG: interpreter_step returned 0, running=1
+DEBUG: About to execute opcode 0x42 at PC offset 3
+DEBUG: interpreter_step returned 1, running=0
+DEBUG: Exiting execute loop, result=1

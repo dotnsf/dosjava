@@ -266,6 +266,7 @@ int generate_class(CodeGenerator* codegen, ASTNode* class_node) {
     uint16_t member_idx;
     ASTNode* member_node;
     uint16_t member_count;
+    uint16_t total_member_count;  /* Save before it gets overwritten */
     
     if (!codegen || !class_node) {
         return -1;
@@ -278,23 +279,42 @@ int generate_class(CodeGenerator* codegen, ASTNode* class_node) {
         return -1;
     }
     
+    printf("DEBUG CODEGEN: generate_class for '%s', member_count=%u, first_member=%u\n",
+           class_name, class_node->data.class_decl.member_count, class_node->data.class_decl.first_member);
+    
     /* Add class name to constant pool */
     add_utf8_constant(codegen, class_name);
     
     /* Get class symbol */
     codegen->current_class = symtable_lookup(codegen->symtable, class_name);
     
-    /* Process members */
+    /* Process members - save member_count before any codegen_get_node calls */
     member_idx = class_node->data.class_decl.first_member;
+    total_member_count = class_node->data.class_decl.member_count;
     member_count = 0;
     
-    while (member_idx != 0 && member_count < class_node->data.class_decl.member_count) {
+    printf("DEBUG CODEGEN: Starting member loop, total_member_count=%u\n", total_member_count);
+    
+    while (member_idx != 0 && member_count < total_member_count) {
+        uint16_t next_sibling;
+        
+        printf("DEBUG CODEGEN: Processing member %u, member_idx=%u\n", member_count, member_idx);
+        
         member_node = codegen_get_node(codegen, member_idx);
         if (!member_node) {
+            printf("DEBUG CODEGEN: Failed to get member_node at index %u\n", member_idx);
             break;
         }
         
+        printf("DEBUG CODEGEN: Member type=%d, next_sibling=%u\n",
+               member_node->type, member_node->next_sibling);
+        
+        /* Save next_sibling before processing */
+        next_sibling = member_node->next_sibling;
+        
         if (member_node->type == NODE_METHOD) {
+            const char* method_name = codegen_get_string(codegen, member_node->data.method.name);
+            printf("DEBUG CODEGEN: Generating method '%s'\n", method_name ? method_name : "???");
             if (generate_method(codegen, member_node) != 0) {
                 return -1;
             }
@@ -304,16 +324,20 @@ int generate_class(CodeGenerator* codegen, ASTNode* class_node) {
             if (field_name && codegen->field_count < 64) {
                 codegen->fields[codegen->field_count].name_index = find_or_add_utf8(codegen, field_name);
                 codegen->fields[codegen->field_count].descriptor_index = 0; /* TODO: type descriptor */
-                codegen->fields[codegen->field_count].flags = 
+                codegen->fields[codegen->field_count].flags =
                     (member_node->data.field.is_static ? FIELD_STATIC : 0) |
                     (member_node->data.field.is_public ? FIELD_PUBLIC : 0);
                 codegen->field_count++;
             }
         }
         
-        member_idx = member_node->next_sibling;
+        member_idx = next_sibling;
         member_count++;
+        printf("DEBUG CODEGEN: After processing, next member_idx=%u, member_count=%u\n",
+               member_idx, member_count);
     }
+    
+    printf("DEBUG CODEGEN: Member loop finished, processed %u members\n", member_count);
     
     return 0;
 }
@@ -384,9 +408,13 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
         generate_block(codegen, body_node);
     }
     
-    /* Add implicit return for void methods */
+    /* Add implicit return for void methods if not already present */
     if (return_type.kind == TYPE_VOID) {
-        emit_opcode(codegen, OP_RETURN);
+        /* Check if last instruction is already a return */
+        if (codegen->context->code->size == 0 ||
+            codegen->context->code->data[codegen->context->code->size - 1] != OP_RETURN) {
+            emit_opcode(codegen, OP_RETURN);
+        }
     }
     
     /* Backpatch labels */
@@ -487,10 +515,13 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
         case NODE_EXPR_STMT: {
             ASTNode* expr_node = codegen_get_node(codegen, stmt_node->data.expr_stmt.expr);
             if (expr_node) {
+                int16_t stack_before = codegen->context->current_stack;
                 generate_expression(codegen, expr_node);
-                /* Pop result if not used */
-                emit_opcode(codegen, OP_POP);
-                update_stack(codegen, -1);
+                /* Pop result if expression left something on stack */
+                if (codegen->context->current_stack > stack_before) {
+                    emit_opcode(codegen, OP_POP);
+                    update_stack(codegen, -1);
+                }
             }
             return 0;
         }
@@ -506,26 +537,48 @@ int generate_block(CodeGenerator* codegen, ASTNode* block_node) {
     uint16_t stmt_idx;
     ASTNode* stmt_node;
     uint16_t stmt_count;
+    uint16_t total_stmt_count;  /* Save block's stmt_count before it gets overwritten */
     
     if (!codegen || !block_node) {
         return -1;
     }
     
-    /* Generate code for each statement */
+    printf("DEBUG CODEGEN: generate_block called, stmt_count=%u, first_stmt=%u\n",
+           block_node->data.block.stmt_count, block_node->data.block.first_stmt);
+    
+    /* Save block data BEFORE any codegen_get_node calls that may overwrite block_node */
     stmt_idx = block_node->data.block.first_stmt;
+    total_stmt_count = block_node->data.block.stmt_count;
     stmt_count = 0;
     
-    while (stmt_idx != 0 && stmt_count < block_node->data.block.stmt_count) {
+    while (stmt_idx != 0 && stmt_count < total_stmt_count) {
+        uint16_t next_sibling;
+        
+        printf("DEBUG CODEGEN: Loop iteration %u, stmt_idx=%u\n", stmt_count, stmt_idx);
+        
         stmt_node = codegen_get_node(codegen, stmt_idx);
         if (!stmt_node) {
+            printf("DEBUG CODEGEN: Failed to get stmt_node at index %u\n", stmt_idx);
             break;
         }
         
+        printf("DEBUG CODEGEN: Processing statement %u, type=%d, next_sibling=%u\n",
+               stmt_idx, stmt_node->type, stmt_node->next_sibling);
+        
+        /* Save next_sibling BEFORE calling generate_statement, which may overwrite stmt_node */
+        next_sibling = stmt_node->next_sibling;
+        
         generate_statement(codegen, stmt_node);
         
-        stmt_idx = stmt_node->next_sibling;
+        stmt_idx = next_sibling;
         stmt_count++;
+        printf("DEBUG CODEGEN: After processing, next stmt_idx=%u, stmt_count=%u\n", stmt_idx, stmt_count);
     }
+    
+    printf("DEBUG CODEGEN: Loop exited, stmt_idx=%u, stmt_count=%u, block.stmt_count=%u\n",
+           stmt_idx, stmt_count, block_node->data.block.stmt_count);
+    
+    printf("DEBUG CODEGEN: generate_block finished, processed %u statements\n", stmt_count);
     
     return 0;
 }
@@ -703,7 +756,7 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
         return -1;
     }
     
-    
+    printf("DEBUG CODEGEN: generate_expression called, node_type=%d\n", expr_node->type);
     
     switch (expr_node->type) {
         case NODE_LITERAL_INT:
@@ -719,6 +772,32 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             emit_u2(codegen, expr_node->data.literal_bool.bool_value);
             update_stack(codegen, 1);
             return 0;
+        
+        case NODE_LITERAL_STRING: {
+            /* Push string constant from constant pool */
+            const char* str_value;
+            uint16_t const_idx;
+            
+            /* Get string from string pool */
+            str_value = codegen_get_string(codegen, expr_node->data.literal_string.str_offset);
+            if (!str_value) {
+                codegen_error(codegen, "Invalid string literal");
+                return -1;
+            }
+            
+            /* Add string to constant pool */
+            const_idx = find_or_add_utf8(codegen, str_value);
+            if (const_idx == 0xFFFF) {
+                codegen_error(codegen, "Failed to add string constant");
+                return -1;
+            }
+            
+            /* Emit OP_PUSH_CONST with constant index */
+            emit_opcode(codegen, OP_PUSH_CONST);
+            emit_u2(codegen, const_idx);
+            update_stack(codegen, 1);
+            return 0;
+        }
         
         case NODE_IDENTIFIER:
             return generate_identifier(codegen, expr_node);
@@ -899,13 +978,24 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     const char* method_name;
     uint16_t arg_idx;
     ASTNode* arg_node;
+    ASTNode* object_node;
     uint16_t arg_count;
+    uint16_t total_arg_count;  /* Save before call_node gets overwritten */
     uint16_t method_idx;
+    uint16_t object_idx;       /* Save object index */
     int is_native;
     
     if (!codegen || !call_node) {
         return -1;
     }
+    
+    /* Save call node data BEFORE any codegen_get_* calls that may overwrite call_node */
+    arg_idx = call_node->data.call.first_arg;
+    total_arg_count = call_node->data.call.arg_count;
+    object_idx = call_node->data.call.object;
+    
+    printf("DEBUG CODEGEN: Method call saved data: first_arg=%u, arg_count=%u, object=%u\n",
+           arg_idx, total_arg_count, object_idx);
     
     /* Get method name */
     method_name = codegen_get_string(codegen, call_node->data.call.method_name);
@@ -914,21 +1004,40 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         return -1;
     }
     
+    /* Check if this has an object (e.g., System.out.println) */
+    if (object_idx != 0) {
+        object_node = codegen_get_node(codegen, object_idx);
+        printf("DEBUG CODEGEN: Method call has object (index=%u)\n", object_idx);
+        /* For now, we ignore the object and just use the method name */
+        /* In a full implementation, we would check the object type */
+    }
+    
     /* Check if this is a native method (System.out.println) */
     is_native = 0;
     if (strcmp(method_name, "println") == 0) {
         is_native = 1;
     }
     
+    printf("DEBUG CODEGEN: Generating call to '%s', is_native=%d, has_object=%d\n",
+           method_name, is_native, object_idx != 0);
+    
     /* Generate code for arguments (push onto stack) */
-    arg_idx = call_node->data.call.first_arg;
     arg_count = 0;
     
-    while (arg_idx != 0 && arg_count < call_node->data.call.arg_count) {
+    printf("DEBUG CODEGEN: Method call arg processing: first_arg=%u, arg_count=%u\n",
+           arg_idx, total_arg_count);
+    
+    while (arg_idx != 0 && arg_count < total_arg_count) {
+        printf("DEBUG CODEGEN: Processing arg %u, arg_idx=%u\n", arg_count, arg_idx);
+        
         arg_node = codegen_get_node(codegen, arg_idx);
         if (!arg_node) {
+            printf("DEBUG CODEGEN: Failed to get arg_node at index %u\n", arg_idx);
             break;
         }
+        
+        printf("DEBUG CODEGEN: Arg node type=%d, next_sibling=%u\n",
+               arg_node->type, arg_node->next_sibling);
         
         /* Generate argument expression */
         generate_expression(codegen, arg_node);
@@ -937,6 +1046,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         arg_count++;
     }
     
+    printf("DEBUG CODEGEN: Finished arg processing, generated %u args\n", arg_count);
+    
     /* Find or create method index */
     method_idx = find_method_index(codegen, method_name, is_native);
     if (method_idx == 0xFFFF) {
@@ -944,12 +1055,20 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         return -1;
     }
     
+    printf("DEBUG CODEGEN: Method '%s' assigned index=%u\n", method_name, method_idx);
+    
     /* Emit INVOKE_STATIC opcode */
     emit_opcode(codegen, OP_INVOKE_STATIC);
     emit_u2(codegen, method_idx);
     
-    /* Update stack (pop arguments, no return value for now) */
+    /* Update stack: arguments are consumed, no return value for void methods */
+    /* For now, assume all methods are void (no return value) */
+    /* Arguments are already on stack from generate_expression calls above */
+    /* INVOKE_STATIC will consume them at runtime, so we mark them as consumed */
     update_stack(codegen, -(int16_t)arg_count);
+    
+    printf("DEBUG CODEGEN: Stack updated, delta=-%d, current_stack=%d\n",
+           arg_count, codegen->context->current_stack);
     
     return 0;
 }
@@ -1117,18 +1236,29 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
         return 0xFFFF;
     }
     
-    /* Search for existing method */
+    printf("DEBUG find_method_index: Looking for method '%s', is_native=%d, current method_count=%u\n",
+           method_name, is_native, codegen->method_count);
+    
+    /* Search for existing method with matching name AND native flag */
     for (i = 0; i < codegen->method_count; i++) {
         name_idx = codegen->methods[i].name_index;
+        printf("DEBUG find_method_index: Checking method %u, name_index=%u\n", i, name_idx);
         if (name_idx < codegen->constants->count) {
             if (codegen->constants->constants[name_idx].tag == CONST_UTF8) {
-                if (strcmp(codegen->constants->constants[name_idx].data.utf8_data, method_name) == 0) {
-                    /* Found existing method */
-                    if (is_native) {
-                        /* Mark as native */
-                        codegen->methods[i].flags |= METHOD_NATIVE;
+                const char* existing_name = codegen->constants->constants[name_idx].data.utf8_data;
+                printf("DEBUG find_method_index: Method %u name='%s', flags=0x%02X\n",
+                       i, existing_name, codegen->methods[i].flags);
+                if (strcmp(existing_name, method_name) == 0) {
+                    /* Check if native flag matches */
+                    int is_method_native = (codegen->methods[i].flags & METHOD_NATIVE) != 0;
+                    if (is_native == is_method_native) {
+                        /* Found matching method */
+                        printf("DEBUG find_method_index: Found existing method at index %u\n", i);
+                        return i;
+                    } else {
+                        printf("DEBUG find_method_index: Name matches but native flag differs (want=%d, have=%d)\n",
+                               is_native, is_method_native);
                     }
-                    return i;
                 }
             }
         }
@@ -1136,6 +1266,7 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
     
     /* Method not found - this is a forward reference or external method */
     /* For now, we'll create a placeholder entry */
+    printf("DEBUG find_method_index: Method not found, creating placeholder\n");
     if (codegen->method_count >= 64) {
         return 0xFFFF;
     }
@@ -1145,6 +1276,8 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
     if (name_idx == 0xFFFF) {
         return 0xFFFF;
     }
+    
+    printf("DEBUG find_method_index: Added method name to constant pool at index %u\n", name_idx);
     
     /* Create method entry */
     i = codegen->method_count;
@@ -1161,6 +1294,8 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
     }
     
     codegen->method_count++;
+    printf("DEBUG find_method_index: Created placeholder method at index %u, new method_count=%u\n",
+           i, codegen->method_count);
     return i;
 }
 

@@ -26,6 +26,8 @@
  */
 typedef struct {
     uint8_t* return_pc;         /* Return address */
+    uint8_t* return_code_start; /* Code start for return context */
+    uint16_t return_code_length;/* Code length for return context */
     uint16_t frame_pointer;     /* Stack frame base offset */
     uint16_t local_base;        /* Local variables base offset */
     uint8_t local_count;        /* Number of locals in this frame */

@@ -1,4 +1,4 @@
-src\test_interpreter.c(37): ŒxI W102: Parameter 2: Œ^‚ªˆê’v‚µ‚Ü‚¹‚ñ
-src\test_interpreter.c(37): î•ñ I2003: •ÏŠ·ƒ\[ƒX‚ÌŒ^‚Í'char *'‚Å‚·
-src\test_interpreter.c(37): î•ñ I2004: •ÏŠ·ƒ^[ƒQƒbƒg‚ÌŒ^‚Í'unsigned short'‚Å‚·
-src\test_interpreter.c(37): î•ñ I2002: 'djc_find_method' ‚Ísrc\vm\..\format\djc.h(127)‚Å’è‹`‚³‚ê‚Ä‚¢‚Ü‚·
+src\test_interpreter.c(37): Warning! W102: Parameter 2: Type mismatch (warning)
+src\test_interpreter.c(37): Note! I2003: source conversion type is 'char *'
+src\test_interpreter.c(37): Note! I2004: target conversion type is 'unsigned short'
+src\test_interpreter.c(37): Note! I2002: 'djc_find_method' defined in: src\vm\..\format\djc.h(127)
