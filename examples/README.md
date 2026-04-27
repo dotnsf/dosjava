@@ -2,13 +2,15 @@
 
 このディレクトリには、DOS Java Compilerで動作するサンプルプログラムが含まれています。
 
+**注意**: 16bit PC-DOSのファイル名制約（8.3形式: 8文字以下+拡張子3文字以下）に準拠しています。
+
 ## サンプル一覧
 
-### 1. Hello World (`01_hello.java`)
+### 1. Hello World (`hello.jav`)
 最も基本的なプログラム。変数の宣言と代入を学びます。
 
 ```batch
-djc 01_hello.java
+djc hello.jav
 ```
 
 **学習内容**:
@@ -19,11 +21,11 @@ djc 01_hello.java
 
 ---
 
-### 2. 算術演算 (`02_arithmetic.java`)
+### 2. 算術演算 (`arith.jav`)
 算術演算子の使用方法を学びます。
 
 ```batch
-djc 02_arithmetic.java
+djc arith.jav
 ```
 
 **学習内容**:
@@ -36,11 +38,11 @@ djc 02_arithmetic.java
 
 ---
 
-### 3. 条件分岐 (`03_conditional.java`)
+### 3. 条件分岐 (`cond.jav`)
 if文を使った条件分岐を学びます。
 
 ```batch
-djc 03_conditional.java
+djc cond.jav
 ```
 
 **学習内容**:
@@ -51,11 +53,11 @@ djc 03_conditional.java
 
 ---
 
-### 4. ループ (`04_loop.java`)
+### 4. ループ (`loop.jav`)
 whileループを使った繰り返し処理を学びます。
 
 ```batch
-djc 04_loop.java
+djc loop.jav
 ```
 
 **学習内容**:
@@ -66,11 +68,11 @@ djc 04_loop.java
 
 ---
 
-### 5. フィボナッチ数列 (`05_fibonacci.java`)
+### 5. フィボナッチ数列 (`fibo.jav`)
 フィボナッチ数列を計算します。
 
 ```batch
-djc 05_fibonacci.java
+djc fibo.jav
 ```
 
 **学習内容**:
@@ -82,11 +84,11 @@ djc 05_fibonacci.java
 
 ---
 
-### 6. 階乗 (`06_factorial.java`)
+### 6. 階乗 (`fact.jav`)
 階乗（n!）を計算します。
 
 ```batch
-djc 06_factorial.java
+djc fact.jav
 ```
 
 **学習内容**:
@@ -98,11 +100,11 @@ djc 06_factorial.java
 
 ---
 
-### 7. 最大公約数 (`07_gcd.java`)
+### 7. 最大公約数 (`gcd.jav`)
 ユークリッドの互除法で最大公約数を計算します。
 
 ```batch
-djc 07_gcd.java
+djc gcd.jav
 ```
 
 **学習内容**:
@@ -122,7 +124,7 @@ djc 07_gcd.java
 ```batch
 @echo off
 echo Compiling all examples...
-for %%f in (*.java) do (
+for %%f in (*.jav) do (
     echo Compiling %%f...
     djc %%f
 )
@@ -137,29 +139,29 @@ compile_all.bat
 ### DOSコマンド
 
 ```batch
-djc 01_hello.java
-djc 02_arithmetic.java
-djc 03_conditional.java
-djc 04_loop.java
-djc 05_fibonacci.java
-djc 06_factorial.java
-djc 07_gcd.java
+djc hello.jav
+djc arith.jav
+djc cond.jav
+djc loop.jav
+djc fibo.jav
+djc fact.jav
+djc gcd.jav
 ```
 
 ## 学習の進め方
 
 ### ステップ1: 基礎を学ぶ
-1. `01_hello.java` - 基本構文
-2. `02_arithmetic.java` - 演算子
-3. `03_conditional.java` - 条件分岐
+1. `hello.jav` - 基本構文
+2. `arith.jav` - 演算子
+3. `cond.jav` - 条件分岐
 
 ### ステップ2: 制御構造を学ぶ
-4. `04_loop.java` - ループ
+4. `loop.jav` - ループ
 
 ### ステップ3: アルゴリズムを学ぶ
-5. `05_fibonacci.java` - 数列
-6. `06_factorial.java` - 階乗
-7. `07_gcd.java` - 最大公約数
+5. `fibo.jav` - 数列
+6. `fact.jav` - 階乗
+7. `gcd.jav` - 最大公約数
 
 ## カスタマイズのヒント
 
