@@ -1,0 +1,5 @@
+*.err
+*.DJC
+*.obj
+*.py
+.clinerules
