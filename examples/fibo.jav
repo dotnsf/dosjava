@@ -23,6 +23,7 @@ class Fibonacci {
         
         // 最終的にbにはF(n)が格納される
         // n=10の場合、b=55
+        System.out.println( b );  // 55
         
         return;
     }

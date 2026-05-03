@@ -18,6 +18,7 @@ class Factorial {
         }
         
         // result = 5! = 120
+        System.out.println( result );  // 120
         
         return;
     }

@@ -3,7 +3,10 @@
 *.obj
 *.py
 *.TMP
+*.sym
+*.ast
 .clinerules
 tests/A
 tests/B
 tests/C
+examples/*.djc

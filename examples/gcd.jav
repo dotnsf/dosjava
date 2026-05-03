@@ -19,6 +19,7 @@ class GCD {
         
         // a に最大公約数が格納される
         // GCD(48, 18) = 6
+        System.out.println( a );  // 6
         
         return;
     }

@@ -32,6 +32,8 @@ class Conditional {
         if (x > 5 && y < 30) {
             result = result + 10;
         }
+
+        System.out.println( result );  // 185
         
         return;
     }
