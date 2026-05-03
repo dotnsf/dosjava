@@ -459,16 +459,24 @@ int collect_method_symbols(SemanticAnalyzer* analyzer, ASTNode* method_node) {
         return -1;
     }
     
-    /* Enter method scope for parameters */
-    symtable_enter_scope(analyzer->symtable);
-    
-    /* Collect parameter symbols */
+    /* Do not enter/exit a separate parameter scope during declaration collection.
+     * Because exited symbols are preserved for codegen, reusing the same numeric
+     * scope level for later methods makes `symtable_exists_in_current_scope()`
+     * see parameters from previous methods as duplicates.
+     *
+     * Keep parameters at the class scope level during Pass1, and let Pass2
+     * create the active method scope used for identifier resolution.
+     */
     param_count = 0;
     
     while (param_idx != 0 && param_count < method_param_count) {
         Symbol param_sym;
         const char* param_name;
         uint16_t next_param_idx;
+        uint16_t param_name_off;
+        TypeInfo param_type;
+        uint16_t param_line;
+        uint16_t param_column;
         
         param_node = semantic_get_node(analyzer, param_idx);
         if (!param_node || param_node->type != NODE_PARAM) {
@@ -476,36 +484,59 @@ int collect_method_symbols(SemanticAnalyzer* analyzer, ASTNode* method_node) {
         }
         
         next_param_idx = param_node->next_sibling;
-        param_name = semantic_get_string(analyzer, param_node->data.param.name);
+        param_name_off = param_node->data.param.name;
+        param_type = param_node->data.param.type;
+        param_line = param_node->line;
+        param_column = param_node->column;
+        
+        param_name = semantic_get_string(analyzer, param_name_off);
         if (!param_name) {
-            semantic_error_node(analyzer, param_node, "Invalid parameter name");
+            semantic_error(analyzer, param_line, param_column, "Invalid parameter name");
             return -1;
         }
         
-        /* Check for duplicate parameter */
-        if (symtable_exists_in_current_scope(analyzer->symtable, param_name)) {
-            semantic_error_node(analyzer, param_node, "Duplicate parameter name");
-            return -1;
+        /* Only compare against parameters already collected for this method.
+         * Symbols from previous methods remain preserved in the same class scope,
+         * so scanning the whole current scope will produce false duplicates.
+         * At this point, only the most recently added contiguous SYM_PARAM entries
+         * belong to the current method.
+         */
+        {
+            uint16_t i = analyzer->symtable->symbol_count;
+            while (i > 0) {
+                Symbol* existing = &analyzer->symtable->symbols[i - 1];
+                const char* existing_name;
+                
+                if (existing->scope_level != analyzer->symtable->scope_level) {
+                    break;
+                }
+                if (existing->kind != SYM_PARAM) {
+                    break;
+                }
+                
+                existing_name = symtable_get_string(analyzer->symtable, existing->name_offset);
+                if (existing_name && strcmp(existing_name, param_name) == 0) {
+                    semantic_error(analyzer, param_line, param_column, "Duplicate parameter name");
+                    return -1;
+                }
+                i--;
+            }
         }
         
-        /* Create parameter symbol */
         memset(&param_sym, 0, sizeof(Symbol));
         param_sym.kind = SYM_PARAM;
-        param_sym.name_offset = param_node->data.param.name;
-        param_sym.type = param_node->data.param.type;
+        param_sym.name_offset = param_name_off;
+        param_sym.type = param_type;
         param_sym.data.param_data.index = param_count;
         
         if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
-            semantic_error_node(analyzer, param_node, "Failed to add parameter symbol");
+            semantic_error(analyzer, param_line, param_column, "Failed to add parameter symbol");
             return -1;
         }
         
         param_idx = next_param_idx;
         param_count++;
     }
-    
-    /* Exit method scope */
-    symtable_exit_scope(analyzer->symtable);
     
     return 0;
 }
@@ -648,12 +679,21 @@ int check_method_body(SemanticAnalyzer* analyzer, ASTNode* method_node) {
     /* Enter method scope */
     symtable_enter_scope(analyzer->symtable);
     
-    /* Re-add parameters to scope */
+    /* Re-add parameters to scope only when not already present.
+     * Pass1 keeps parameter symbols for later codegen, so blindly re-adding
+     * them in Pass2 can trigger duplicate-parameter failures depending on
+     * scope reuse/preservation details.
+     */
     param_count = 0;
     
     while (param_idx != 0 && param_count < method_param_count) {
         Symbol param_sym;
         uint16_t next_param_idx;
+        const char* param_name;
+        uint16_t param_name_off;
+        TypeInfo param_type;
+        uint16_t param_line;
+        uint16_t param_column;
         
         param_node = semantic_get_node(analyzer, param_idx);
         if (!param_node) {
@@ -661,14 +701,29 @@ int check_method_body(SemanticAnalyzer* analyzer, ASTNode* method_node) {
         }
         
         next_param_idx = param_node->next_sibling;
+        param_name_off = param_node->data.param.name;
+        param_type = param_node->data.param.type;
+        param_line = param_node->line;
+        param_column = param_node->column;
         
-        memset(&param_sym, 0, sizeof(Symbol));
-        param_sym.kind = SYM_PARAM;
-        param_sym.name_offset = param_node->data.param.name;
-        param_sym.type = param_node->data.param.type;
-        param_sym.data.param_data.index = param_count;
+        param_name = semantic_get_string(analyzer, param_name_off);
+        if (!param_name) {
+            semantic_error(analyzer, param_line, param_column, "Invalid parameter name");
+            break;
+        }
         
-        symtable_add_symbol(analyzer->symtable, &param_sym);
+        if (!symtable_exists_in_current_scope(analyzer->symtable, param_name)) {
+            memset(&param_sym, 0, sizeof(Symbol));
+            param_sym.kind = SYM_PARAM;
+            param_sym.name_offset = param_name_off;
+            param_sym.type = param_type;
+            param_sym.data.param_data.index = param_count;
+            
+            if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                semantic_error(analyzer, param_line, param_column, "Failed to add parameter symbol");
+                break;
+            }
+        }
         
         param_idx = next_param_idx;
         param_count++;
