@@ -129,6 +129,8 @@ uint16_t parse_member(Parser* parser);
  * @return Index of method node, or 0 on error
  */
 uint16_t parse_method(Parser* parser, int is_public, int is_static, TypeInfo return_type);
+uint16_t parse_param_list(Parser* parser, uint16_t* param_count);
+uint16_t parse_arg_list(Parser* parser, uint16_t* arg_count);
 
 /**
  * Parse field declaration

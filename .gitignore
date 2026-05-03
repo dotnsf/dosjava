@@ -2,6 +2,7 @@
 *.DJC
 *.obj
 *.py
+*.TMP
 .clinerules
 tests/A
 tests/B

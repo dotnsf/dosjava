@@ -231,8 +231,8 @@ int codegen_generate(CodeGenerator* codegen) {
         return -1;
     }
     
-    /* Get root node */
-    root = codegen_get_node(codegen, 1);
+    /* Get root node (parser writes NODE_PROGRAM last) */
+    root = codegen_get_node(codegen, codegen->total_nodes);
     if (!root || root->type != NODE_PROGRAM) {
         codegen_error(codegen, "Invalid AST: root node is not NODE_PROGRAM");
         return -1;
@@ -266,13 +266,20 @@ int generate_class(CodeGenerator* codegen, ASTNode* class_node) {
     ASTNode* member_node;
     uint16_t member_count;
     uint16_t total_member_count;  /* Save before it gets overwritten */
+    uint16_t class_name_off;
+    uint16_t class_first_member;
     
     if (!codegen || !class_node) {
         return -1;
     }
     
+    /* Save class data before later node reads overwrite the shared buffer */
+    class_name_off = class_node->data.class_decl.name;
+    class_first_member = class_node->data.class_decl.first_member;
+    total_member_count = class_node->data.class_decl.member_count;
+    
     /* Get class name */
-    class_name = codegen_get_string(codegen, class_node->data.class_decl.name);
+    class_name = codegen_get_string(codegen, class_name_off);
     if (!class_name) {
         codegen_error(codegen, "Invalid class name");
         return -1;
@@ -286,9 +293,8 @@ int generate_class(CodeGenerator* codegen, ASTNode* class_node) {
     /* Get class symbol */
     codegen->current_class = symtable_lookup(codegen->symtable, class_name);
     
-    /* Process members - save member_count before any codegen_get_node calls */
-    member_idx = class_node->data.class_decl.first_member;
-    total_member_count = class_node->data.class_decl.member_count;
+    /* Process members */
+    member_idx = class_first_member;
     member_count = 0;
     
     
@@ -1277,47 +1283,41 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     ASTNode* arg_node;
     ASTNode* object_node;
     uint16_t arg_count;
-    uint16_t total_arg_count;  /* Save before call_node gets overwritten */
+    uint16_t total_arg_count;
     uint16_t method_idx;
-    uint16_t object_idx;       /* Save object index */
+    uint16_t object_idx;
     int is_native;
     NodeType arg_node_type;
     uint16_t saved_first_arg;
+    Symbol* method_sym;
+    int returns_value;
     
     if (!codegen || !call_node) {
         return -1;
     }
     
-    /* Save call node data BEFORE any codegen_get_* calls that may overwrite call_node */
     arg_idx = call_node->data.call.first_arg;
     total_arg_count = call_node->data.call.arg_count;
     object_idx = call_node->data.call.object;
-    saved_first_arg = arg_idx;  /* Save first_arg before any get_node calls */
+    saved_first_arg = arg_idx;
     
-    
-    
-    /* Get method name */
     method_name = codegen_get_string(codegen, call_node->data.call.method_name);
     if (!method_name) {
         codegen_error(codegen, "Invalid method name");
         return -1;
     }
     
-    /* Check if this has an object (e.g., System.out.println) */
     if (object_idx != 0) {
         object_node = codegen_get_node(codegen, object_idx);
-        /* For now, we ignore the object and just use the method name */
-        /* In a full implementation, we would check the object type */
+        (void)object_node;
     }
     
-    /* Check if this is a native method (System.out.println) */
     is_native = 0;
     if (strcmp(method_name, "println") == 0) {
         is_native = 1;
     }
     
-    /* Get argument node type for descriptor generation */
-    arg_node_type = NODE_PROGRAM;  /* Default to invalid type */
+    arg_node_type = NODE_PROGRAM;
     if (saved_first_arg != 0) {
         arg_node = codegen_get_node(codegen, saved_first_arg);
         if (arg_node) {
@@ -1325,12 +1325,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         }
     }
     
-    /* Generate code for arguments (push onto stack) */
     arg_count = 0;
-    arg_idx = saved_first_arg;  /* Use saved value */
-    
-    
-    
+    arg_idx = saved_first_arg;
     while (arg_idx != 0 && arg_count < total_arg_count) {
         uint16_t next_arg_idx;
         
@@ -1340,42 +1336,32 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         }
         
         next_arg_idx = arg_node->next_sibling;
-        
-        /* Generate argument expression */
         generate_expression(codegen, arg_node);
         
         arg_idx = next_arg_idx;
         arg_count++;
     }
     
-    
-    
-    /* Find or create method index */
     method_idx = find_method_index(codegen, method_name, is_native);
     if (method_idx == 0xFFFF) {
         codegen_error(codegen, "Failed to add method reference");
         return -1;
     }
     
-    /* Set descriptor for native methods if not already set */
     if (is_native && codegen->methods[method_idx].descriptor_index == 0) {
         uint16_t desc_idx;
         char descriptor[32];
         
-        /* Generate descriptor based on argument node type
-         * For println, we assume integer arguments unless it's a string literal
-         */
         if (arg_node_type == NODE_LITERAL_STRING) {
             strcpy(descriptor, "(Ljava/lang/String;)V");
         } else if (arg_node_type == NODE_LITERAL_INT ||
                    arg_node_type == NODE_IDENTIFIER ||
                    arg_node_type == NODE_BINARY_OP ||
                    arg_node_type == NODE_UNARY_OP ||
-                   arg_node_type == NODE_POSTFIX_OP) {
-            /* Integer expression */
+                   arg_node_type == NODE_POSTFIX_OP ||
+                   arg_node_type == NODE_CALL) {
             strcpy(descriptor, "(I)V");
         } else {
-            /* Default to integer for unknown types */
             strcpy(descriptor, "(I)V");
         }
         
@@ -1385,19 +1371,22 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         }
     }
     
+    returns_value = 0;
+    if (!is_native) {
+        method_sym = symtable_lookup(codegen->symtable, method_name);
+        if (method_sym && method_sym->kind == SYM_METHOD && method_sym->type.kind != TYPE_VOID) {
+            returns_value = 1;
+        }
+    }
     
-    
-    /* Emit INVOKE_STATIC opcode */
     emit_opcode(codegen, OP_INVOKE_STATIC);
     emit_u2(codegen, method_idx);
+    emit_u1(codegen, (uint8_t)arg_count);
     
-    /* Update stack: arguments are consumed, no return value for void methods */
-    /* For now, assume all methods are void (no return value) */
-    /* Arguments are already on stack from generate_expression calls above */
-    /* INVOKE_STATIC will consume them at runtime, so we mark them as consumed */
     update_stack(codegen, -(int16_t)arg_count);
-    
-    
+    if (returns_value) {
+        update_stack(codegen, 1);
+    }
     
     return 0;
 }
@@ -1565,9 +1554,6 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
         return 0xFFFF;
     }
     
-    
-    
-    /* Search for existing method with matching name AND native flag */
     for (i = 0; i < codegen->method_count; i++) {
         name_idx = codegen->methods[i].name_index;
         
@@ -1576,11 +1562,8 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
                 const char* existing_name = codegen->constants->constants[name_idx].data.utf8_data;
                 
                 if (strcmp(existing_name, method_name) == 0) {
-                    /* Check if native flag matches */
                     int is_method_native = (codegen->methods[i].flags & METHOD_NATIVE) != 0;
                     if (is_native == is_method_native) {
-                        /* Found matching method */
-                        
                         return i;
                     }
                 }
@@ -1588,38 +1571,25 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
         }
     }
     
-    /* Method not found - this is a forward reference or external method */
-    /* For now, we'll create a placeholder entry */
-    
     if (codegen->method_count >= 64) {
         return 0xFFFF;
     }
     
-    /* Add method name to constant pool */
     name_idx = find_or_add_utf8(codegen, method_name);
     if (name_idx == 0xFFFF) {
         return 0xFFFF;
     }
     
-    
-    
-    /* Create method entry */
-    i = codegen->method_count;
-    codegen->methods[i].name_index = name_idx;
-    codegen->methods[i].descriptor_index = 0;
-    codegen->methods[i].code_offset = 0;
-    codegen->methods[i].code_length = 0;
-    codegen->methods[i].max_stack = 0;
-    codegen->methods[i].max_locals = 0;
-    codegen->methods[i].flags = METHOD_STATIC;
-    
-    if (is_native) {
-        codegen->methods[i].flags |= METHOD_NATIVE;
-    }
+    codegen->methods[codegen->method_count].name_index = name_idx;
+    codegen->methods[codegen->method_count].descriptor_index = 0;
+    codegen->methods[codegen->method_count].code_offset = 0;
+    codegen->methods[codegen->method_count].code_length = 0;
+    codegen->methods[codegen->method_count].max_stack = 0;
+    codegen->methods[codegen->method_count].max_locals = 0;
+    codegen->methods[codegen->method_count].flags = is_native ? METHOD_NATIVE : 0;
     
     codegen->method_count++;
-    
-    return i;
+    return (uint16_t)(codegen->method_count - 1);
 }
 
 /* Create label */

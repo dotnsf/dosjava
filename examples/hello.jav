@@ -1,15 +1,11 @@
-﻿/*
- * Example 1: Hello World
- * 
- * 最も基本的なプログラム。
- * 変数を宣言して値を代入し、returnで終了します。
- */
-
-class Hello {
+// hello.jav
+class hello {
     public static void main() {
-        int x = 42;
+        helloworld();
+        return;
+    }
+    public static void helloworld() {
+        System.out.println( "Hello World!" );
         return;
     }
 }
-
-

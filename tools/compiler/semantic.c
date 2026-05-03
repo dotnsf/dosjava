@@ -14,6 +14,7 @@
 /* Forward declarations */
 static int read_ast_header(SemanticAnalyzer* analyzer);
 static int load_string_pool(SemanticAnalyzer* analyzer);
+static int current_scope_has_local_name(SemanticAnalyzer* analyzer, const char* name, SymbolKind kind);
 
 /* Initialize semantic analyzer */
 int semantic_init(SemanticAnalyzer* analyzer, const char* ast_file, const char* symbol_file) {
@@ -176,6 +177,36 @@ uint16_t semantic_add_string(SemanticAnalyzer* analyzer, const char* str) {
     return offset;
 }
 
+static int current_scope_has_local_name(SemanticAnalyzer* analyzer, const char* name, SymbolKind kind) {
+    uint16_t i;
+    uint16_t scope_start;
+    
+    if (!analyzer || !analyzer->symtable || !name) {
+        return 0;
+    }
+    
+    scope_start = analyzer->symtable->scope_stack[analyzer->symtable->scope_level];
+    
+    for (i = analyzer->symtable->symbol_count; i > scope_start; i--) {
+        Symbol* sym = &analyzer->symtable->symbols[i - 1];
+        const char* sym_name;
+        
+        if (sym->scope_level != analyzer->symtable->scope_level) {
+            continue;
+        }
+        if (sym->kind != kind) {
+            continue;
+        }
+        
+        sym_name = symtable_get_string(analyzer->symtable, sym->name_offset);
+        if (sym_name && strcmp(sym_name, name) == 0) {
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
 /* Report semantic error */
 void semantic_error(SemanticAnalyzer* analyzer, uint16_t line, uint16_t col, const char* message) {
     char buffer[256];
@@ -256,20 +287,24 @@ int semantic_analyze(SemanticAnalyzer* analyzer) {
 int collect_declarations(SemanticAnalyzer* analyzer) {
     ASTNode* root;
     ASTNode* class_node;
+    uint16_t class_idx;
     
     if (!analyzer) {
         return -1;
     }
     
-    /* Get root node (should be NODE_PROGRAM) */
-    root = semantic_get_node(analyzer, 1);
+    /* Get root node (parser writes NODE_PROGRAM last) */
+    root = semantic_get_node(analyzer, analyzer->total_nodes);
     if (!root || root->type != NODE_PROGRAM) {
         semantic_error(analyzer, 0, 0, "Invalid AST: root node is not NODE_PROGRAM");
         return -1;
     }
     
+    /* Save class index before next semantic_get_node overwrites root buffer */
+    class_idx = root->data.program.class_node;
+    
     /* Get class node */
-    class_node = semantic_get_node(analyzer, root->data.program.class_node);
+    class_node = semantic_get_node(analyzer, class_idx);
     if (!class_node || class_node->type != NODE_CLASS) {
         semantic_error(analyzer, 0, 0, "Invalid AST: no class node");
         return -1;
@@ -290,13 +325,19 @@ int collect_class_symbols(SemanticAnalyzer* analyzer, ASTNode* class_node) {
     uint16_t member_idx;
     ASTNode* member_node;
     uint16_t member_count;
+    uint16_t class_name_off;
+    uint16_t class_member_count;
+    uint16_t class_first_member;
     
     if (!analyzer || !class_node) {
         return -1;
     }
     
     /* Get class name */
-    class_name = semantic_get_string(analyzer, class_node->data.class_decl.name);
+    class_name_off = class_node->data.class_decl.name;
+    class_member_count = class_node->data.class_decl.member_count;
+    class_first_member = class_node->data.class_decl.first_member;
+    class_name = semantic_get_string(analyzer, class_name_off);
     if (!class_name) {
         semantic_error_node(analyzer, class_node, "Invalid class name");
         return -1;
@@ -311,10 +352,10 @@ int collect_class_symbols(SemanticAnalyzer* analyzer, ASTNode* class_node) {
     /* Create class symbol */
     memset(&class_sym, 0, sizeof(Symbol));
     class_sym.kind = SYM_CLASS;
-    class_sym.name_offset = class_node->data.class_decl.name;
+    class_sym.name_offset = class_name_off;
     class_sym.type.kind = TYPE_CLASS;
-    class_sym.type.class_name = class_node->data.class_decl.name;
-    class_sym.data.class_data.member_count = class_node->data.class_decl.member_count;
+    class_sym.type.class_name = class_name_off;
+    class_sym.data.class_data.member_count = class_member_count;
     
     /* Add class to symbol table */
     if (symtable_add_symbol(analyzer->symtable, &class_sym) == 0xFFFF) {
@@ -328,24 +369,26 @@ int collect_class_symbols(SemanticAnalyzer* analyzer, ASTNode* class_node) {
     symtable_enter_scope(analyzer->symtable);
     
     /* Collect member symbols */
-    member_idx = class_node->data.class_decl.first_member;
+    member_idx = class_first_member;
     member_count = 0;
     
-    while (member_idx != 0 && member_count < class_node->data.class_decl.member_count) {
+    while (member_idx != 0 && member_count < class_member_count) {
         uint16_t next_member_idx;
+        uint16_t member_type;
         member_node = semantic_get_node(analyzer, member_idx);
         if (!member_node) {
             break;
         }
         
-        /* Save next_sibling before any function calls that might invalidate the pointer */
+        /* Save fields before any function calls that might invalidate the pointer */
+        member_type = member_node->type;
         next_member_idx = member_node->next_sibling;
         
-        if (member_node->type == NODE_METHOD) {
+        if (member_type == NODE_METHOD) {
             if (collect_method_symbols(analyzer, member_node) != 0) {
                 return -1;
             }
-        } else if (member_node->type == NODE_FIELD) {
+        } else if (member_type == NODE_FIELD) {
             if (collect_field_symbols(analyzer, member_node) != 0) {
                 return -1;
             }
@@ -365,39 +408,54 @@ int collect_class_symbols(SemanticAnalyzer* analyzer, ASTNode* class_node) {
 int collect_method_symbols(SemanticAnalyzer* analyzer, ASTNode* method_node) {
     Symbol method_sym;
     const char* method_name;
+    uint16_t method_name_off;
+    TypeInfo method_return_type;
+    uint16_t method_param_count;
+    uint16_t method_is_static;
+    uint16_t method_is_public;
     uint16_t param_idx;
     ASTNode* param_node;
     uint16_t param_count;
+    uint16_t method_line;
+    uint16_t method_column;
     
     if (!analyzer || !method_node) {
         return -1;
     }
     
+    method_name_off = method_node->data.method.name;
+    method_return_type = method_node->data.method.return_type;
+    method_param_count = method_node->data.method.param_count;
+    method_is_static = method_node->data.method.is_static;
+    method_is_public = method_node->data.method.is_public;
+    param_idx = method_node->data.method.first_param;
+    method_line = method_node->line;
+    method_column = method_node->column;
+    
     /* Get method name */
-    method_name = semantic_get_string(analyzer, method_node->data.method.name);
+    method_name = semantic_get_string(analyzer, method_name_off);
     if (!method_name) {
-        semantic_error_node(analyzer, method_node, "Invalid method name");
+        semantic_error(analyzer, method_line, method_column, "Invalid method name");
         return -1;
     }
-    
     /* Check for duplicate method */
     if (symtable_exists_in_current_scope(analyzer->symtable, method_name)) {
-        semantic_error_node(analyzer, method_node, "Duplicate method declaration");
+        semantic_error(analyzer, method_line, method_column, "Duplicate method declaration");
         return -1;
     }
     
     /* Create method symbol */
     memset(&method_sym, 0, sizeof(Symbol));
     method_sym.kind = SYM_METHOD;
-    method_sym.name_offset = method_node->data.method.name;
-    method_sym.type = method_node->data.method.return_type;
-    method_sym.data.method_data.param_count = method_node->data.method.param_count;
-    method_sym.data.method_data.is_static = method_node->data.method.is_static;
-    method_sym.data.method_data.is_public = method_node->data.method.is_public;
+    method_sym.name_offset = method_name_off;
+    method_sym.type = method_return_type;
+    method_sym.data.method_data.param_count = method_param_count;
+    method_sym.data.method_data.is_static = method_is_static;
+    method_sym.data.method_data.is_public = method_is_public;
     
     /* Add method to symbol table */
     if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
-        semantic_error_node(analyzer, method_node, "Failed to add method symbol");
+        semantic_error(analyzer, method_line, method_column, "Failed to add method symbol");
         return -1;
     }
     
@@ -405,18 +463,19 @@ int collect_method_symbols(SemanticAnalyzer* analyzer, ASTNode* method_node) {
     symtable_enter_scope(analyzer->symtable);
     
     /* Collect parameter symbols */
-    param_idx = method_node->data.method.first_param;
     param_count = 0;
     
-    while (param_idx != 0 && param_count < method_node->data.method.param_count) {
+    while (param_idx != 0 && param_count < method_param_count) {
         Symbol param_sym;
         const char* param_name;
+        uint16_t next_param_idx;
         
         param_node = semantic_get_node(analyzer, param_idx);
         if (!param_node || param_node->type != NODE_PARAM) {
             break;
         }
         
+        next_param_idx = param_node->next_sibling;
         param_name = semantic_get_string(analyzer, param_node->data.param.name);
         if (!param_name) {
             semantic_error_node(analyzer, param_node, "Invalid parameter name");
@@ -441,7 +500,7 @@ int collect_method_symbols(SemanticAnalyzer* analyzer, ASTNode* method_node) {
             return -1;
         }
         
-        param_idx = param_node->next_sibling;
+        param_idx = next_param_idx;
         param_count++;
     }
     
@@ -494,33 +553,39 @@ int collect_field_symbols(SemanticAnalyzer* analyzer, ASTNode* field_node) {
 int check_semantics(SemanticAnalyzer* analyzer) {
     ASTNode* root;
     ASTNode* class_node;
+    uint16_t class_idx;
     uint16_t member_idx;
     ASTNode* member_node;
     uint16_t member_count;
+    uint16_t expected_member_count;
     
     if (!analyzer) {
         return -1;
     }
     
-    /* Get root and class nodes */
-    root = semantic_get_node(analyzer, 1);
+    /* Get root node and save class index before next node read overwrites buffer */
+    root = semantic_get_node(analyzer, analyzer->total_nodes);
     if (!root) {
         return -1;
     }
+    class_idx = root->data.program.class_node;
     
-    class_node = semantic_get_node(analyzer, root->data.program.class_node);
+    class_node = semantic_get_node(analyzer, class_idx);
     if (!class_node) {
         return -1;
     }
+    
+    /* Save member traversal data before later semantic_get_node calls overwrite class_node */
+    member_idx = class_node->data.class_decl.first_member;
+    expected_member_count = class_node->data.class_decl.member_count;
     
     /* Enter class scope */
     symtable_enter_scope(analyzer->symtable);
     
     /* Check each method body */
-    member_idx = class_node->data.class_decl.first_member;
     member_count = 0;
     
-    while (member_idx != 0 && member_count < class_node->data.class_decl.member_count) {
+    while (member_idx != 0 && member_count < expected_member_count) {
         uint16_t next_member_idx;
         member_node = semantic_get_node(analyzer, member_idx);
         if (!member_node) {
@@ -550,18 +615,33 @@ int check_semantics(SemanticAnalyzer* analyzer) {
 int check_method_body(SemanticAnalyzer* analyzer, ASTNode* method_node) {
     const char* method_name;
     ASTNode* body_node;
+    uint16_t method_name_off;
+    TypeInfo return_type;
+    uint16_t body_idx;
+    uint16_t method_param_count;
     uint16_t param_idx;
     ASTNode* param_node;
     uint16_t param_count;
+    uint16_t method_line;
+    uint16_t method_column;
     
     if (!analyzer || !method_node) {
         return -1;
     }
     
+    /* Save method data before semantic_get_node calls overwrite method_node buffer */
+    method_name_off = method_node->data.method.name;
+    return_type = method_node->data.method.return_type;
+    body_idx = method_node->data.method.body;
+    method_param_count = method_node->data.method.param_count;
+    param_idx = method_node->data.method.first_param;
+    method_line = method_node->line;
+    method_column = method_node->column;
+    
     /* Get method symbol */
-    method_name = semantic_get_string(analyzer, method_node->data.method.name);
+    method_name = semantic_get_string(analyzer, method_name_off);
     analyzer->current_method = symtable_lookup(analyzer->symtable, method_name);
-    analyzer->expected_return = method_node->data.method.return_type;
+    analyzer->expected_return = return_type;
     analyzer->has_return = 0;
     analyzer->next_local_index = 0;
     
@@ -569,19 +649,18 @@ int check_method_body(SemanticAnalyzer* analyzer, ASTNode* method_node) {
     symtable_enter_scope(analyzer->symtable);
     
     /* Re-add parameters to scope */
-    param_idx = method_node->data.method.first_param;
     param_count = 0;
     
-    while (param_idx != 0 && param_count < method_node->data.method.param_count) {
+    while (param_idx != 0 && param_count < method_param_count) {
         Symbol param_sym;
-        const char* param_name;
+        uint16_t next_param_idx;
         
         param_node = semantic_get_node(analyzer, param_idx);
         if (!param_node) {
             break;
         }
         
-        param_name = semantic_get_string(analyzer, param_node->data.param.name);
+        next_param_idx = param_node->next_sibling;
         
         memset(&param_sym, 0, sizeof(Symbol));
         param_sym.kind = SYM_PARAM;
@@ -591,19 +670,19 @@ int check_method_body(SemanticAnalyzer* analyzer, ASTNode* method_node) {
         
         symtable_add_symbol(analyzer->symtable, &param_sym);
         
-        param_idx = param_node->next_sibling;
+        param_idx = next_param_idx;
         param_count++;
     }
     
     /* Check method body */
-    body_node = semantic_get_node(analyzer, method_node->data.method.body);
+    body_node = semantic_get_node(analyzer, body_idx);
     if (body_node) {
         check_block(analyzer, body_node);
     }
     
     /* Check return statement requirement */
     if (!is_void_type(analyzer->expected_return) && !analyzer->has_return) {
-        semantic_error_node(analyzer, method_node, "Missing return statement in non-void method");
+        semantic_error(analyzer, method_line, method_column, "Missing return statement in non-void method");
     }
     
     /* Exit method scope */
@@ -721,8 +800,8 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
         return -1;
     }
     
-    /* Check for duplicate variable in current scope */
-    if (symtable_exists_in_current_scope(analyzer->symtable, var_name)) {
+    /* Check for duplicate local variable in current active scope only */
+    if (current_scope_has_local_name(analyzer, var_name, SYM_LOCAL)) {
         semantic_error_node(analyzer, var_node, "Duplicate variable declaration");
         return -1;
     }
@@ -1256,11 +1335,10 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
     ASTNode* object_node;
     ASTNode* arg_node;
     ASTNode* recv_object_node;
-    TypeInfo object_type;
-    TypeInfo arg_type;
     uint16_t object_idx;
     uint16_t first_arg_idx;
     uint16_t method_name_off;
+    uint16_t arg_count;
     const char* method_name;
     
     if (!analyzer || !call_node || !result_type) {
@@ -1270,6 +1348,7 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
     object_idx = call_node->data.call.object;
     first_arg_idx = call_node->data.call.first_arg;
     method_name_off = call_node->data.call.method_name;
+    arg_count = call_node->data.call.arg_count;
     method_name = semantic_get_string(analyzer, method_name_off);
     
     /* Special-case built-in System.out.println(...) */
@@ -1286,12 +1365,21 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
             if (field_name && strcmp(field_name, "out") == 0 &&
                 recv_object_node && recv_object_node->type == NODE_IDENTIFIER) {
                 const char* recv_name = semantic_get_string(analyzer, recv_object_node->data.identifier.name);
+                uint16_t checked_args = 0;
+                uint16_t current_arg_idx = first_arg_idx;
+                
                 if (recv_name && strcmp(recv_name, "System") == 0) {
-                    if (first_arg_idx != 0) {
-                        arg_node = semantic_get_node(analyzer, first_arg_idx);
+                    while (current_arg_idx != 0 && checked_args < arg_count) {
+                        TypeInfo arg_type;
+                        uint16_t next_arg_idx;
+                        
+                        arg_node = semantic_get_node(analyzer, current_arg_idx);
                         if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
                             return -1;
                         }
+                        next_arg_idx = arg_node->next_sibling;
+                        current_arg_idx = next_arg_idx;
+                        checked_args++;
                     }
                     
                     result_type->kind = TYPE_VOID;
@@ -1303,22 +1391,89 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
     }
     
     if (object_idx != 0) {
-        object_node = semantic_get_node(analyzer, object_idx);
-        if (!object_node || check_expression(analyzer, object_node, &object_type) != 0) {
-            return -1;
-        }
+        semantic_error_node(analyzer, call_node, "Instance method calls are not supported");
+        return -1;
     }
     
-    if (first_arg_idx != 0) {
-        arg_node = semantic_get_node(analyzer, first_arg_idx);
-        if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
+    {
+        Symbol* method_sym = NULL;
+        uint16_t checked_args;
+        uint16_t current_arg_idx;
+        uint16_t param_index;
+        uint16_t i;
+        
+        if (!method_name) {
+            semantic_error_node(analyzer, call_node, "Invalid method name");
             return -1;
         }
+        
+        for (i = analyzer->symtable->symbol_count; i > 0; i--) {
+            Symbol* sym = &analyzer->symtable->symbols[i - 1];
+            const char* sym_name = symtable_get_string(analyzer->symtable, sym->name_offset);
+            if (sym->kind == SYM_METHOD &&
+                sym_name &&
+                strcmp(sym_name, method_name) == 0) {
+                method_sym = sym;
+                break;
+            }
+        }
+        
+        if (!method_sym) {
+            semantic_error_node(analyzer, call_node, "Undefined method");
+            return -1;
+        }
+        
+        if (!method_sym->data.method_data.is_static) {
+            semantic_error_node(analyzer, call_node, "Only static methods are supported");
+            return -1;
+        }
+        
+        if (method_sym->data.method_data.param_count != arg_count) {
+            semantic_error_node(analyzer, call_node, "Argument count mismatch in method call");
+            return -1;
+        }
+        
+        checked_args = 0;
+        current_arg_idx = first_arg_idx;
+        param_index = 0;
+        
+        while (current_arg_idx != 0 && checked_args < arg_count) {
+            TypeInfo arg_type;
+            Symbol* param_sym = NULL;
+            uint16_t next_arg_idx;
+            
+            arg_node = semantic_get_node(analyzer, current_arg_idx);
+            if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
+                return -1;
+            }
+            
+            for (i = 0; i < analyzer->symtable->symbol_count; i++) {
+                Symbol* sym = &analyzer->symtable->symbols[i];
+                if (sym->kind == SYM_PARAM && sym->data.param_data.index == param_index) {
+                    param_sym = sym;
+                    break;
+                }
+            }
+            
+            if (!is_numeric_type(arg_type)) {
+                semantic_error_node(analyzer, call_node, "Only int arguments are supported");
+                return -1;
+            }
+            
+            if (param_sym && !types_compatible(param_sym->type, arg_type)) {
+                semantic_error_node(analyzer, call_node, "Argument type mismatch in method call");
+                return -1;
+            }
+            
+            next_arg_idx = arg_node->next_sibling;
+            current_arg_idx = next_arg_idx;
+            checked_args++;
+            param_index++;
+        }
+        
+        *result_type = method_sym->type;
+        return 0;
     }
-    
-    result_type->kind = TYPE_VOID;
-    result_type->class_name = 0;
-    return 0;
 }
 
 /* Type checking helpers */

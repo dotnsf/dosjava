@@ -15,6 +15,7 @@ static int read_token_from_file(Parser* parser, Token* token);
 static uint16_t parse_if_stmt(Parser* parser);
 static uint16_t parse_while_stmt(Parser* parser);
 static uint16_t parse_return_stmt(Parser* parser);
+static int parser_link_sibling(Parser* parser, uint16_t current_node, uint16_t next_node);
 
 /**
  * Initialize parser
@@ -223,6 +224,29 @@ int parser_flush_nodes(Parser* parser) {
     return 0;
 }
 
+static int parser_link_sibling(Parser* parser, uint16_t current_node, uint16_t next_node) {
+    uint16_t current_idx;
+    
+    if (!parser || current_node == 0 || next_node == 0) {
+        return -1;
+    }
+    
+    if (current_node <= parser->total_nodes) {
+        parser_error(parser, "Internal parser error: cannot link flushed sibling node");
+        return -1;
+    }
+    
+    current_idx = current_node - parser->total_nodes - 1;
+    if (current_idx >= parser->node_count) {
+        parser_error(parser, "Internal parser error: sibling index out of range");
+        return -1;
+    }
+    
+    parser->nodes[current_idx].next_sibling = next_node;
+    
+    return 0;
+}
+
 /**
  * Parse entire program
  * Program -> ClassDecl
@@ -248,15 +272,7 @@ uint16_t parser_parse(Parser* parser) {
     /* Temporarily redirect node output to temp file */
     parser->ast_file = temp_file;
     
-    /* Allocate program node */
-    program_node = parser_alloc_node(parser, NODE_PROGRAM);
-    if (program_node == 0) {
-        fclose(temp_file);
-        parser->ast_file = original_ast_file;
-        return 0;
-    }
-    
-    /* Parse class */
+    /* Parse class first so child node indices match file order */
     class_node = parse_class(parser);
     if (class_node == 0) {
         fclose(temp_file);
@@ -264,7 +280,16 @@ uint16_t parser_parse(Parser* parser) {
         return 0;
     }
     
+    /* Allocate program node after child nodes */
+    program_node = parser_alloc_node(parser, NODE_PROGRAM);
+    if (program_node == 0) {
+        fclose(temp_file);
+        parser->ast_file = original_ast_file;
+        return 0;
+    }
+    
     parser->nodes[program_node - parser->total_nodes - 1].data.program.class_node = class_node;
+    
     /* Expect EOF */
     if (!parser_match(parser, TOK_EOF)) {
         parser_error(parser, "Expected end of file");
@@ -305,16 +330,13 @@ uint16_t parser_parse(Parser* parser) {
     parser->ast_file = original_ast_file;
     
     /* Now write to actual AST file in correct order */
-    /* Write header */
     fwrite(&parser->total_nodes, sizeof(uint16_t), 1, parser->ast_file);
     fwrite(&parser->pool_size, sizeof(uint16_t), 1, parser->ast_file);
     
-    /* Write string pool */
     if (parser->pool_size > 0) {
         fwrite(parser->string_pool, 1, parser->pool_size, parser->ast_file);
     }
     
-    /* Write nodes */
     fwrite(nodes_buffer, 1, nodes_size, parser->ast_file);
     
     free(nodes_buffer);
@@ -349,12 +371,6 @@ uint16_t parse_class(Parser* parser) {
     name_offset = parser->current.value.str_offset;
     parser_next_token(parser);
     
-    /* Allocate class node */
-    class_node = parser_alloc_node(parser, NODE_CLASS);
-    if (class_node == 0) {
-        return 0;
-    }
-    
     /* Expect '{' */
     if (parser_expect(parser, TOK_LBRACE) < 0) {
         return 0;
@@ -376,7 +392,9 @@ uint16_t parse_class(Parser* parser) {
         }
         
         if (prev_member != 0) {
-            parser->nodes[prev_member - parser->total_nodes - 1].next_sibling = member_node;
+            if (parser_link_sibling(parser, prev_member, member_node) < 0) {
+                return 0;
+            }
         }
         
         prev_member = member_node;
@@ -385,6 +403,12 @@ uint16_t parse_class(Parser* parser) {
     
     /* Expect '}' */
     if (parser_expect(parser, TOK_RBRACE) < 0) {
+        return 0;
+    }
+    
+    /* Allocate class node after members so file order matches node indices */
+    class_node = parser_alloc_node(parser, NODE_CLASS);
+    if (class_node == 0) {
         return 0;
     }
     
@@ -443,6 +467,8 @@ uint16_t parse_method(Parser* parser, int is_public, int is_static, TypeInfo ret
     uint16_t method_node;
     uint16_t name_offset;
     uint16_t body_node;
+    uint16_t first_param;
+    uint16_t param_count;
     
     /* Expect method name */
     if (!parser_match(parser, TOK_IDENTIFIER)) {
@@ -453,18 +479,16 @@ uint16_t parse_method(Parser* parser, int is_public, int is_static, TypeInfo ret
     name_offset = parser->current.value.str_offset;
     parser_next_token(parser);
     
-    /* Allocate method node */
-    method_node = parser_alloc_node(parser, NODE_METHOD);
-    if (method_node == 0) {
-        return 0;
-    }
-    
     /* Expect '(' */
     if (parser_expect(parser, TOK_LPAREN) < 0) {
         return 0;
     }
     
-    /* Expect ')' (no parameters for MVP) */
+    first_param = parse_param_list(parser, &param_count);
+    if (parser->has_error) {
+        return 0;
+    }
+    
     if (parser_expect(parser, TOK_RPAREN) < 0) {
         return 0;
     }
@@ -475,16 +499,111 @@ uint16_t parse_method(Parser* parser, int is_public, int is_static, TypeInfo ret
         return 0;
     }
     
+    /* Allocate method node after children so file order matches node indices */
+    method_node = parser_alloc_node(parser, NODE_METHOD);
+    if (method_node == 0) {
+        return 0;
+    }
+    
     /* Fill method node */
     parser->nodes[method_node - parser->total_nodes - 1].data.method.name = name_offset;
     parser->nodes[method_node - parser->total_nodes - 1].data.method.return_type = return_type;
     parser->nodes[method_node - parser->total_nodes - 1].data.method.is_static = is_static;
     parser->nodes[method_node - parser->total_nodes - 1].data.method.is_public = is_public;
-    parser->nodes[method_node - parser->total_nodes - 1].data.method.param_count = 0;
-    parser->nodes[method_node - parser->total_nodes - 1].data.method.first_param = 0;
+    parser->nodes[method_node - parser->total_nodes - 1].data.method.param_count = param_count;
+    parser->nodes[method_node - parser->total_nodes - 1].data.method.first_param = first_param;
     parser->nodes[method_node - parser->total_nodes - 1].data.method.body = body_node;
     
     return method_node;
+}
+
+uint16_t parse_param_list(Parser* parser, uint16_t* param_count) {
+    uint16_t first_param;
+    uint16_t prev_param;
+    
+    if (!parser || !param_count) {
+        return 0;
+    }
+    
+    *param_count = 0;
+    first_param = 0;
+    prev_param = 0;
+    
+    while (!parser_match(parser, TOK_RPAREN)) {
+        TypeInfo param_type;
+        uint16_t param_node;
+        uint16_t param_name;
+        
+        if (parse_type(parser, &param_type) < 0) {
+            return 0;
+        }
+        
+        if (!parser_match(parser, TOK_IDENTIFIER)) {
+            parser_error(parser, "Expected parameter name");
+            return 0;
+        }
+        
+        param_name = parser->current.value.str_offset;
+        parser_next_token(parser);
+        
+        param_node = parser_alloc_node(parser, NODE_PARAM);
+        if (param_node == 0) {
+            return 0;
+        }
+        
+        parser->nodes[param_node - parser->total_nodes - 1].data.param.name = param_name;
+        parser->nodes[param_node - parser->total_nodes - 1].data.param.type = param_type;
+        
+        if (first_param == 0) {
+            first_param = param_node;
+        } else if (parser_link_sibling(parser, prev_param, param_node) < 0) {
+            return 0;
+        }
+        prev_param = param_node;
+        (*param_count)++;
+        
+        if (!parser_consume(parser, TOK_COMMA)) {
+            break;
+        }
+    }
+    
+    return first_param;
+}
+
+uint16_t parse_arg_list(Parser* parser, uint16_t* arg_count) {
+    uint16_t first_arg;
+    uint16_t prev_arg;
+    
+    if (!parser || !arg_count) {
+        return 0;
+    }
+    
+    *arg_count = 0;
+    first_arg = 0;
+    prev_arg = 0;
+    
+    while (!parser_match(parser, TOK_RPAREN)) {
+        uint16_t arg_node;
+        
+        arg_node = parse_expression(parser);
+        if (arg_node == 0) {
+            return 0;
+        }
+        
+        if (first_arg == 0) {
+            first_arg = arg_node;
+        } else if (parser_link_sibling(parser, prev_arg, arg_node) < 0) {
+            return 0;
+        }
+        prev_arg = arg_node;
+        (*arg_count)++;
+        
+        if (!parser_consume(parser, TOK_COMMA)) {
+            break;
+        }
+    }
+    
+    return first_arg;
 }
 
 /**
@@ -538,13 +657,7 @@ uint16_t parse_block(Parser* parser) {
         return 0;
     }
     
-    /* Allocate block node */
-    block_node = parser_alloc_node(parser, NODE_BLOCK);
-    if (block_node == 0) {
-        return 0;
-    }
-    
-    /* Parse statements */
+    /* Parse statements first so file order matches node indices */
     first_stmt = 0;
     stmt_count = 0;
     prev_stmt = 0;
@@ -563,7 +676,9 @@ uint16_t parse_block(Parser* parser) {
         }
         
         if (prev_stmt != 0) {
-            parser->nodes[prev_stmt - parser->total_nodes - 1].next_sibling = stmt_node;
+            if (parser_link_sibling(parser, prev_stmt, stmt_node) < 0) {
+                return 0;
+            }
         }
         
         prev_stmt = stmt_node;
@@ -572,6 +687,12 @@ uint16_t parse_block(Parser* parser) {
     
     /* Expect '}' */
     if (parser_expect(parser, TOK_RBRACE) < 0) {
+        return 0;
+    }
+    
+    /* Allocate block node after children */
+    block_node = parser_alloc_node(parser, NODE_BLOCK);
+    if (block_node == 0) {
         return 0;
     }
     
@@ -1304,6 +1425,8 @@ uint16_t parse_postfix(Parser* parser) {
     
     while (1) {
         if (expr_is_identifier && parser_match(parser, TOK_LPAREN)) {
+            uint16_t arg_count;
+            
             parser_next_token(parser);  /* consume '(' */
             
             call_node = parser_alloc_node(parser, NODE_CALL);
@@ -1311,12 +1434,9 @@ uint16_t parse_postfix(Parser* parser) {
                 return 0;
             }
             
-            arg_node = 0;
-            if (!parser_match(parser, TOK_RPAREN)) {
-                arg_node = parse_expression(parser);
-                if (arg_node == 0) {
-                    return 0;
-                }
+            arg_node = parse_arg_list(parser, &arg_count);
+            if (parser->has_error) {
+                return 0;
             }
             
             if (parser_expect(parser, TOK_RPAREN) < 0) {
@@ -1325,7 +1445,7 @@ uint16_t parse_postfix(Parser* parser) {
             
             parser->nodes[call_node - parser->total_nodes - 1].data.call.object = 0;
             parser->nodes[call_node - parser->total_nodes - 1].data.call.method_name = identifier_name;
-            parser->nodes[call_node - parser->total_nodes - 1].data.call.arg_count = (arg_node != 0) ? 1 : 0;
+            parser->nodes[call_node - parser->total_nodes - 1].data.call.arg_count = arg_count;
             parser->nodes[call_node - parser->total_nodes - 1].data.call.first_arg = arg_node;
             
             expr = call_node;
@@ -1341,17 +1461,16 @@ uint16_t parse_postfix(Parser* parser) {
             parser_next_token(parser);
             
             if (parser_consume(parser, TOK_LPAREN)) {
+                uint16_t arg_count;
+                
                 call_node = parser_alloc_node(parser, NODE_CALL);
                 if (call_node == 0) {
                     return 0;
                 }
                 
-                arg_node = 0;
-                if (!parser_match(parser, TOK_RPAREN)) {
-                    arg_node = parse_expression(parser);
-                    if (arg_node == 0) {
-                        return 0;
-                    }
+                arg_node = parse_arg_list(parser, &arg_count);
+                if (parser->has_error) {
+                    return 0;
                 }
                 
                 if (parser_expect(parser, TOK_RPAREN) < 0) {
@@ -1360,7 +1479,7 @@ uint16_t parse_postfix(Parser* parser) {
                 
                 parser->nodes[call_node - parser->total_nodes - 1].data.call.object = expr;
                 parser->nodes[call_node - parser->total_nodes - 1].data.call.method_name = field_name;
-                parser->nodes[call_node - parser->total_nodes - 1].data.call.arg_count = (arg_node != 0) ? 1 : 0;
+                parser->nodes[call_node - parser->total_nodes - 1].data.call.arg_count = arg_count;
                 parser->nodes[call_node - parser->total_nodes - 1].data.call.first_arg = arg_node;
                 
                 expr = call_node;

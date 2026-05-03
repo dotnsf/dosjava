@@ -681,13 +681,15 @@ int interpreter_step(ExecutionContext* ctx) {
         
         case OP_INVOKE_STATIC: {
             uint16_t method_index;
+            uint8_t arg_count;
             DJCMethod* method;
             CallFrame* frame;
             uint8_t* method_code;
             const char* method_name;
             
-            /* Read method index (2 bytes, little-endian) */
+            /* Read method index (2 bytes, little-endian) and argument count */
             method_index = interpreter_read_u16(ctx);
+            arg_count = interpreter_read_u8(ctx);
             
             
             
@@ -783,7 +785,9 @@ int interpreter_step(ExecutionContext* ctx) {
                 return -1;
             }
             
-            /* Save current state to call frame */
+            /* Save current state to call frame.
+             * The new callee frame owns locals starting at the current local_pointer.
+             */
             frame = &ctx->call_frames[ctx->call_depth];
             frame->return_pc = ctx->pc;
             frame->return_code_start = ctx->code_start;
@@ -795,17 +799,34 @@ int interpreter_step(ExecutionContext* ctx) {
             /* Increment call depth */
             ctx->call_depth++;
             
-            /* Allocate space for new method's locals */
-            ctx->local_pointer += method->max_locals;
-            
             /* Initialize new locals to 0 */
             if (method->max_locals > 0) {
                 memset(&ctx->shared_locals[frame->local_base], 0,
                        method->max_locals * sizeof(uint16_t));
             }
             
-            /* TODO: Handle method parameters (pop from stack, store to locals) */
-            /* For now, we assume no parameters */
+            /* Allocate space for new method's locals */
+            ctx->local_pointer += method->max_locals;
+            
+            /* Move arguments from operand stack into callee locals.
+             * Arguments are evaluated left-to-right and pushed in order,
+             * so pop them in reverse into local slots [0..arg_count-1].
+             */
+            {
+                uint8_t arg_index;
+                
+                if (arg_count > method->max_locals) {
+                    arg_count = method->max_locals;
+                }
+                if (arg_count > ctx->stack_pointer) {
+                    arg_count = (uint8_t)ctx->stack_pointer;
+                }
+                
+                for (arg_index = 0; arg_index < arg_count; arg_index++) {
+                    ctx->shared_locals[frame->local_base + arg_count - arg_index - 1] =
+                        stack_pop_shared(ctx);
+                }
+            }
             
             /* Set PC to method code */
             ctx->pc = method_code;
@@ -839,9 +860,6 @@ int interpreter_step(ExecutionContext* ctx) {
             ctx->code_start = frame->return_code_start;
             ctx->code_length = frame->return_code_length;
             
-            /* Note: code_start and code_length are not restored */
-            /* This is OK because PC is absolute */
-            
             break;
         }
         
@@ -874,8 +892,10 @@ int interpreter_step(ExecutionContext* ctx) {
             /* Restore local pointer */
             ctx->local_pointer = frame->local_base;
             
-            /* Restore PC */
+            /* Restore PC and code context */
             ctx->pc = frame->return_pc;
+            ctx->code_start = frame->return_code_start;
+            ctx->code_length = frame->return_code_length;
             
             break;
         }
@@ -907,11 +927,6 @@ int interpreter_execute(ExecutionContext* ctx) {
     
     /* Execute until return or error */
     while (ctx->running) {
-        uint16_t pc_offset = (uint16_t)(ctx->pc - ctx->code_start);
-        uint8_t next_opcode = (ctx->pc < ctx->code_start + ctx->code_length) ? *ctx->pc : 0xFF;
-        
-        
-        
         result = interpreter_step(ctx);
         
         

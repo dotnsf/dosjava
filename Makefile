@@ -53,10 +53,10 @@ test_interpreter: $(BIN_DIR)/test_int.exe
 mkdjc: $(BIN_DIR)/mkdjc.exe
 
 # Test lexer program
-test_lexer: $(BIN_DIR)/test_lexer.exe
+test_lexer: $(BIN_DIR)/tlex.exe
 
 # Test parser program
-test_parser: $(BIN_DIR)/test_parser.exe
+test_parser: $(BIN_DIR)/tpars.exe
 
 # Java to .djc converter
 java2djc: $(BIN_DIR)/java2djc.exe
@@ -158,8 +158,8 @@ $(OBJ_DIR)/test_lexer.obj: tools/compiler/test_lexer.c tools/compiler/lexer.h
 	@echo Compiling test_lexer.c...
 	$(CC) $(CFLAGS) -fo=$@ tools/compiler/test_lexer.c
 
-$(BIN_DIR)/test_lexer.exe: $(OBJ_DIR)/test_lexer.obj $(OBJ_DIR)/lexer.obj
-	@echo Linking test_lexer.exe...
+$(BIN_DIR)/tlex.exe: $(OBJ_DIR)/test_lexer.obj $(OBJ_DIR)/lexer.obj
+	@echo Linking tlex.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_lexer.obj $(OBJ_DIR)/lexer.obj }
 
 $(OBJ_DIR)/parser.obj: tools/compiler/parser.c tools/compiler/parser.h tools/compiler/ast.h
@@ -170,8 +170,8 @@ $(OBJ_DIR)/test_parser.obj: tools/compiler/test_parser.c tools/compiler/parser.h
 	@echo Compiling test_parser.c...
 	$(CC) $(CFLAGS) -fo=$@ tools/compiler/test_parser.c
 
-$(BIN_DIR)/test_parser.exe: $(OBJ_DIR)/test_parser.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj
-	@echo Linking test_parser.exe...
+$(BIN_DIR)/tpars.exe: $(OBJ_DIR)/test_parser.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj
+	@echo Linking tpars.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_parser.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj }
 
 # Compile rules - Semantic Analyzer
@@ -187,11 +187,11 @@ $(OBJ_DIR)/test_semantic.obj: tools/compiler/test_semantic.c tools/compiler/sema
 	@echo Compiling test_semantic.c...
 	$(CC) $(CFLAGS) -fo=$@ tools/compiler/test_semantic.c
 
-$(BIN_DIR)/test_semantic.exe: $(OBJ_DIR)/test_semantic.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj
-	@echo Linking test_semantic.exe...
+$(BIN_DIR)/tsem.exe: $(OBJ_DIR)/test_semantic.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj
+	@echo Linking tsem.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_semantic.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj }
 
-test_semantic: $(BIN_DIR)/test_semantic.exe
+test_semantic: $(BIN_DIR)/tsem.exe
 
 # Compile rules - Code Generator
 $(OBJ_DIR)/codegen.obj: tools/compiler/codegen.c tools/compiler/codegen.h tools/compiler/semantic.h
@@ -202,11 +202,11 @@ $(OBJ_DIR)/test_codegen.obj: tools/compiler/test_codegen.c tools/compiler/codege
 	@echo Compiling test_codegen.c...
 	$(CC) $(CFLAGS) -fo=$@ tools/compiler/test_codegen.c
 
-$(BIN_DIR)/test_codegen.exe: $(OBJ_DIR)/test_codegen.obj $(OBJ_DIR)/codegen.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj $(FORMAT_OBJS) $(OBJ_DIR)/memory.obj
-	@echo Linking test_codegen.exe...
+$(BIN_DIR)/tcgen.exe: $(OBJ_DIR)/test_codegen.obj $(OBJ_DIR)/codegen.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj $(FORMAT_OBJS) $(OBJ_DIR)/memory.obj
+	@echo Linking tcgen.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_codegen.obj $(OBJ_DIR)/codegen.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/lexer.obj $(FORMAT_OBJS) $(OBJ_DIR)/memory.obj }
 
-test_codegen: $(BIN_DIR)/test_codegen.exe
+test_codegen: $(BIN_DIR)/tcgen.exe
 
 # Compile rules - Integrated Compiler (djc)
 $(OBJ_DIR)/djc_main.obj: tools/compiler/djc.c tools/compiler/djc.h

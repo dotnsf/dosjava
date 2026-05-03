@@ -59,15 +59,15 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         
-        if (token.type == TOK_EOF) {
-            break;
-        }
-        
         if (lexer_write_token(lexer, &token) < 0) {
             fprintf(stderr, "Error: Failed to write token\n");
             lexer_cleanup(lexer);
             free(lexer);
             return 1;
+        }
+        
+        if (token.type == TOK_EOF) {
+            break;
         }
     }
     

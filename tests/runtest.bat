@@ -251,7 +251,8 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value 10
 echo.
 
-goto :completed
+#goto :completed
+goto :test7
 
 :test6_fail
 echo FAILED: Compilation error
@@ -268,6 +269,84 @@ goto :end
 :test6_badout
 echo FAILED: Output mismatch for Test 6
 echo Expected: 10
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+:test7
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 7: Arrays
+echo ------------------------------
+..\build\bin\djc.exe arrays.jav
+if errorlevel 1 goto :test7_fail
+if not exist ARRAYS.DJC goto :test7_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe ARRAYS.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test7_runfail
+find "12" RT_OUT.TXT > nul
+if errorlevel 1 goto :test7_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value 12
+echo.
+
+goto :test8
+
+:test7_fail
+echo FAILED: Compilation error
+goto :end
+
+:test7_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test7_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test7_badout
+echo FAILED: Output mismatch for Test 7
+echo Expected: 12
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+:test8
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 8: Function and return value
+echo ------------------------------
+..\build\bin\djc.exe func.jav
+if errorlevel 1 goto :test8_fail
+if not exist FUNC.DJC goto :test8_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe FUNC.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test8_runfail
+find "6" RT_OUT.TXT > nul
+if errorlevel 1 goto :test8_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value 6
+echo.
+
+goto :completed
+
+:test8_fail
+echo FAILED: Compilation error
+goto :end
+
+:test8_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test8_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test8_badout
+echo FAILED: Output mismatch for Test 8
+echo Expected: 6
 echo Actual:
 type RT_OUT.TXT
 goto :end

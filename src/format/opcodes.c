@@ -167,7 +167,6 @@ uint8_t opcode_length(uint8_t opcode) {
         case OP_IF_LE:
         case OP_IF_GT:
         case OP_IF_GE:
-        case OP_INVOKE_STATIC:
         case OP_INVOKE_VIRTUAL:
         case OP_NEW:
         case OP_GET_FIELD:
@@ -177,6 +176,10 @@ uint8_t opcode_length(uint8_t opcode) {
         case OP_INSTANCEOF:
         case OP_CHECKCAST:
             return 3;
+        
+        /* Instructions with 2-byte + 1-byte operands (4 bytes) */
+        case OP_INVOKE_STATIC:
+            return 4;
         
         /* Instructions with 2 operands (3 bytes) */
         case OP_INC_LOCAL:
