@@ -115,14 +115,14 @@ int parser_next_token(Parser* parser) {
  * Check if current token matches type
  */
 int parser_match(Parser* parser, TokenType type) {
-    return parser->current.type == type;
+    return ((uint8_t)parser->current.type) == ((uint8_t)type);
 }
 
 /**
  * Consume token if it matches
  */
 int parser_consume(Parser* parser, TokenType type) {
-    if (parser_match(parser, type)) {
+    if (((uint8_t)parser->current.type) == ((uint8_t)type)) {
         parser_next_token(parser);
         return 1;
     }
@@ -133,10 +133,10 @@ int parser_consume(Parser* parser, TokenType type) {
  * Expect token and consume it
  */
 int parser_expect(Parser* parser, TokenType type) {
-    if (!parser_match(parser, type)) {
+    if (((uint8_t)parser->current.type) != ((uint8_t)type)) {
         fprintf(stderr, "Error: Expected %s but got %s at line %d\n",
-                token_type_name(type),
-                token_type_name(parser->current.type),
+                token_type_name((TokenType)((uint8_t)type)),
+                token_type_name((TokenType)((uint8_t)parser->current.type)),
                 parser->current.line);
         parser->has_error = 1;
         parser->error_count++;
@@ -183,7 +183,7 @@ const char* parser_get_string(Parser* parser, uint16_t offset) {
 uint16_t parser_alloc_node(Parser* parser, NodeType type) {
     uint16_t index;
     
-    if (parser->node_count >= 128) {
+    if (parser->node_count >= 512) {
         /* Flush buffer */
         if (parser_flush_nodes(parser) < 0) {
             return 0;
@@ -265,7 +265,6 @@ uint16_t parser_parse(Parser* parser) {
     }
     
     parser->nodes[program_node - parser->total_nodes - 1].data.program.class_node = class_node;
-    
     /* Expect EOF */
     if (!parser_match(parser, TOK_EOF)) {
         parser_error(parser, "Expected end of file");
@@ -490,9 +489,11 @@ uint16_t parse_method(Parser* parser, int is_public, int is_static, TypeInfo ret
 
 /**
  * Parse type
- * Type -> 'void' | 'int' | 'boolean'
+ * Type -> 'void' | 'int' ('[' ']')? | 'boolean' ('[' ']')?
  */
 int parse_type(Parser* parser, TypeInfo* type) {
+    uint16_t base_kind = 0;
+    
     if (parser_consume(parser, TOK_VOID)) {
         type->kind = TYPE_VOID;
         type->class_name = 0;
@@ -500,19 +501,25 @@ int parse_type(Parser* parser, TypeInfo* type) {
     }
     
     if (parser_consume(parser, TOK_INT)) {
-        type->kind = TYPE_INT;
-        type->class_name = 0;
-        return 0;
+        base_kind = TYPE_INT;
+    } else if (parser_consume(parser, TOK_BOOLEAN)) {
+        base_kind = TYPE_BOOLEAN;
+    } else {
+        parser_error(parser, "Expected type");
+        return -1;
     }
     
-    if (parser_consume(parser, TOK_BOOLEAN)) {
-        type->kind = TYPE_BOOLEAN;
-        type->class_name = 0;
-        return 0;
+    type->kind = base_kind;
+    type->class_name = 0;
+    
+    if (parser_consume(parser, TOK_LBRACKET)) {
+        if (parser_expect(parser, TOK_RBRACKET) < 0) {
+            return -1;
+        }
+        type->kind = TYPE_ARRAY;
     }
     
-    parser_error(parser, "Expected type");
-    return -1;
+    return 0;
 }
 
 /**
@@ -545,6 +552,9 @@ uint16_t parse_block(Parser* parser) {
     while (!parser_match(parser, TOK_RBRACE) && !parser_match(parser, TOK_EOF)) {
         stmt_node = parse_statement(parser);
         if (stmt_node == 0) {
+            if (parser_match(parser, TOK_RBRACE)) {
+                break;
+            }
             return 0;
         }
         
@@ -553,7 +563,7 @@ uint16_t parse_block(Parser* parser) {
         }
         
         if (prev_stmt != 0) {
-            parser->nodes[prev_stmt - 1].next_sibling = stmt_node;
+            parser->nodes[prev_stmt - parser->total_nodes - 1].next_sibling = stmt_node;
         }
         
         prev_stmt = stmt_node;
@@ -566,8 +576,8 @@ uint16_t parse_block(Parser* parser) {
     }
     
     /* Fill block node */
-    parser->nodes[block_node - 1].data.block.stmt_count = stmt_count;
-    parser->nodes[block_node - 1].data.block.first_stmt = first_stmt;
+    parser->nodes[block_node - parser->total_nodes - 1].data.block.stmt_count = stmt_count;
+    parser->nodes[block_node - parser->total_nodes - 1].data.block.first_stmt = first_stmt;
     
     return block_node;
 }
@@ -577,6 +587,11 @@ uint16_t parse_block(Parser* parser) {
  * Statement -> Block | VarDecl | IfStmt | WhileStmt | ReturnStmt | ExprStmt
  */
 uint16_t parse_statement(Parser* parser) {
+    /* Block terminator is not a statement */
+    if (parser_match(parser, TOK_RBRACE)) {
+        return 0;
+    }
+    
     /* Block statement */
     if (parser_match(parser, TOK_LBRACE)) {
         return parse_block(parser);
@@ -1262,74 +1277,40 @@ uint16_t parse_unary(Parser* parser) {
 
 /**
  * Parse postfix expression
- * Postfix -> Primary ('.' ID '(' ArgList? ')' | '(' ArgList? ')')*
+ * Postfix -> Primary suffix*
  */
 uint16_t parse_postfix(Parser* parser) {
     uint16_t expr;
     uint16_t call_node;
     uint16_t field_name;
     uint16_t arg_node;
+    uint16_t identifier_name;
+    int expr_is_identifier;
     
     expr = parse_primary(parser);
     if (expr == 0) {
         return 0;
     }
     
-    /* Check for direct method call: identifier '(' ... ')' */
-    if (parser->nodes[expr - parser->total_nodes - 1].type == NODE_IDENTIFIER &&
-        parser_match(parser, TOK_LPAREN)) {
-        /* This is a simple method call like helper() */
-        parser_next_token(parser);  /* consume '(' */
-        
-        /* Allocate call node */
-        call_node = parser_alloc_node(parser, NODE_CALL);
-        if (call_node == 0) {
-            return 0;
+    expr_is_identifier = 0;
+    identifier_name = 0;
+    if (expr > parser->total_nodes) {
+        ASTNode* expr_node = &parser->nodes[expr - parser->total_nodes - 1];
+        if (expr_node->type == NODE_IDENTIFIER) {
+            expr_is_identifier = 1;
+            identifier_name = expr_node->data.identifier.name;
         }
-        
-        /* Parse arguments (simplified: only one argument for MVP) */
-        arg_node = 0;
-        if (!parser_match(parser, TOK_RPAREN)) {
-            arg_node = parse_expression(parser);
-            if (arg_node == 0) {
-                return 0;
-            }
-        }
-        
-        /* Expect ')' */
-        if (parser_expect(parser, TOK_RPAREN) < 0) {
-            return 0;
-        }
-        
-        /* Fill call node - for simple calls, object is 0 (static call) */
-        parser->nodes[call_node - parser->total_nodes - 1].data.call.object = 0;
-        parser->nodes[call_node - parser->total_nodes - 1].data.call.method_name =
-            parser->nodes[expr - parser->total_nodes - 1].data.identifier.name;
-        parser->nodes[call_node - parser->total_nodes - 1].data.call.arg_count = (arg_node != 0) ? 1 : 0;
-        parser->nodes[call_node - parser->total_nodes - 1].data.call.first_arg = arg_node;
-        
-        expr = call_node;
     }
     
-    while (parser_consume(parser, TOK_DOT)) {
-        /* Expect field/method name */
-        if (!parser_match(parser, TOK_IDENTIFIER)) {
-            parser_error(parser, "Expected field or method name");
-            return 0;
-        }
-        
-        field_name = parser->current.value.str_offset;
-        parser_next_token(parser);
-        
-        /* Check for method call */
-        if (parser_consume(parser, TOK_LPAREN)) {
-            /* Allocate call node */
+    while (1) {
+        if (expr_is_identifier && parser_match(parser, TOK_LPAREN)) {
+            parser_next_token(parser);  /* consume '(' */
+            
             call_node = parser_alloc_node(parser, NODE_CALL);
             if (call_node == 0) {
                 return 0;
             }
             
-            /* Parse arguments (simplified: only one argument for MVP) */
             arg_node = 0;
             if (!parser_match(parser, TOK_RPAREN)) {
                 arg_node = parse_expression(parser);
@@ -1338,46 +1319,114 @@ uint16_t parse_postfix(Parser* parser) {
                 }
             }
             
-            /* Expect ')' */
             if (parser_expect(parser, TOK_RPAREN) < 0) {
                 return 0;
             }
             
-            /* Fill call node */
-            parser->nodes[call_node - parser->total_nodes - 1].data.call.object = expr;
-            parser->nodes[call_node - parser->total_nodes - 1].data.call.method_name = field_name;
+            parser->nodes[call_node - parser->total_nodes - 1].data.call.object = 0;
+            parser->nodes[call_node - parser->total_nodes - 1].data.call.method_name = identifier_name;
             parser->nodes[call_node - parser->total_nodes - 1].data.call.arg_count = (arg_node != 0) ? 1 : 0;
             parser->nodes[call_node - parser->total_nodes - 1].data.call.first_arg = arg_node;
             
             expr = call_node;
-        } else {
-            /* Field access */
-            uint16_t field_node = parser_alloc_node(parser, NODE_FIELD_ACCESS);
-            if (field_node == 0) {
+            expr_is_identifier = 0;
+            identifier_name = 0;
+        } else if (parser_consume(parser, TOK_DOT)) {
+            if (!parser_match(parser, TOK_IDENTIFIER)) {
+                parser_error(parser, "Expected field or method name");
                 return 0;
             }
             
-            parser->nodes[field_node - parser->total_nodes - 1].data.field_access.object = expr;
-            parser->nodes[field_node - parser->total_nodes - 1].data.field_access.field_name = field_name;
+            field_name = parser->current.value.str_offset;
+            parser_next_token(parser);
             
-            expr = field_node;
+            if (parser_consume(parser, TOK_LPAREN)) {
+                call_node = parser_alloc_node(parser, NODE_CALL);
+                if (call_node == 0) {
+                    return 0;
+                }
+                
+                arg_node = 0;
+                if (!parser_match(parser, TOK_RPAREN)) {
+                    arg_node = parse_expression(parser);
+                    if (arg_node == 0) {
+                        return 0;
+                    }
+                }
+                
+                if (parser_expect(parser, TOK_RPAREN) < 0) {
+                    return 0;
+                }
+                
+                parser->nodes[call_node - parser->total_nodes - 1].data.call.object = expr;
+                parser->nodes[call_node - parser->total_nodes - 1].data.call.method_name = field_name;
+                parser->nodes[call_node - parser->total_nodes - 1].data.call.arg_count = (arg_node != 0) ? 1 : 0;
+                parser->nodes[call_node - parser->total_nodes - 1].data.call.first_arg = arg_node;
+                
+                expr = call_node;
+            } else {
+                uint16_t field_node = parser_alloc_node(parser, NODE_FIELD_ACCESS);
+                if (field_node == 0) {
+                    return 0;
+                }
+                
+                parser->nodes[field_node - parser->total_nodes - 1].data.field_access.object = expr;
+                parser->nodes[field_node - parser->total_nodes - 1].data.field_access.field_name = field_name;
+                
+                expr = field_node;
+            }
+            expr_is_identifier = 0;
+            identifier_name = 0;
+        } else if (parser_consume(parser, TOK_LBRACKET)) {
+            uint16_t index_node;
+            uint16_t array_node;
+            
+            /* Parse index expression.
+             * Array indices need additive arithmetic like:
+             *   arr[i]
+             *   arr[j + 1]
+             *   arr[n - i - 1]
+             * but must stop before outer relational operators in expressions like:
+             *   arr[j] > arr[j + 1]
+             */
+            index_node = parse_additive(parser);
+            if (index_node == 0) {
+                return 0;
+            }
+            
+            if (parser_expect(parser, TOK_RBRACKET) < 0) {
+                return 0;
+            }
+            
+            array_node = parser_alloc_node(parser, NODE_ARRAY_ACCESS);
+            if (array_node == 0) {
+                return 0;
+            }
+            
+            parser->nodes[array_node - parser->total_nodes - 1].data.array_access.array = expr;
+            parser->nodes[array_node - parser->total_nodes - 1].data.array_access.index = index_node;
+            
+            expr = array_node;
+            expr_is_identifier = 0;
+            identifier_name = 0;
+        } else {
+            break;
         }
     }
     
-    /* Check for postfix operators (++ or --) */
     if (parser_match(parser, TOK_PLUSPLUS) || parser_match(parser, TOK_MINUSMINUS)) {
         uint16_t postfix_node;
         TokenType op_type = parser->current.type;
         
-        parser_next_token(parser);  /* consume ++ or -- */
+        parser_next_token(parser);
         
-        /* Allocate postfix node */
         postfix_node = parser_alloc_node(parser, NODE_POSTFIX_OP);
+        expr_is_identifier = 0;
+        identifier_name = 0;
         if (postfix_node == 0) {
             return 0;
         }
         
-        /* Fill postfix node */
         parser->nodes[postfix_node - parser->total_nodes - 1].data.postfix_op.op =
             (op_type == TOK_PLUSPLUS) ? POSTOP_INC : POSTOP_DEC;
         parser->nodes[postfix_node - parser->total_nodes - 1].data.postfix_op.operand = expr;
@@ -1390,7 +1439,7 @@ uint16_t parse_postfix(Parser* parser) {
 
 /**
  * Parse primary expression
- * Primary -> INTEGER | ID | '(' Expr ')'
+ * Primary -> INTEGER | ID | 'new' ('int'|'boolean') '[' Expr ']' | '(' Expr ')'
  */
 uint16_t parse_primary(Parser* parser) {
     uint16_t node;
@@ -1417,6 +1466,44 @@ uint16_t parse_primary(Parser* parser) {
         
         parser->nodes[node - parser->total_nodes - 1].data.literal_string.str_offset = parser->current.value.str_offset;
         parser_next_token(parser);
+        
+        return node;
+    }
+    
+    /* Array creation */
+    if (parser_consume(parser, TOK_NEW)) {
+        uint16_t base_kind;
+        uint16_t size_expr;
+        
+        if (parser_consume(parser, TOK_INT)) {
+            base_kind = TYPE_INT;
+        } else if (parser_consume(parser, TOK_BOOLEAN)) {
+            base_kind = TYPE_BOOLEAN;
+        } else {
+            parser_error(parser, "Expected array element type after new");
+            return 0;
+        }
+        
+        if (parser_expect(parser, TOK_LBRACKET) < 0) {
+            return 0;
+        }
+        
+        size_expr = parse_expression(parser);
+        if (size_expr == 0) {
+            return 0;
+        }
+        
+        if (parser_expect(parser, TOK_RBRACKET) < 0) {
+            return 0;
+        }
+        
+        node = parser_alloc_node(parser, NODE_NEW);
+        if (node == 0) {
+            return 0;
+        }
+        
+        parser->nodes[node - parser->total_nodes - 1].data.new_expr.class_name = base_kind;
+        parser->nodes[node - parser->total_nodes - 1].next_sibling = size_expr;
         
         return node;
     }

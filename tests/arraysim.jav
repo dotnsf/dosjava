@@ -1,4 +1,4 @@
-﻿// Minimal array test - just declaration
+// Minimal array test - just declaration
 class ArraySimple {
     public static void main() {
         int[] arr;

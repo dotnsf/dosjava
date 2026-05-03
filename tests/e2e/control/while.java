@@ -1,4 +1,4 @@
-﻿class WhileTest {
+class WhileTest {
     public static void main() {
         int i = 0;
         int sum = 0;

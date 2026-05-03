@@ -1,4 +1,4 @@
-﻿// Calculation Test
+// Calculation Test
 class Calc {
     public static void main() {
         int x = 10;

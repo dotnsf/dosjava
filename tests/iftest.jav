@@ -1,4 +1,4 @@
-﻿// If Statement Test
+// If Statement Test
 class IfTest {
     public static void main() {
         int x = 15;

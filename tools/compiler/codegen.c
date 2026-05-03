@@ -21,7 +21,6 @@ int codegen_init(CodeGenerator* codegen, const char* ast_file, const char* symbo
     
     /* Clear structure */
     memset(codegen, 0, sizeof(CodeGenerator));
-    
     /* Open AST file */
     codegen->ast_file = fopen(ast_file, "rb");
     if (!codegen->ast_file) {
@@ -169,10 +168,6 @@ static int load_string_pool(CodeGenerator* codegen) {
 
 /* Load symbol table */
 static int load_symbol_table(CodeGenerator* codegen, const char* symbol_file) {
-    uint16_t i;
-    Symbol* sym;
-    const char* sym_name;
-    
     codegen->symtable = (SymbolTable*)malloc(sizeof(SymbolTable));
     if (!codegen->symtable) {
         return -1;
@@ -315,8 +310,6 @@ int generate_class(CodeGenerator* codegen, ASTNode* class_node) {
         next_sibling = member_node->next_sibling;
         
         if (member_node->type == NODE_METHOD) {
-            const char* method_name = codegen_get_string(codegen, member_node->data.method.name);
-            
             if (generate_method(codegen, member_node) != 0) {
                 return -1;
             }
@@ -859,39 +852,33 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
     
     switch (expr_node->type) {
         case NODE_LITERAL_INT:
-            /* Push integer constant */
             emit_opcode(codegen, OP_PUSH_INT);
             emit_u2(codegen, (uint16_t)expr_node->data.literal_int.int_value);
             update_stack(codegen, 1);
             return 0;
         
         case NODE_LITERAL_BOOL:
-            /* Push boolean as integer (0 or 1) */
             emit_opcode(codegen, OP_PUSH_INT);
             emit_u2(codegen, expr_node->data.literal_bool.bool_value);
             update_stack(codegen, 1);
             return 0;
         
         case NODE_LITERAL_STRING: {
-            /* Push string constant from constant pool */
             const char* str_value;
             uint16_t const_idx;
             
-            /* Get string from string pool */
             str_value = codegen_get_string(codegen, expr_node->data.literal_string.str_offset);
             if (!str_value) {
                 codegen_error(codegen, "Invalid string literal");
                 return -1;
             }
             
-            /* Add string to constant pool */
             const_idx = find_or_add_utf8(codegen, str_value);
             if (const_idx == 0xFFFF) {
                 codegen_error(codegen, "Failed to add string constant");
                 return -1;
             }
             
-            /* Emit OP_PUSH_CONST with constant index */
             emit_opcode(codegen, OP_PUSH_CONST);
             emit_u2(codegen, const_idx);
             update_stack(codegen, 1);
@@ -915,6 +902,73 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
         
         case NODE_CALL:
             return generate_method_call(codegen, expr_node);
+        
+        case NODE_NEW: {
+            ASTNode* size_node;
+            uint16_t size_idx = expr_node->next_sibling;
+            uint8_t elem_type = (uint8_t)expr_node->data.new_expr.class_name;
+            
+            size_node = codegen_get_node(codegen, size_idx);
+            if (!size_node) {
+                codegen_error(codegen, "Invalid array size expression");
+                return -1;
+            }
+            generate_expression(codegen, size_node);
+            emit_opcode(codegen, OP_NEW_ARRAY);
+            emit_u1(codegen, elem_type);
+            return 0;
+        }
+        
+        case NODE_ARRAY_ACCESS: {
+            ASTNode* array_node;
+            ASTNode* index_node;
+            uint16_t array_idx = expr_node->data.array_access.array;
+            uint16_t index_idx = expr_node->data.array_access.index;
+            
+            array_node = codegen_get_node(codegen, array_idx);
+            if (!array_node) {
+                codegen_error(codegen, "Invalid array access");
+                return -1;
+            }
+            generate_expression(codegen, array_node);
+            
+            index_node = codegen_get_node(codegen, index_idx);
+            if (!index_node) {
+                codegen_error(codegen, "Invalid array access");
+                return -1;
+            }
+            generate_expression(codegen, index_node);
+            emit_opcode(codegen, OP_ARRAY_LOAD);
+            update_stack(codegen, -1);
+            return 0;
+        }
+        
+        case NODE_FIELD_ACCESS: {
+            const char* field_name;
+            ASTNode* object_node;
+            uint16_t field_name_off = expr_node->data.field_access.field_name;
+            uint16_t object_idx = expr_node->data.field_access.object;
+            
+            field_name = codegen_get_string(codegen, field_name_off);
+            if (!field_name) {
+                codegen_error(codegen, "Invalid field access");
+                return -1;
+            }
+            
+            object_node = codegen_get_node(codegen, object_idx);
+            if (!object_node) {
+                codegen_error(codegen, "Invalid field access");
+                return -1;
+            }
+            
+            if (strcmp(field_name, "length") == 0) {
+                generate_expression(codegen, object_node);
+                emit_opcode(codegen, OP_ARRAY_LENGTH);
+                return 0;
+            }
+            codegen_error(codegen, "Unsupported field access");
+            return -1;
+        }
         
         default:
             codegen_error(codegen, "Unknown expression type");
@@ -1123,41 +1177,88 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     uint16_t local_idx;
     uint16_t target_index;
     uint16_t value_index;
+    uint16_t target_type;
+    uint16_t target_name_off;
+    uint16_t array_idx;
+    uint16_t index_idx;
     
     if (!codegen || !assign_node) {
         return -1;
     }
     
-    /* CRITICAL: Save indices BEFORE any recursive calls */
     target_index = assign_node->data.assign.target;
     value_index = assign_node->data.assign.value;
     
-    /* Generate value */
-    value_node = codegen_get_node(codegen, value_index);
-    if (value_node) {
-        generate_expression(codegen, value_node);
+    target_node = codegen_get_node(codegen, target_index);
+    if (!target_node) {
+        codegen_error(codegen, "Invalid assignment");
+        return -1;
     }
     
-    /* Duplicate value (assignment returns the value) */
+    /* Save target information before any further codegen_get_node() calls */
+    target_type = target_node->type;
+    target_name_off = 0;
+    array_idx = 0;
+    index_idx = 0;
+    
+    if (target_type == NODE_IDENTIFIER) {
+        target_name_off = target_node->data.identifier.name;
+    } else if (target_type == NODE_ARRAY_ACCESS) {
+        array_idx = target_node->data.array_access.array;
+        index_idx = target_node->data.array_access.index;
+    }
+    
+    value_node = codegen_get_node(codegen, value_index);
+    if (!value_node) {
+        codegen_error(codegen, "Invalid assignment");
+        return -1;
+    }
+    
+    if (target_type == NODE_ARRAY_ACCESS) {
+        ASTNode* array_node;
+        ASTNode* index_node;
+        
+        array_node = codegen_get_node(codegen, array_idx);
+        if (!array_node) {
+            codegen_error(codegen, "Invalid array assignment target");
+            return -1;
+        }
+        generate_expression(codegen, array_node);
+        
+        index_node = codegen_get_node(codegen, index_idx);
+        if (!index_node) {
+            codegen_error(codegen, "Invalid array assignment target");
+            return -1;
+        }
+        generate_expression(codegen, index_node);
+        
+        value_node = codegen_get_node(codegen, value_index);
+        if (!value_node) {
+            codegen_error(codegen, "Invalid assignment");
+            return -1;
+        }
+        generate_expression(codegen, value_node);
+        emit_opcode(codegen, OP_ARRAY_STORE);
+        update_stack(codegen, -3);
+        return 0;
+    }
+    
+    generate_expression(codegen, value_node);
     emit_opcode(codegen, OP_DUP);
     update_stack(codegen, 1);
     
-    /* Get target */
-    target_node = codegen_get_node(codegen, target_index);
-    if (!target_node || target_node->type != NODE_IDENTIFIER) {
+    if (target_type != NODE_IDENTIFIER) {
         codegen_error(codegen, "Invalid assignment target");
         return -1;
     }
     
-    /* Get variable name and index */
-    var_name = codegen_get_string(codegen, target_node->data.identifier.name);
+    var_name = codegen_get_string(codegen, target_name_off);
     if (!var_name) {
         return -1;
     }
     
     local_idx = get_local_index(codegen, var_name);
     
-    /* Store to local variable */
     if (local_idx <= 2) {
         emit_opcode(codegen, OP_STORE_0 + local_idx);
     } else {
@@ -1231,20 +1332,19 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     
     
     while (arg_idx != 0 && arg_count < total_arg_count) {
-        
+        uint16_t next_arg_idx;
         
         arg_node = codegen_get_node(codegen, arg_idx);
         if (!arg_node) {
-            
             break;
         }
         
-        
+        next_arg_idx = arg_node->next_sibling;
         
         /* Generate argument expression */
         generate_expression(codegen, arg_node);
         
-        arg_idx = arg_node->next_sibling;
+        arg_idx = next_arg_idx;
         arg_count++;
     }
     

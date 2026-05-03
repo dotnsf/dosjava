@@ -1,4 +1,4 @@
-﻿class Factorial {
+class Factorial {
     public static void main() {
         int n = 5;
         int result = 1;

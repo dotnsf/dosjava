@@ -1,4 +1,4 @@
-﻿// Test case for scope resolution
+// Test case for scope resolution
 // This file should pass semantic analysis without errors
 
 class ScopeTest {

@@ -1,4 +1,4 @@
-﻿// Test case for type checking
+// Test case for type checking
 // This file should pass semantic analysis without errors
 
 class TypeTest {

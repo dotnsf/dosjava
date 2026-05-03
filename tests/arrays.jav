@@ -1,4 +1,4 @@
-﻿// Array sorting test - Bubble sort algorithm
+// Array sorting test - Bubble sort algorithm
 // Tests array operations in a practical algorithm
 
 class Arrays {

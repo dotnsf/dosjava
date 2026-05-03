@@ -291,7 +291,6 @@ int run_lexer_phase(CompilerContext* ctx) {
     }
     
     ctx->line_count = lexer->line;
-    
     /* Cleanup */
     lexer_cleanup(lexer);
     free(lexer);
@@ -332,7 +331,6 @@ int run_parser_phase(CompilerContext* ctx) {
     }
     
     ctx->node_count = parser->total_nodes;
-    
     /* Cleanup */
     parser_cleanup(parser);
     free(parser);
@@ -379,7 +377,6 @@ int run_semantic_phase(CompilerContext* ctx) {
     }
     
     ctx->symbol_count = analyzer->symtable->symbol_count;
-    
     /* Cleanup */
     semantic_cleanup(analyzer);
     free(analyzer);
@@ -419,7 +416,6 @@ int run_codegen_phase(CompilerContext* ctx) {
     }
     
     ctx->bytecode_size = codegen->bytecode->size;
-    
     /* Cleanup */
     codegen_cleanup(codegen);
     free(codegen);

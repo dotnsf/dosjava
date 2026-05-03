@@ -80,7 +80,8 @@ typedef enum {
     TYPE_VOID = 0,
     TYPE_INT = 1,
     TYPE_BOOLEAN = 2,
-    TYPE_CLASS = 3
+    TYPE_CLASS = 3,
+    TYPE_ARRAY = 4   /* Current implementation treats arrays as int[] */
 } TypeKind;
 
 /* Type information */

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Test: Simple Method Call
  * 
  * Tests basic method invocation with no parameters and no return value.

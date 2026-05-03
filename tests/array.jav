@@ -1,4 +1,4 @@
-﻿// Array test program
+// Array test program
 // Tests basic array operations: declaration, initialization, access
 
 class Array {

@@ -1,4 +1,4 @@
-﻿// Variable Test
+// Variable Test
 class VarTest {
     public static void main() {
         int x = 10;

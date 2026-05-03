@@ -564,6 +564,102 @@ int interpreter_step(ExecutionContext* ctx) {
             }
             break;
         
+        case OP_NEW_ARRAY: {
+            uint8_t elem_type;
+            uint16_t size;
+            uint16_t total_size;
+            uint16_t* array_data;
+            
+            elem_type = interpreter_read_u8(ctx);
+            size = stack_pop_shared(ctx);
+            (void)elem_type;
+            
+            if ((int16_t)size < 0) {
+                printf("ERROR: Negative array size\n");
+                return -1;
+            }
+            
+            if (size > 0x7FFF / sizeof(uint16_t) - 1) {
+                printf("ERROR: Array too large\n");
+                return -1;
+            }
+            
+            total_size = (uint16_t)((size + 1) * sizeof(uint16_t));
+            array_data = (uint16_t*)memory_alloc(total_size);
+            if (array_data == NULL) {
+                printf("ERROR: Out of memory allocating array\n");
+                return -1;
+            }
+            
+            memset(array_data, 0, total_size);
+            array_data[0] = size;
+            
+            if (stack_push_shared(ctx, (uint16_t)array_data) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_ARRAY_LENGTH: {
+            uint16_t* array_data;
+            
+            array_data = (uint16_t*)stack_pop_shared(ctx);
+            if (array_data == NULL) {
+                printf("ERROR: Null array reference\n");
+                return -1;
+            }
+            
+            if (stack_push_shared(ctx, array_data[0]) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_ARRAY_LOAD: {
+            uint16_t index;
+            uint16_t* array_data;
+            
+            index = stack_pop_shared(ctx);
+            array_data = (uint16_t*)stack_pop_shared(ctx);
+            if (array_data == NULL) {
+                printf("ERROR: Null array reference\n");
+                return -1;
+            }
+            if (index >= array_data[0]) {
+                printf("ERROR: Array index out of bounds\n");
+                return -1;
+            }
+            
+            if (stack_push_shared(ctx, array_data[index + 1]) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_ARRAY_STORE: {
+            uint16_t value;
+            uint16_t index;
+            uint16_t* array_data;
+            
+            value = stack_pop_shared(ctx);
+            index = stack_pop_shared(ctx);
+            array_data = (uint16_t*)stack_pop_shared(ctx);
+            if (array_data == NULL) {
+                printf("ERROR: Null array reference\n");
+                return -1;
+            }
+            if (index >= array_data[0]) {
+                printf("ERROR: Array index out of bounds\n");
+                return -1;
+            }
+            
+            array_data[index + 1] = value;
+            break;
+        }
+        
         case OP_PRINT_INT:
             /* Debug: print integer */
             value1 = stack_pop_shared(ctx);

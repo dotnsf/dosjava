@@ -107,6 +107,7 @@ uint16_t symtable_add_symbol(SymbolTable* table, const Symbol* sym) {
 
 /* Lookup symbol by name (searches from current scope to global) */
 Symbol* symtable_lookup(SymbolTable* table, const char* name) {
+    int scope;
     uint16_t i;
     const char* sym_name;
     
@@ -114,11 +115,18 @@ Symbol* symtable_lookup(SymbolTable* table, const char* name) {
         return NULL;
     }
     
-    /* Search from most recent to oldest */
-    for (i = table->symbol_count; i > 0; i--) {
-        sym_name = symtable_get_string(table, table->symbols[i - 1].name_offset);
-        if (sym_name && strcmp(sym_name, name) == 0) {
-            return &table->symbols[i - 1];
+    /* Search visible scopes only, from innermost to outermost.
+     * Symbols from exited scopes remain in the table for codegen, so
+     * we must filter by scope_level instead of scanning blindly. */
+    for (scope = (int)table->scope_level; scope >= 0; scope--) {
+        for (i = table->symbol_count; i > 0; i--) {
+            if (table->symbols[i - 1].scope_level != (uint16_t)scope) {
+                continue;
+            }
+            sym_name = symtable_get_string(table, table->symbols[i - 1].name_offset);
+            if (sym_name && strcmp(sym_name, name) == 0) {
+                return &table->symbols[i - 1];
+            }
         }
     }
     
@@ -128,29 +136,24 @@ Symbol* symtable_lookup(SymbolTable* table, const char* name) {
 /* Lookup symbol in specific scope only */
 Symbol* symtable_lookup_in_scope(SymbolTable* table, const char* name, uint16_t scope) {
     uint16_t i;
-    uint16_t scope_start;
-    uint16_t scope_end;
     const char* sym_name;
     
-    if (!table || !name || scope > table->scope_level) {
+    if (!table || !name) {
         return NULL;
     }
     
-    /* Determine scope boundaries */
-    scope_start = table->scope_stack[scope];
-    if (scope < table->scope_level) {
-        scope_end = table->scope_stack[scope + 1];
-    } else {
-        scope_end = table->symbol_count;
-    }
-    
-    /* Search within scope */
-    for (i = scope_start; i < scope_end; i++) {
-        if (table->symbols[i].scope_level == scope) {
-            sym_name = symtable_get_string(table, table->symbols[i].name_offset);
-            if (sym_name && strcmp(sym_name, name) == 0) {
-                return &table->symbols[i];
-            }
+    /* IMPORTANT:
+     * Symbols are intentionally preserved after scope exit for code generation.
+     * Therefore scope_stack boundaries are no longer reliable for lookup.
+     * Search the full table backwards and match exact scope_level instead.
+     */
+    for (i = table->symbol_count; i > 0; i--) {
+        if (table->symbols[i - 1].scope_level != scope) {
+            continue;
+        }
+        sym_name = symtable_get_string(table, table->symbols[i - 1].name_offset);
+        if (sym_name && strcmp(sym_name, name) == 0) {
+            return &table->symbols[i - 1];
         }
     }
     

@@ -1,4 +1,4 @@
-﻿// Switch Statement Test
+// Switch Statement Test
 class SwitchTest {
     public static void main() {
         int x = 1;

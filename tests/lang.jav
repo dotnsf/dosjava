@@ -1,4 +1,4 @@
-﻿// Lang Test
+// Lang Test
 class Lang {
     public static void main() {
         double x = 0.1;

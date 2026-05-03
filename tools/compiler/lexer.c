@@ -84,6 +84,26 @@ int lexer_init(Lexer* lexer, const char* source_file, const char* token_file) {
         return -1;
     }
     
+    /* Skip UTF-8 BOM if present */
+    if ((unsigned char)lexer->current_char == 0xEF) {
+        if (lexer_read_char(lexer) < 0) {
+            lexer_cleanup(lexer);
+            return -1;
+        }
+        if ((unsigned char)lexer->current_char == 0xBB) {
+            if (lexer_read_char(lexer) < 0) {
+                lexer_cleanup(lexer);
+                return -1;
+            }
+            if ((unsigned char)lexer->current_char == 0xBF) {
+                if (lexer_read_char(lexer) < 0) {
+                    lexer_cleanup(lexer);
+                    return -1;
+                }
+            }
+        }
+    }
+    
     return 0;
 }
 

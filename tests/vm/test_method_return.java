@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Test: Method with Return Value
  * 
  * Tests method invocation with return value.

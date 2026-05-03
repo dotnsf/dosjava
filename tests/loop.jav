@@ -1,4 +1,4 @@
-﻿// While Loop Test
+// While Loop Test
 class Loop {
     public static void main() {
         int i = 0;

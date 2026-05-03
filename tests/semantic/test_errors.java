@@ -1,4 +1,4 @@
-﻿// Test case for error detection
+// Test case for error detection
 // This file should produce semantic errors
 
 class ErrorTest {

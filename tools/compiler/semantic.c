@@ -641,7 +641,9 @@ int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node, uint16_t stm
         
         case NODE_EXPR_STMT: {
             TypeInfo expr_type = {0};
-            ASTNode* expr_node = semantic_get_node(analyzer, stmt_node->data.expr_stmt.expr);
+            ASTNode* expr_node;
+            uint16_t expr_idx = stmt_node->data.expr_stmt.expr;
+            expr_node = semantic_get_node(analyzer, expr_idx);
             if (expr_node) {
                 return check_expression(analyzer, expr_node, &expr_type);
             }
@@ -969,9 +971,8 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             return 0;
         
         case NODE_LITERAL_STRING:
-            /* String literals are treated as String type */
             result_type->kind = TYPE_CLASS;
-            result_type->class_name = 0;  /* TODO: Add "String" to constant pool */
+            result_type->class_name = 0;
             return 0;
         
         case NODE_IDENTIFIER:
@@ -989,14 +990,87 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
         case NODE_ASSIGN:
             return check_assignment(analyzer, expr_node, result_type);
         
-        case NODE_CALL: {
-            /* Method calls return void for now */
-            ASTNode* call_node = expr_node;
-            const char* method_name = semantic_get_string(analyzer, call_node->data.call.method_name);
-            uint16_t object_idx = call_node->data.call.object;
-            result_type->kind = TYPE_VOID;
+        case NODE_CALL:
+            return check_call(analyzer, expr_node, result_type);
+        
+        case NODE_NEW: {
+            ASTNode* size_node;
+            TypeInfo size_type;
+            
+            size_node = semantic_get_node(analyzer, expr_node->next_sibling);
+            if (!size_node || check_expression(analyzer, size_node, &size_type) != 0) {
+                return -1;
+            }
+            if (!is_numeric_type(size_type)) {
+                semantic_error_node(analyzer, expr_node, "Array size must be integer");
+                return -1;
+            }
+            
+            result_type->kind = TYPE_ARRAY;
             result_type->class_name = 0;
             return 0;
+        }
+        
+        case NODE_ARRAY_ACCESS: {
+            ASTNode* array_node;
+            ASTNode* index_node;
+            TypeInfo array_type;
+            TypeInfo index_type;
+            uint16_t array_idx;
+            uint16_t index_idx;
+            
+            /* Save indices before recursive node reads overwrite expr_node */
+            array_idx = expr_node->data.array_access.array;
+            index_idx = expr_node->data.array_access.index;
+            
+            array_node = semantic_get_node(analyzer, array_idx);
+            if (!array_node || check_expression(analyzer, array_node, &array_type) != 0) {
+                return -1;
+            }
+            if (array_type.kind != TYPE_ARRAY) {
+                semantic_error_node(analyzer, expr_node, "Array access requires array type");
+                return -1;
+            }
+            
+            index_node = semantic_get_node(analyzer, index_idx);
+            if (!index_node || check_expression(analyzer, index_node, &index_type) != 0) {
+                return -1;
+            }
+            if (!is_numeric_type(index_type)) {
+                semantic_error_node(analyzer, expr_node, "Array index must be integer");
+                return -1;
+            }
+            
+            result_type->kind = TYPE_INT;
+            result_type->class_name = 0;
+            return 0;
+        }
+        
+        case NODE_FIELD_ACCESS: {
+            ASTNode* object_node;
+            TypeInfo object_type;
+            const char* field_name;
+            uint16_t object_idx;
+            uint16_t field_name_off;
+            
+            /* Save indices before recursive node reads overwrite expr_node */
+            object_idx = expr_node->data.field_access.object;
+            field_name_off = expr_node->data.field_access.field_name;
+            
+            object_node = semantic_get_node(analyzer, object_idx);
+            if (!object_node || check_expression(analyzer, object_node, &object_type) != 0) {
+                return -1;
+            }
+            
+            field_name = semantic_get_string(analyzer, field_name_off);
+            if (object_type.kind == TYPE_ARRAY && field_name && strcmp(field_name, "length") == 0) {
+                result_type->kind = TYPE_INT;
+                result_type->class_name = 0;
+                return 0;
+            }
+            
+            semantic_error_node(analyzer, expr_node, "Unsupported field access");
+            return -1;
         }
         
         default:
@@ -1159,6 +1233,13 @@ int check_identifier(SemanticAnalyzer* analyzer, ASTNode* id_node, TypeInfo* res
         return -1;
     }
     
+    /* Built-in class name used by System.out.println */
+    if (strcmp(id_name, "System") == 0) {
+        result_type->kind = TYPE_CLASS;
+        result_type->class_name = 0;
+        return 0;
+    }
+    
     /* Lookup symbol */
     sym = symtable_lookup(analyzer->symtable, id_name);
     if (!sym) {
@@ -1167,6 +1248,76 @@ int check_identifier(SemanticAnalyzer* analyzer, ASTNode* id_node, TypeInfo* res
     }
     
     *result_type = sym->type;
+    return 0;
+}
+
+/* Check method call */
+int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_type) {
+    ASTNode* object_node;
+    ASTNode* arg_node;
+    ASTNode* recv_object_node;
+    TypeInfo object_type;
+    TypeInfo arg_type;
+    uint16_t object_idx;
+    uint16_t first_arg_idx;
+    uint16_t method_name_off;
+    const char* method_name;
+    
+    if (!analyzer || !call_node || !result_type) {
+        return -1;
+    }
+    
+    object_idx = call_node->data.call.object;
+    first_arg_idx = call_node->data.call.first_arg;
+    method_name_off = call_node->data.call.method_name;
+    method_name = semantic_get_string(analyzer, method_name_off);
+    
+    /* Special-case built-in System.out.println(...) */
+    if (object_idx != 0 && method_name && strcmp(method_name, "println") == 0) {
+        object_node = semantic_get_node(analyzer, object_idx);
+        if (!object_node) {
+            return -1;
+        }
+        
+        if (object_node->type == NODE_FIELD_ACCESS) {
+            const char* field_name = semantic_get_string(analyzer, object_node->data.field_access.field_name);
+            recv_object_node = semantic_get_node(analyzer, object_node->data.field_access.object);
+            
+            if (field_name && strcmp(field_name, "out") == 0 &&
+                recv_object_node && recv_object_node->type == NODE_IDENTIFIER) {
+                const char* recv_name = semantic_get_string(analyzer, recv_object_node->data.identifier.name);
+                if (recv_name && strcmp(recv_name, "System") == 0) {
+                    if (first_arg_idx != 0) {
+                        arg_node = semantic_get_node(analyzer, first_arg_idx);
+                        if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
+                            return -1;
+                        }
+                    }
+                    
+                    result_type->kind = TYPE_VOID;
+                    result_type->class_name = 0;
+                    return 0;
+                }
+            }
+        }
+    }
+    
+    if (object_idx != 0) {
+        object_node = semantic_get_node(analyzer, object_idx);
+        if (!object_node || check_expression(analyzer, object_node, &object_type) != 0) {
+            return -1;
+        }
+    }
+    
+    if (first_arg_idx != 0) {
+        arg_node = semantic_get_node(analyzer, first_arg_idx);
+        if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
+            return -1;
+        }
+    }
+    
+    result_type->kind = TYPE_VOID;
+    result_type->class_name = 0;
     return 0;
 }
 

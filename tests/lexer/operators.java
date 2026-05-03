@@ -1,4 +1,4 @@
-﻿// Test all operators
+// Test all operators
 class OperatorTest {
     public static void main() {
         int a = 10;

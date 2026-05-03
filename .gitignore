@@ -3,3 +3,6 @@
 *.obj
 *.py
 .clinerules
+tests/A
+tests/B
+tests/C

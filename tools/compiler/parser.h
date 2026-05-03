@@ -23,8 +23,11 @@ typedef struct {
     /* Output */
     FILE* ast_file;             /* AST output file */
     
-    /* AST node buffer */
-    ASTNode nodes[128];         /* Node buffer (4KB) */
+    /* AST node buffer
+     * Keep large enough to avoid mid-parse flushes, because many parser paths
+     * still link sibling nodes by in-memory index.
+     */
+    ASTNode nodes[512];
     uint16_t node_count;        /* Nodes in buffer */
     uint16_t total_nodes;       /* Total nodes written */
     
@@ -35,6 +38,9 @@ typedef struct {
     /* Error tracking */
     int has_error;
     uint16_t error_count;
+    
+    /* Context flags */
+    uint16_t parsing_array_index;
 } Parser;
 
 /**

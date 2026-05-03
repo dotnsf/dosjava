@@ -1,4 +1,4 @@
-﻿class Control {
+class Control {
     public static void main() {
         int i = 0;
         int sum = 0;
