@@ -330,7 +330,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value 6
 echo.
 
-goto :completed
+goto :test9
 
 :test8_fail
 echo FAILED: Compilation error
@@ -351,6 +351,46 @@ echo Actual:
 type RT_OUT.TXT
 goto :end
 
+:test9
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 9: String
+echo ------------------------------
+..\build\bin\djc.exe str.jav
+if errorlevel 1 goto :test9_fail
+if not exist STR.DJC goto :test9_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe STR.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test9_runfail
+find "Hello World!" RT_OUT.TXT > nul
+if errorlevel 1 goto :test9_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "Hello World!" 
+echo.
+
+goto :completed
+
+:test9_fail
+echo FAILED: Compilation error
+goto :end
+
+:test9_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test9_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test9_badout
+echo FAILED: Output mismatch for Test 9
+echo Expected: "Hello World!"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
 
 :completed
 
@@ -360,4 +400,3 @@ echo ========================================
 
 :end
 
-@REM Made with Bob

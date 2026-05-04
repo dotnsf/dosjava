@@ -612,6 +612,7 @@ uint16_t parse_arg_list(Parser* parser, uint16_t* arg_count) {
  */
 int parse_type(Parser* parser, TypeInfo* type) {
     uint16_t base_kind = 0;
+    const char* ident_name;
     
     if (parser_consume(parser, TOK_VOID)) {
         type->kind = TYPE_VOID;
@@ -621,21 +622,33 @@ int parse_type(Parser* parser, TypeInfo* type) {
     
     if (parser_consume(parser, TOK_INT)) {
         base_kind = TYPE_INT;
+        type->class_name = 0;
     } else if (parser_consume(parser, TOK_BOOLEAN)) {
         base_kind = TYPE_BOOLEAN;
+        type->class_name = 0;
+    } else if (parser_match(parser, TOK_IDENTIFIER)) {
+        ident_name = parser_get_string(parser, parser->current.value.str_offset);
+        if (ident_name && strcmp(ident_name, "String") == 0) {
+            base_kind = TYPE_CLASS;
+            type->class_name = parser->current.value.str_offset;
+            parser_next_token(parser);
+        } else {
+            parser_error(parser, "Expected type");
+            return -1;
+        }
     } else {
         parser_error(parser, "Expected type");
         return -1;
     }
     
     type->kind = base_kind;
-    type->class_name = 0;
     
     if (parser_consume(parser, TOK_LBRACKET)) {
         if (parser_expect(parser, TOK_RBRACKET) < 0) {
             return -1;
         }
         type->kind = TYPE_ARRAY;
+        type->class_name = 0;
     }
     
     return 0;
@@ -718,8 +731,16 @@ uint16_t parse_statement(Parser* parser) {
         return parse_block(parser);
     }
     
-    /* Variable declaration */
-    if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN)) {
+    /* Variable declaration
+     * Only treat identifier-led statements as declarations when the
+     * identifier is a known type name pattern for Phase 1 (currently String).
+     * This avoids misparsing expression statements like:
+     *   System.out.println(str);
+     */
+    if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN) ||
+        (parser_match(parser, TOK_IDENTIFIER) &&
+         parser_get_string(parser, parser->current.value.str_offset) &&
+         strcmp(parser_get_string(parser, parser->current.value.str_offset), "String") == 0)) {
         return parse_var_decl(parser);
     }
     

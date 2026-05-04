@@ -1291,6 +1291,9 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     uint16_t saved_first_arg;
     Symbol* method_sym;
     int returns_value;
+    const char* first_arg_name;
+    uint16_t i;
+    int first_arg_is_string;
     
     if (!codegen || !call_node) {
         return -1;
@@ -1318,10 +1321,31 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     arg_node_type = NODE_PROGRAM;
+    first_arg_name = NULL;
+    first_arg_is_string = 0;
     if (saved_first_arg != 0) {
         arg_node = codegen_get_node(codegen, saved_first_arg);
         if (arg_node) {
             arg_node_type = arg_node->type;
+            if (arg_node_type == NODE_IDENTIFIER) {
+                first_arg_name = codegen_get_string(codegen, arg_node->data.identifier.name);
+                if (first_arg_name) {
+                    for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                        Symbol* sym = &codegen->symtable->symbols[i];
+                        const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                            sym_name &&
+                            strcmp(sym_name, first_arg_name) == 0 &&
+                            sym->type.kind == TYPE_CLASS) {
+                            const char* class_name = symtable_get_string(codegen->symtable, sym->type.class_name);
+                            if (class_name && strcmp(class_name, "String") == 0) {
+                                first_arg_is_string = 1;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -1352,7 +1376,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         uint16_t desc_idx;
         char descriptor[32];
         
-        if (arg_node_type == NODE_LITERAL_STRING) {
+        if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
             strcpy(descriptor, "(Ljava/lang/String;)V");
         } else if (arg_node_type == NODE_LITERAL_INT ||
                    arg_node_type == NODE_IDENTIFIER ||

@@ -124,15 +124,32 @@ ASTNode* semantic_get_node(SemanticAnalyzer* analyzer, uint16_t node_index) {
         return NULL;
     }
     
-    /* Always read node from file to avoid pointer invalidation issues */
-    file_pos = sizeof(uint16_t) * 2 + analyzer->pool_size + (node_index - 1) * sizeof(ASTNode);
+    /* AST file layout:
+     *   [uint16 total_nodes][uint16 pool_size][string_pool][AST nodes...]
+     *
+     * The old offset math used analyzer->pool_size directly. That becomes wrong
+     * after semantic_add_string() grows the in-memory pool during analysis
+     * (for example when adding "String"), causing later node reads to seek into
+     * the wrong location and produce impossible line/column values like 2304/13312.
+     *
+     * read_ast_header()/load_string_pool() leave the file position exactly at the
+     * first AST node, so anchor all node reads to that stable on-disk offset.
+     */
+    file_pos = ftell(analyzer->ast_file);
+    if (file_pos < 0) {
+        return NULL;
+    }
+    if (analyzer->node_count == 0) {
+        analyzer->node_count = (uint16_t)file_pos;
+    }
+    
+    file_pos = (long)analyzer->node_count + (long)(node_index - 1) * (long)sizeof(ASTNode);
     fseek(analyzer->ast_file, file_pos, SEEK_SET);
     
     if (fread(&analyzer->nodes[0], sizeof(ASTNode), 1, analyzer->ast_file) != 1) {
         return NULL;
     }
     
-    analyzer->node_count = 1;
     return &analyzer->nodes[0];
 }
 
@@ -626,9 +643,13 @@ int check_semantics(SemanticAnalyzer* analyzer) {
         /* Save next_sibling before any function calls */
         next_member_idx = member_node->next_sibling;
         
-        if (member_node->type == NODE_METHOD) {
-            if (check_method_body(analyzer, member_node) != 0) {
-                /* Continue checking other methods */
+        {
+            uint16_t member_type = member_node->type;
+            
+            if (member_type == NODE_METHOD) {
+                if (check_method_body(analyzer, member_node) != 0) {
+                    /* Continue checking other methods */
+                }
             }
         }
         
@@ -750,11 +771,23 @@ int check_method_body(SemanticAnalyzer* analyzer, ASTNode* method_node) {
 
 /* Check statement */
 int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node, uint16_t stmt_idx) {
+    uint16_t stmt_type;
+    uint16_t expr_idx;
+    
     if (!analyzer || !stmt_node) {
         return -1;
     }
     
-    switch (stmt_node->type) {
+    /* CRITICAL: semantic_get_node() uses a shared buffer. Save dispatch data
+     * before calling helpers that recursively load other nodes.
+     */
+    stmt_type = stmt_node->type;
+    expr_idx = 0;
+    if (stmt_type == NODE_EXPR_STMT) {
+        expr_idx = stmt_node->data.expr_stmt.expr;
+    }
+    
+    switch (stmt_type) {
         case NODE_BLOCK:
             return check_block(analyzer, stmt_node);
         
@@ -776,7 +809,7 @@ int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node, uint16_t stm
         case NODE_EXPR_STMT: {
             TypeInfo expr_type = {0};
             ASTNode* expr_node;
-            uint16_t expr_idx = stmt_node->data.expr_stmt.expr;
+            
             expr_node = semantic_get_node(analyzer, expr_idx);
             if (expr_node) {
                 return check_expression(analyzer, expr_node, &expr_type);
@@ -1089,11 +1122,20 @@ int check_return_stmt_idx(SemanticAnalyzer* analyzer, uint16_t return_idx) {
 
 /* Check expression */
 int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* result_type) {
+    uint16_t expr_type;
+    uint16_t next_sibling_idx;
+    
     if (!analyzer || !expr_node || !result_type) {
         return -1;
     }
     
-    switch (expr_node->type) {
+    /* CRITICAL: semantic_get_node() reuses a single shared buffer.
+     * Save dispatch-critical fields before any recursive reads.
+     */
+    expr_type = expr_node->type;
+    next_sibling_idx = expr_node->next_sibling;
+    
+    switch (expr_type) {
         case NODE_LITERAL_INT:
             result_type->kind = TYPE_INT;
             result_type->class_name = 0;
@@ -1106,7 +1148,7 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
         
         case NODE_LITERAL_STRING:
             result_type->kind = TYPE_CLASS;
-            result_type->class_name = 0;
+            result_type->class_name = semantic_add_string(analyzer, "String");
             return 0;
         
         case NODE_IDENTIFIER:
@@ -1131,7 +1173,7 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             ASTNode* size_node;
             TypeInfo size_type;
             
-            size_node = semantic_get_node(analyzer, expr_node->next_sibling);
+            size_node = semantic_get_node(analyzer, next_sibling_idx);
             if (!size_node || check_expression(analyzer, size_node, &size_type) != 0) {
                 return -1;
             }
@@ -1153,7 +1195,6 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             uint16_t array_idx;
             uint16_t index_idx;
             
-            /* Save indices before recursive node reads overwrite expr_node */
             array_idx = expr_node->data.array_access.array;
             index_idx = expr_node->data.array_access.index;
             
@@ -1187,7 +1228,6 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             uint16_t object_idx;
             uint16_t field_name_off;
             
-            /* Save indices before recursive node reads overwrite expr_node */
             object_idx = expr_node->data.field_access.object;
             field_name_off = expr_node->data.field_access.field_name;
             
@@ -1367,10 +1407,10 @@ int check_identifier(SemanticAnalyzer* analyzer, ASTNode* id_node, TypeInfo* res
         return -1;
     }
     
-    /* Built-in class name used by System.out.println */
-    if (strcmp(id_name, "System") == 0) {
+    /* Built-in class names used by Phase 1 runtime support */
+    if (strcmp(id_name, "System") == 0 || strcmp(id_name, "String") == 0) {
         result_type->kind = TYPE_CLASS;
-        result_type->class_name = 0;
+        result_type->class_name = semantic_add_string(analyzer, id_name);
         return 0;
     }
     
@@ -1408,22 +1448,31 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
     
     /* Special-case built-in System.out.println(...) */
     if (object_idx != 0 && method_name && strcmp(method_name, "println") == 0) {
+        uint16_t field_name_off;
+        uint16_t recv_object_idx;
+        const char* field_name;
+        
         object_node = semantic_get_node(analyzer, object_idx);
         if (!object_node) {
             return -1;
         }
         
         if (object_node->type == NODE_FIELD_ACCESS) {
-            const char* field_name = semantic_get_string(analyzer, object_node->data.field_access.field_name);
-            recv_object_node = semantic_get_node(analyzer, object_node->data.field_access.object);
+            field_name_off = object_node->data.field_access.field_name;
+            recv_object_idx = object_node->data.field_access.object;
+            field_name = semantic_get_string(analyzer, field_name_off);
+            recv_object_node = semantic_get_node(analyzer, recv_object_idx);
             
             if (field_name && strcmp(field_name, "out") == 0 &&
                 recv_object_node && recv_object_node->type == NODE_IDENTIFIER) {
-                const char* recv_name = semantic_get_string(analyzer, recv_object_node->data.identifier.name);
+                uint16_t recv_name_off = recv_object_node->data.identifier.name;
+                const char* recv_name = semantic_get_string(analyzer, recv_name_off);
                 uint16_t checked_args = 0;
                 uint16_t current_arg_idx = first_arg_idx;
                 
                 if (recv_name && strcmp(recv_name, "System") == 0) {
+                    uint16_t string_name_off = semantic_add_string(analyzer, "String");
+                    
                     while (current_arg_idx != 0 && checked_args < arg_count) {
                         TypeInfo arg_type;
                         uint16_t next_arg_idx;
@@ -1432,6 +1481,13 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                         if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
                             return -1;
                         }
+                        
+                        if (!(is_numeric_type(arg_type) ||
+                              (arg_type.kind == TYPE_CLASS && arg_type.class_name == string_name_off))) {
+                            semantic_error_node(analyzer, call_node, "println supports only int or String in Phase 1");
+                            return -1;
+                        }
+                        
                         next_arg_idx = arg_node->next_sibling;
                         current_arg_idx = next_arg_idx;
                         checked_args++;
