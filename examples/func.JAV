@@ -18,6 +18,5 @@ class func {
     }
     public static void func3( int a ) {
         System.out.println( a );
-        return;
     }
 }

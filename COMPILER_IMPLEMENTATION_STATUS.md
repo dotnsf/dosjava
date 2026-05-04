@@ -4,168 +4,140 @@
 
 PC-DOS上でJavaソースコードから直接.djcバイトコードをコンパイルする「djc compiler」の実装状況レポート。
 
-**Last Updated**: 2026-04-19
-**Status**: Phase 1 (Lexer) Complete
+**Last Updated**: 2026-05-04
+**Status**: Core compiler pipeline operational (lexer/parser/semantic/codegen/integration complete)
 
 ## Implementation Progress
 
 ### ✅ Completed Phases
 
-#### Phase 0: Planning and Design (100%)
-- [x] Architecture design document (COMPILER_DESIGN.md)
-- [x] Implementation roadmap (COMPILER_ROADMAP.md)
-- [x] Quick start guide (COMPILER_QUICKSTART.md)
-- [x] Plan summary (COMPILER_PLAN_SUMMARY.md)
-- [x] Directory structure created
-- [x] Test directories created
+#### Phase 0: Planning and Design
+- [x] Architecture and roadmap documents
+- [x] Build/test directory structure
+- [x] Compiler/VM implementation plans
 
-#### Phase 1: Lexer Implementation (100%)
-- [x] Token type definitions (lexer.h)
-- [x] Lexer state structure
-- [x] Character buffering (512 bytes)
-- [x] Keyword recognition (15 keywords)
-- [x] Operator tokenization (15 operators)
-- [x] Identifier parsing
-- [x] Integer literal parsing
-- [x] String literal parsing with escape sequences
-- [x] Comment handling (// and /* */)
-- [x] String pool management (2KB)
-- [x] Token file output
-- [x] Test program (test_lexer.c)
-- [x] Test cases (hello.java, operators.java)
-- [x] Makefile integration
+#### Phase 1: Lexer
+- [x] Keyword/operator tokenization
+- [x] Integer and string literal handling
+- [x] Comment handling
+- [x] Token stream output
+- [x] Lexer test program and test inputs
 
-**Files Created**:
-- `tools/compiler/lexer.h` (159 lines)
-- `tools/compiler/lexer.c` (643 lines)
-- `tools/compiler/test_lexer.c` (99 lines)
-- `tests/lexer/hello.java` (7 lines)
-- `tests/lexer/operators.java` (28 lines)
+#### Phase 2: Parser
+- [x] AST node definitions
+- [x] Recursive-descent expression parser with precedence
+- [x] Statements: variable declarations, blocks, if/else, while, for, return
+- [x] Method declarations and static method calls
+- [x] String literal and array syntax parsing
+- [x] Parser test program
 
-**Key Features**:
-- Memory-efficient buffering (512 bytes)
-- String pool for identifiers (2KB)
-- Complete operator support
-- Comment handling
-- Error reporting with line/column numbers
+#### Phase 3: Semantic Analyzer
+- [x] Symbol table and scope tracking
+- [x] Type checking for `int`, `boolean`, `void`
+- [x] Static method resolution and argument validation
+- [x] Array access / assignment / `.length`
+- [x] Phase 1 `String` local variables and `println(String)`
+- [x] `String.length()`
+- [x] `String + String` and chained concatenation typing
 
-### 🚧 In Progress Phases
+#### Phase 4: Code Generator
+- [x] `.djc` constant pool generation
+- [x] Method table generation
+- [x] Bytecode emission for arithmetic and control flow
+- [x] Bytecode emission for static calls with integer parameters/returns
+- [x] Bytecode emission for arrays
+- [x] Bytecode emission for Phase 1 `String` operations
+- [x] Integrated compiler executable (`djc.exe`)
 
-#### Phase 2: Parser Implementation (0%)
-**Status**: Not started
-**Next Steps**:
-1. Define AST node structures (ast.h)
-2. Implement recursive descent parser (parser.c)
-3. Create parser test program (test_parser.c)
-4. Add test cases
-
-**Estimated Time**: 1-2 weeks
-
-#### Phase 3: Semantic Analyzer (0%)
-**Status**: Not started
-**Dependencies**: Parser completion
-
-**Estimated Time**: 1-2 weeks
-
-#### Phase 4: Code Generator (0%)
-**Status**: Not started
-**Dependencies**: Semantic analyzer completion
-
-**Estimated Time**: 1-2 weeks
-
-#### Phase 5: Integration (0%)
-**Status**: Not started
-**Dependencies**: All previous phases
-
-**Estimated Time**: 1 week
+#### Phase 5: Integration / Runtime Validation
+- [x] End-to-end compile pipeline
+- [x] VM execution with `djvm.exe`
+- [x] Verified examples for arithmetic, control flow, methods, arrays, strings
+- [x] Verified `String.length()`
+- [x] Verified `String + String` concatenation
+- [x] DOS 8.3 oriented source/test workflow
 
 ## File Structure
 
 ```
 dosjava/
-├── tools/
-│   ├── compiler/
-│   │   ├── lexer.h              ✅ Complete (159 lines)
-│   │   ├── lexer.c              ✅ Complete (643 lines)
-│   │   ├── test_lexer.c         ✅ Complete (99 lines)
-│   │   ├── ast.h                ⏳ Pending
-│   │   ├── parser.h             ⏳ Pending
-│   │   ├── parser.c             ⏳ Pending
-│   │   ├── test_parser.c        ⏳ Pending
-│   │   ├── symtable.h           ⏳ Pending
-│   │   ├── symtable.c           ⏳ Pending
-│   │   ├── semantic.h           ⏳ Pending
-│   │   ├── semantic.c           ⏳ Pending
-│   │   ├── test_semantic.c      ⏳ Pending
-│   │   ├── codegen.h            ⏳ Pending
-│   │   ├── codegen.c            ⏳ Pending
-│   │   ├── test_codegen.c       ⏳ Pending
-│   │   └── djc.c                ⏳ Pending
-│   ├── classfile.c              ✅ Existing
-│   ├── classfile.h              ✅ Existing
-│   ├── java2djc.c               ✅ Existing
-│   └── mkdjc.c                  ✅ Existing
+├── tools/compiler/
+│   ├── lexer.[ch]               ✅ Implemented
+│   ├── parser.[ch]              ✅ Implemented
+│   ├── ast.h                    ✅ Implemented
+│   ├── symtable.[ch]            ✅ Implemented
+│   ├── semantic.[ch]            ✅ Implemented
+│   ├── codegen.[ch]             ✅ Implemented
+│   ├── djc.[ch]                 ✅ Implemented
+│   ├── test_lexer.c             ✅ Implemented
+│   ├── test_parser.c            ✅ Implemented
+│   ├── test_semantic.c          ✅ Implemented
+│   └── test_codegen.c           ✅ Implemented
+├── src/vm/
+│   ├── djvm.c                   ✅ Implemented
+│   ├── interpreter.[ch]         ✅ Implemented
+│   ├── memory.[ch]              ✅ Implemented
+│   └── stack.[ch]               ✅ Implemented
+├── src/runtime/
+│   ├── system.[ch]              ✅ Implemented
+│   ├── string.[ch]              ✅ Implemented
+│   ├── integer.[ch]             ✅ Implemented
+│   └── object.[ch]              ✅ Implemented
 ├── tests/
-│   ├── lexer/
-│   │   ├── hello.java           ✅ Complete
-│   │   └── operators.java       ✅ Complete
-│   ├── parser/                  📁 Created (empty)
-│   ├── semantic/                📁 Created (empty)
-│   ├── codegen/                 📁 Created (empty)
-│   └── e2e/                     📁 Created (empty)
-├── docs/
-│   ├── COMPILER_DESIGN.md       ✅ Complete (673 lines)
-│   ├── COMPILER_ROADMAP.md      ✅ Complete (835 lines)
-│   ├── COMPILER_QUICKSTART.md   ✅ Complete (598 lines)
-│   └── COMPILER_PLAN_SUMMARY.md ✅ Complete (467 lines)
-└── Makefile                     ✅ Updated with lexer targets
+│   ├── *.jav                    ✅ DOS 8.3 style runtime tests
+│   ├── lexer/                   ✅ Lexer tests
+│   ├── parser/                  ✅ Parser tests
+│   ├── semantic/                ✅ Semantic tests
+│   └── e2e/                     ✅ Additional long-name host-side tests
+└── Makefile                     ✅ Integrated build
 ```
 
-## Lexer Implementation Details
+## Current Supported Language/Runtime Subset
 
-### Token Types Supported
+### Primitive and Reference Types
+- `int`
+- `boolean`
+- `void`
+- `String` (limited runtime-backed support)
 
-**Keywords (15)**:
-- `class`, `public`, `static`, `void`
-- `int`, `boolean`
-- `if`, `else`, `while`, `for`, `return`
-- `new`, `this`
-- `true`, `false`
+### Statements and Control Flow
+- Block statements
+- Local variable declarations
+- Assignment
+- `if / else`
+- `while`
+- `for`
+- `return`
 
-**Operators (15)**:
-- Arithmetic: `+`, `-`, `*`, `/`, `%`
-- Comparison: `==`, `!=`, `<`, `<=`, `>`, `>=`
-- Logical: `&&`, `||`, `!`
-- Assignment: `=`
+### Methods
+- `public static` methods
+- Zero or more `int` parameters
+- `int` / `void` return values
+- Static method calls
+- Nested calls
 
-**Delimiters (9)**:
-- `(`, `)`, `{`, `}`, `[`, `]`
-- `;`, `,`, `.`
+### Arrays
+- `int[]`
+- `boolean[]`
+- Array element load/store
+- `array.length`
 
-**Literals**:
-- Integer literals (16-bit signed)
-- String literals (with escape sequences: `\n`, `\t`, `\\`, `\"`)
-- Identifiers (alphanumeric + underscore)
+### String Phase 1 Support
+- String literals
+- `String` local variables
+- `System.out.println(String)`
+- `str.length()`
+- `"literal".length()`
+- `String + String`
+- chained concatenation such as `a + b + "56"`
 
-### Memory Usage
-
-```
-Component               Size        Usage
--------------------------------------------------
-Lexer state            ~100 bytes  Structure overhead
-Input buffer           512 bytes   Source file buffering
-String pool            2048 bytes  Identifier/string storage
-Token structure        8 bytes     Per token
--------------------------------------------------
-Total (static)         ~2660 bytes
-```
-
-### Performance Characteristics
-
-- **Buffering**: 512-byte chunks for efficient file I/O
-- **String pool**: 2KB capacity, ~100-200 identifiers
-- **Token output**: Binary format, 8 bytes per token
-- **Memory footprint**: ~2.6KB static + dynamic token buffer
+### Known Active Restrictions
+- No instance methods
+- No overloading
+- No general object allocation/runtime objects
+- No `String + int`
+- No `String` parameters or `String` return values
+- No inheritance/interfaces/exceptions/packages
 
 ## Build System
 
@@ -197,200 +169,121 @@ wlink system dos name build/bin/test_lexer.exe file { build/obj/test_lexer.obj b
 
 ## Testing
 
-### Test Cases
+### Current Runtime-Oriented Test Coverage
 
-#### Test 1: hello.java
-```java
-// Simple Hello World program for lexer testing
-class HelloWorld {
-    public static void main() {
-        int x = 42;
-        System.out.println(x);
-    }
-}
-```
+Representative DOS 8.3 style tests under `tests/`:
 
-**Expected Tokens**: ~25 tokens
-- Keywords: class, public, static, void, int
-- Identifiers: HelloWorld, main, x, System, out, println
-- Literals: 42
-- Operators: =
-- Delimiters: {, }, (, ), ;, .
+- `HELLO.JAV` - basic hello/string output
+- `var1.jav`, `vartest.jav` - local variables
+- `arith.jav`, `calc.jav` - arithmetic
+- `iftest.jav`, `loop.jav`, `for.jav`, `switch.jav` - control flow coverage
+- `func.JAV` - static method calls with integer parameters/returns
+- `array.jav`, `arrays.jav`, `arraysim.jav` - arrays
+- `str.jav` - String local variables and `println(String)`
+- `strlen.jav` - `String.length()`
+- `strcat.jav` - `String + String` and chained concatenation
 
-#### Test 2: operators.java
-```java
-// Test all operators
-class OperatorTest {
-    public static void main() {
-        int a = 10;
-        int b = 20;
-        
-        // Arithmetic
-        int sum = a + b;
-        int diff = a - b;
-        // ... (more operators)
-    }
-}
-```
+### Host-Side Component Tests
 
-**Expected Tokens**: ~150+ tokens
-- All operator types
-- Multiple identifiers
-- Integer literals
-- Comments (should be skipped)
+- `test_lexer.c`
+- `test_parser.c`
+- `test_semantic.c`
+- `test_codegen.c`
 
-### Test Execution
+### Validation Status
 
-```bash
-# Run lexer test
-build\bin\test_lexer.exe tests\lexer\hello.java
-
-# Expected output:
-# DOS Java Compiler - Lexer Test
-# ================================
-# Source: tests\lexer\hello.java
-# Output: tokens.tmp
-#
-# Line:Col  Token Type       Value
-# --------  ---------------  -----
-#    2:  1  class
-#    2:  7  IDENTIFIER       'HelloWorld'
-#    2: 18  {
-#    3:  5  public
-# ...
-# Total tokens: 25
-# String pool size: 87 bytes
-#
-# Tokenization complete!
-```
+- Compiler pipeline builds successfully
+- `djc.exe` compiles DOS 8.3 named `.jav` inputs into `.djc`
+- `djvm.exe` executes generated bytecode for the currently supported subset
+- Recent validation includes correct output for `tests/strcat.jav`
 
 ## Known Issues and Limitations
 
 ### Current Limitations
 
-1. **No Parser Yet**: Lexer is complete but cannot parse syntax
-2. **No Semantic Analysis**: Type checking not implemented
-3. **No Code Generation**: Cannot generate .djc files yet
-4. **Limited Testing**: Only basic test cases created
+1. Some documentation and tests still reflect older unsupported states
+2. DOS 8.3 naming must still be observed for real DOS execution inputs
+3. String support is intentionally limited to the currently implemented Phase 1 subset
+4. Array support exists but is still under stabilization/expanded validation
 
 ### Future Improvements
 
-1. **Error Recovery**: Better error handling and recovery
-2. **Unicode Support**: Currently ASCII only
-3. **Preprocessor Directives**: No support for #define, etc.
-4. **Better Diagnostics**: More detailed error messages
+1. Remove temporary debug-oriented code paths if any remain
+2. Add more DOS 8.3 regression coverage
+3. Extend String support to parameters/returns and mixed-type concatenation
+4. Improve diagnostics and developer tooling
 
 ## Next Steps
 
-### Immediate (Week 2)
+### Immediate
 
-1. **Implement Parser**:
-   - Define AST node structures
-   - Implement recursive descent parser
-   - Handle operator precedence
-   - Create test cases
+1. Document the current supported subset accurately
+2. Add/refresh DOS 8.3 focused regression tests for methods and String features
+3. Continue array validation and stabilization
+4. Remove temporary debug instrumentation where safe
 
-2. **Test Parser**:
-   - Parse hello.java successfully
-   - Parse operators.java successfully
-   - Handle syntax errors gracefully
+### Short Term
 
-### Short Term (Weeks 3-4)
-
-1. **Implement Semantic Analyzer**:
-   - Build symbol table
-   - Type checking
-   - Identifier resolution
-
-2. **Implement Code Generator**:
-   - Generate .djc bytecode
-   - Constant pool construction
-   - Method table generation
-
-### Medium Term (Week 5)
-
-1. **Integration**:
-   - Combine all phases
-   - Create djc.exe main program
-   - End-to-end testing
-
-2. **Documentation**:
-   - User guide
-   - Developer guide
-   - API documentation
+1. Extend String support beyond Phase 1 limitations
+2. Improve test automation under DOSBox
+3. Expand runtime/native library coverage
 
 ## Success Metrics
 
-### Phase 1 (Lexer) - ✅ COMPLETE
+### Lexer - ✅ COMPLETE
+- [x] Tokenization
+- [x] Literals/identifiers/comments
+- [x] Token output
+- [x] Unit-style validation
 
-- [x] Tokenize simple Java programs
-- [x] Handle all keywords and operators
-- [x] Parse identifiers and literals
-- [x] Skip comments correctly
-- [x] Write tokens to file
-- [x] Test program works
-- [x] Makefile integration
+### Parser - ✅ COMPLETE
+- [x] Class/method parsing
+- [x] Expression precedence
+- [x] Control statements
+- [x] Calls, arrays, String literals
+- [x] AST output
 
-### Phase 2 (Parser) - ⏳ PENDING
+### Semantic Analyzer - ✅ COMPLETE
+- [x] Symbol resolution
+- [x] Type checking
+- [x] Method validation
+- [x] Array typing
+- [x] Phase 1 String typing
 
-- [ ] Parse class declarations
-- [ ] Parse method declarations
-- [ ] Parse statements (if/while/return)
-- [ ] Parse expressions with precedence
-- [ ] Generate AST
-- [ ] Write AST to file
-- [ ] Test program works
+### Code Generator - ✅ COMPLETE
+- [x] Constant pool generation
+- [x] Method/code generation
+- [x] Control flow bytecode
+- [x] Method invocation bytecode
+- [x] Array bytecode
+- [x] Phase 1 String bytecode
 
-### Phase 3 (Semantic) - ⏳ PENDING
-
-- [ ] Build symbol table
-- [ ] Type check expressions
-- [ ] Resolve identifiers
-- [ ] Validate method calls
-- [ ] Check return statements
-- [ ] Write symbol table to file
-
-### Phase 4 (CodeGen) - ⏳ PENDING
-
-- [ ] Generate .djc header
-- [ ] Generate constant pool
-- [ ] Generate method table
-- [ ] Generate bytecode
-- [ ] Write .djc file
-- [ ] Test with DOS Java VM
-
-### Phase 5 (Integration) - ⏳ PENDING
-
-- [ ] Combine all phases
-- [ ] Command-line interface
-- [ ] Error reporting
-- [ ] End-to-end tests
-- [ ] Documentation
+### Integration / Validation - ✅ CORE COMPLETE
+- [x] End-to-end compile/run flow
+- [x] Command-line tooling
+- [x] Runtime execution on supported subset
+- [x] Recent String concatenation validation
+- [ ] Documentation fully synchronized
+- [ ] Broader regression coverage fully synchronized
 
 ## Conclusion
 
-Phase 1 (Lexer) is **100% complete** with all planned features implemented:
-- ✅ Full tokenization support
-- ✅ Memory-efficient design
-- ✅ Test program and test cases
-- ✅ Makefile integration
-- ✅ Documentation
+The compiler is no longer in an early lexer-only state. The current project status is:
 
-**Ready to proceed to Phase 2 (Parser implementation).**
+- ✅ Full compiler pipeline implemented
+- ✅ `djc.exe` generates `.djc` bytecode
+- ✅ `djvm.exe` executes supported programs
+- ✅ Static methods with integer parameters/returns supported
+- ✅ Arrays supported in the current implemented subset
+- ✅ Phase 1 String support implemented, including:
+  - string literals
+  - `println(String)`
+  - `String.length()`
+  - `String + String`
+  - chained concatenation
 
-The lexer provides a solid foundation for the compiler, with efficient memory usage and comprehensive token support. The next phase will build on this to create the Abstract Syntax Tree (AST) from the token stream.
-
----
-
-**Total Lines of Code (Phase 1)**: 901 lines
-- lexer.h: 159 lines
-- lexer.c: 643 lines
-- test_lexer.c: 99 lines
-
-**Total Documentation**: 2,573 lines
-- COMPILER_DESIGN.md: 673 lines
-- COMPILER_ROADMAP.md: 835 lines
-- COMPILER_QUICKSTART.md: 598 lines
-- COMPILER_PLAN_SUMMARY.md: 467 lines
-
-**Overall Progress**: 20% (1 of 5 phases complete)
+Current work should focus on:
+- documentation synchronization
+- DOS 8.3 regression expansion
+- array stabilization follow-up
+- future String feature expansion

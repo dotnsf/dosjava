@@ -68,9 +68,9 @@ Traces execution step-by-step:
 
 ### 1. Write Java Code
 
-Create `hello.java`:
+Create `hello.jav`:
 ```java
-public class Hello {
+class hello {
     public static void main() {
         System.out.println("Hello, DOS!");
     }
@@ -80,10 +80,13 @@ public class Hello {
 ### 2. Compile to .djc
 
 ```batch
-djc hello.java
+djc hello.jav
 ```
 
 Creates `hello.djc` bytecode file.
+
+> DOS 実行環境では 8.3 形式のファイル名を使用してください。
+> 例: `hello.jav`, `strlen.jav`, `strcat.jav`
 
 ### 3. Run with VM
 
@@ -223,54 +226,43 @@ ERROR: Stack overflow
 
 **Solution:** Reduce recursion depth or increase max_stack in the method.
 
-## Supported Opcodes
+## Supported Execution Features
 
-### Stack Operations
-- `PUSH_CONST` - Push constant from pool
-- `PUSH_INT` - Push immediate integer
-- `POP` - Pop and discard
-- `DUP` - Duplicate top
-- `LOAD_LOCAL` - Load local variable
-- `STORE_LOCAL` - Store to local variable
-- `LOAD_0/1/2` - Load local 0/1/2 (optimized)
-- `STORE_0/1/2` - Store to local 0/1/2 (optimized)
+### Values and Locals
+- Integer constants and arithmetic values
+- Constant-pool-backed String handles
+- Local variable load/store
+- Optimized local opcodes for the first few locals
 
-### Arithmetic Operations
-- `ADD` - Integer addition
-- `SUB` - Integer subtraction
-- `MUL` - Integer multiplication
-- `DIV` - Integer division
-- `MOD` - Integer modulo
-- `NEG` - Negate
-- `INC_LOCAL` - Increment local variable
-
-### Comparison Operations
-- `CMP_EQ` - Compare equal
-- `CMP_NE` - Compare not equal
-- `CMP_LT` - Compare less than
-- `CMP_LE` - Compare less or equal
-- `CMP_GT` - Compare greater than
-- `CMP_GE` - Compare greater or equal
+### Arithmetic and Comparison
+- Integer `+`, `-`, `*`, `/`, `%`
+- Relational comparison operations
+- Logical operations used by compiled control flow
 
 ### Control Flow
-- `GOTO` - Unconditional jump
-- `IF_TRUE` - Jump if true
-- `IF_FALSE` - Jump if false
-- `IF_EQ` - Jump if equal
-- `IF_NE` - Jump if not equal
-- `IF_LT` - Jump if less than
-- `IF_LE` - Jump if less or equal
-- `IF_GT` - Jump if greater than
-- `IF_GE` - Jump if greater or equal
+- Conditional branches
+- `if / else`
+- `while`
+- `for`
+- `return` / value return
 
 ### Method Invocation
-- `RETURN` - Return void
-- `RETURN_VALUE` - Return with value
+- Static user-defined method calls
+- Integer parameters
+- `int` / `void` return values
+- Native runtime-backed calls for selected built-ins
 
-### Special Operations
-- `PRINT_INT` - Print integer (debug)
-- `PRINT_CHAR` - Print character (debug)
-- `HALT` - Halt execution
+### Arrays
+- Array creation for `int[]` / `boolean[]`
+- Array load/store
+- `array.length`
+
+### String Phase 1 Runtime Support
+- String literal loading from constant pool
+- `System.out.println(String)`
+- `String.length()`
+- native concatenation for `String + String`
+- chained concatenation execution
 
 ## Memory Limits
 
@@ -336,10 +328,10 @@ Smaller .djc files load faster and use less memory.
 ## Next Steps
 
 1. **Try Examples** - Run the example programs in `examples/`
-2. **Write Programs** - Create your own Java programs
-3. **Debug Issues** - Use debug mode to understand execution
-4. **Optimize** - Profile and improve performance
-5. **Extend** - Add new opcodes or features
+2. **Use DOS 8.3 Names** - Keep source filenames DOS-compatible for real DOS runs
+3. **Exercise Current String Support** - Try `str.jav`, `strlen.jav`, `strcat.jav`
+4. **Debug Issues** - Use debug mode to understand execution
+5. **Extend** - Add more runtime/library features
 
 ## Additional Resources
 
