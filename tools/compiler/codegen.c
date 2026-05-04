@@ -535,10 +535,23 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
         case NODE_EXPR_STMT: {
             ASTNode* expr_node = codegen_get_node(codegen, stmt_node->data.expr_stmt.expr);
             if (expr_node) {
-                int16_t stack_before = codegen->context->current_stack;
-                generate_expression(codegen, expr_node);
-                /* Pop result if expression left something on stack */
-                if (codegen->context->current_stack > stack_before) {
+                ASTNode expr_copy;
+                uint16_t expr_type;
+                
+                memcpy(&expr_copy, expr_node, sizeof(ASTNode));
+                expr_type = expr_copy.type;
+                generate_expression(codegen, &expr_copy);
+
+                if (expr_type == NODE_BINARY_OP ||
+                    expr_type == NODE_UNARY_OP ||
+                    expr_type == NODE_IDENTIFIER ||
+                    expr_type == NODE_LITERAL_INT ||
+                    expr_type == NODE_LITERAL_BOOL ||
+                    expr_type == NODE_LITERAL_STRING ||
+                    expr_type == NODE_NEW ||
+                    expr_type == NODE_ARRAY_ACCESS ||
+                    expr_type == NODE_FIELD_ACCESS ||
+                    expr_type == NODE_ASSIGN) {
                     emit_opcode(codegen, OP_POP);
                     update_stack(codegen, -1);
                 }
@@ -1258,11 +1271,13 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     uint16_t target_name_off;
     uint16_t array_idx;
     uint16_t index_idx;
+    uint16_t assign_op;
     
     if (!codegen || !assign_node) {
         return -1;
     }
     
+    assign_op = assign_node->data.assign.op;
     target_index = assign_node->data.assign.target;
     value_index = assign_node->data.assign.value;
     
@@ -1292,37 +1307,61 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     }
     
     if (target_type == NODE_ARRAY_ACCESS) {
-        ASTNode* array_node;
-        ASTNode* index_node;
+        if (assign_op == 0) {
+            ASTNode array_expr_copy;
+            ASTNode index_expr_copy;
+            ASTNode value_expr_copy;
+            
+            {
+                ASTNode* array_src = codegen_get_node(codegen, array_idx);
+                if (!array_src) {
+                    codegen_error(codegen, "Invalid array assignment target");
+                    return -1;
+                }
+                memcpy(&array_expr_copy, array_src, sizeof(ASTNode));
+            }
+            
+            {
+                ASTNode* index_src = codegen_get_node(codegen, index_idx);
+                if (!index_src) {
+                    codegen_error(codegen, "Invalid array assignment target");
+                    return -1;
+                }
+                memcpy(&index_expr_copy, index_src, sizeof(ASTNode));
+            }
+            
+            {
+                ASTNode* value_src = codegen_get_node(codegen, value_index);
+                if (!value_src) {
+                    codegen_error(codegen, "Invalid assignment");
+                    return -1;
+                }
+                memcpy(&value_expr_copy, value_src, sizeof(ASTNode));
+            }
+            
+            if (generate_expression(codegen, &array_expr_copy) != 0) {
+                return -1;
+            }
+            if (generate_expression(codegen, &index_expr_copy) != 0) {
+                return -1;
+            }
+            if (generate_expression(codegen, &value_expr_copy) != 0) {
+                return -1;
+            }
+            
+            emit_opcode(codegen, OP_ARRAY_STORE);
+            update_stack(codegen, -3);
+            return 0;
+        }
         
-        array_node = codegen_get_node(codegen, array_idx);
-        if (!array_node) {
-            codegen_error(codegen, "Invalid array assignment target");
+        if (assign_op == 1 || assign_op == 2) {
+            codegen_error(codegen, "Compound assignment for array elements is not yet codegen-safe");
             return -1;
         }
-        generate_expression(codegen, array_node);
         
-        index_node = codegen_get_node(codegen, index_idx);
-        if (!index_node) {
-            codegen_error(codegen, "Invalid array assignment target");
-            return -1;
-        }
-        generate_expression(codegen, index_node);
-        
-        value_node = codegen_get_node(codegen, value_index);
-        if (!value_node) {
-            codegen_error(codegen, "Invalid assignment");
-            return -1;
-        }
-        generate_expression(codegen, value_node);
-        emit_opcode(codegen, OP_ARRAY_STORE);
-        update_stack(codegen, -3);
-        return 0;
+        codegen_error(codegen, "Unsupported assignment operator");
+        return -1;
     }
-    
-    generate_expression(codegen, value_node);
-    emit_opcode(codegen, OP_DUP);
-    update_stack(codegen, 1);
     
     if (target_type != NODE_IDENTIFIER) {
         codegen_error(codegen, "Invalid assignment target");
@@ -1336,15 +1375,53 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     
     local_idx = get_local_index(codegen, var_name);
     
-    if (local_idx <= 2) {
-        emit_opcode(codegen, OP_STORE_0 + local_idx);
-    } else {
-        emit_opcode(codegen, OP_STORE_LOCAL);
-        emit_u1(codegen, (uint8_t)local_idx);
+    if (assign_op == 0) {
+        generate_expression(codegen, value_node);
+        emit_opcode(codegen, OP_DUP);
+        update_stack(codegen, 1);
+        
+        if (local_idx <= 2) {
+            emit_opcode(codegen, OP_STORE_0 + local_idx);
+        } else {
+            emit_opcode(codegen, OP_STORE_LOCAL);
+            emit_u1(codegen, (uint8_t)local_idx);
+        }
+        update_stack(codegen, -1);
+        return 0;
     }
-    update_stack(codegen, -1);
     
-    return 0;
+    if (assign_op == 1 || assign_op == 2) {
+        if (local_idx <= 2) {
+            emit_opcode(codegen, OP_LOAD_0 + local_idx);
+        } else {
+            emit_opcode(codegen, OP_LOAD_LOCAL);
+            emit_u1(codegen, (uint8_t)local_idx);
+        }
+        update_stack(codegen, 1);
+        
+        generate_expression(codegen, value_node);
+        if (assign_op == 1) {
+            emit_opcode(codegen, OP_ADD);
+        } else {
+            emit_opcode(codegen, OP_SUB);
+        }
+        update_stack(codegen, -1);
+        
+        emit_opcode(codegen, OP_DUP);
+        update_stack(codegen, 1);
+        
+        if (local_idx <= 2) {
+            emit_opcode(codegen, OP_STORE_0 + local_idx);
+        } else {
+            emit_opcode(codegen, OP_STORE_LOCAL);
+            emit_u1(codegen, (uint8_t)local_idx);
+        }
+        update_stack(codegen, -1);
+        return 0;
+    }
+    
+    codegen_error(codegen, "Unsupported assignment operator");
+    return -1;
 }
 
 /* Generate code for method call */

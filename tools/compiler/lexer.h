@@ -55,6 +55,8 @@ typedef enum {
     TOK_NOT,            /* ! */
     TOK_PLUSPLUS,       /* ++ */
     TOK_MINUSMINUS,     /* -- */
+    TOK_PLUS_ASSIGN,    /* += */
+    TOK_MINUS_ASSIGN,   /* -= */
     
     /* Delimiters */
     TOK_LPAREN,         /* ( */

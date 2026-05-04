@@ -205,11 +205,11 @@ if not exist CALC.DJC goto :test5_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe CALC.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test5_runfail
-find "20\n5\n0\n1\n0" RT_OUT.TXT > nul
+find "20\n5\n0\n1\n0\n2\n-8" RT_OUT.TXT > nul
 if errorlevel 1 goto :test5_badout
 echo Output:
 type RT_OUT.TXT
-echo SUCCESS: Output matched expected value "20\n5\n0\n1\n0"
+echo SUCCESS: Output matched expected value "20\n5\n0\n1\n0\n2\n-8"
 echo.
 
 goto :test6
@@ -228,7 +228,7 @@ goto :end
 
 :test5_badout
 echo FAILED: Output mismatch for Test 5
-echo Expected: "20\n5\n0\n1\n0"
+echo Expected: "20\n5\n0\n1\n0\n2\n-8"
 echo Actual:
 type RT_OUT.TXT
 goto :end
@@ -251,7 +251,6 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value 10
 echo.
 
-#goto :completed
 goto :test7
 
 :test6_fail

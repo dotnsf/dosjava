@@ -33,6 +33,14 @@ class Calc {
         z --;
         System.out.println(z); // 0
 
+        // +=
+        z += 2;
+        System.out.println(z); // 2
+
+        // -=
+        z -= x;
+        System.out.println(z); // -8
+
         return;
     }
 }

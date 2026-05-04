@@ -1392,12 +1392,15 @@ int check_assignment(SemanticAnalyzer* analyzer, ASTNode* assign_node, TypeInfo*
     ASTNode* value_node;
     uint16_t target_idx;
     uint16_t value_idx;
+    uint16_t assign_op;
+    uint16_t target_node_type;
     
     if (!analyzer || !assign_node || !result_type) {
         return -1;
     }
     
-    /* CRITICAL: Save indices BEFORE any semantic_get_node calls */
+    /* CRITICAL: Save indices/operator BEFORE any semantic_get_node calls */
+    assign_op = assign_node->data.assign.op;
     target_idx = assign_node->data.assign.target;
     value_idx = assign_node->data.assign.value;
     
@@ -1406,6 +1409,7 @@ int check_assignment(SemanticAnalyzer* analyzer, ASTNode* assign_node, TypeInfo*
     if (!target_node || check_expression(analyzer, target_node, &target_type) != 0) {
         return -1;
     }
+    target_node_type = target_node->type;
     
     /* Check value */
     value_node = semantic_get_node(analyzer, value_idx);
@@ -1413,9 +1417,30 @@ int check_assignment(SemanticAnalyzer* analyzer, ASTNode* assign_node, TypeInfo*
         return -1;
     }
     
-    /* Check type compatibility */
-    if (!types_compatible(target_type, value_type)) {
-        semantic_error_node(analyzer, assign_node, "Type mismatch in assignment");
+    if (assign_op == 0) {
+        /* Simple assignment */
+        if (!types_compatible(target_type, value_type)) {
+            semantic_error_node(analyzer, assign_node, "Type mismatch in assignment");
+            return -1;
+        }
+        
+        *result_type = target_type;
+        return 0;
+    }
+    
+    /* Phase 1 compound assignment support: int locals and int[] elements only */
+    if (!(assign_op == 1 || assign_op == 2)) {
+        semantic_error_node(analyzer, assign_node, "Unsupported assignment operator");
+        return -1;
+    }
+    
+    if (!(target_node_type == NODE_IDENTIFIER || target_node_type == NODE_ARRAY_ACCESS)) {
+        semantic_error_node(analyzer, assign_node, "Compound assignment requires variable or array element target");
+        return -1;
+    }
+    
+    if (target_type.kind != TYPE_INT || value_type.kind != TYPE_INT) {
+        semantic_error_node(analyzer, assign_node, "Compound assignment currently supports only int operands");
         return -1;
     }
     

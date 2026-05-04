@@ -393,6 +393,10 @@ int lexer_next_token(Lexer* lexer, Token* token) {
                 token->type = TOK_PLUSPLUS;
                 lexer->column++;
                 lexer_read_char(lexer);
+            } else if (lexer->current_char == '=') {
+                token->type = TOK_PLUS_ASSIGN;
+                lexer->column++;
+                lexer_read_char(lexer);
             } else {
                 token->type = TOK_PLUS;
             }
@@ -403,6 +407,10 @@ int lexer_next_token(Lexer* lexer, Token* token) {
             lexer_read_char(lexer);
             if (lexer->current_char == '-') {
                 token->type = TOK_MINUSMINUS;
+                lexer->column++;
+                lexer_read_char(lexer);
+            } else if (lexer->current_char == '=') {
+                token->type = TOK_MINUS_ASSIGN;
                 lexer->column++;
                 lexer_read_char(lexer);
             } else {

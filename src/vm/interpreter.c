@@ -137,7 +137,13 @@ int interpreter_init_context(ExecutionContext* ctx, DJCFile* djc_file, DJCMethod
     }
     
     /* Initialize call frames */
-    ctx->call_depth = 0;
+    ctx->call_depth = 1;
+    ctx->call_frames[0].return_pc = NULL;
+    ctx->call_frames[0].return_code_start = ctx->code_start;
+    ctx->call_frames[0].return_code_length = ctx->code_length;
+    ctx->call_frames[0].frame_pointer = 0;
+    ctx->call_frames[0].local_base = 0;
+    ctx->call_frames[0].local_count = method->max_locals;
     
     return 0;
 }
@@ -569,6 +575,7 @@ int interpreter_step(ExecutionContext* ctx) {
             uint16_t size;
             uint16_t total_size;
             uint16_t* array_data;
+            uint16_t raw_ref;
             
             elem_type = interpreter_read_u8(ctx);
             size = stack_pop_shared(ctx);
@@ -593,8 +600,9 @@ int interpreter_step(ExecutionContext* ctx) {
             
             memset(array_data, 0, total_size);
             array_data[0] = size;
+            raw_ref = (uint16_t)array_data;
             
-            if (stack_push_shared(ctx, (uint16_t)array_data) != 0) {
+            if (stack_push_shared(ctx, raw_ref) != 0) {
                 printf("ERROR: Stack overflow\n");
                 return -1;
             }
@@ -602,11 +610,13 @@ int interpreter_step(ExecutionContext* ctx) {
         }
         
         case OP_ARRAY_LENGTH: {
+            uint16_t raw_ref;
             uint16_t* array_data;
             
-            array_data = (uint16_t*)stack_pop_shared(ctx);
+            raw_ref = stack_pop_shared(ctx);
+            array_data = (uint16_t*)raw_ref;
             if (array_data == NULL) {
-                printf("ERROR: Null array reference\n");
+                printf("ERROR: Null array reference (ARRAY_LENGTH)\n");
                 return -1;
             }
             
@@ -618,13 +628,15 @@ int interpreter_step(ExecutionContext* ctx) {
         }
         
         case OP_ARRAY_LOAD: {
+            uint16_t raw_ref;
             uint16_t index;
             uint16_t* array_data;
             
             index = stack_pop_shared(ctx);
-            array_data = (uint16_t*)stack_pop_shared(ctx);
+            raw_ref = stack_pop_shared(ctx);
+            array_data = (uint16_t*)raw_ref;
             if (array_data == NULL) {
-                printf("ERROR: Null array reference\n");
+                printf("ERROR: Null array reference (ARRAY_LOAD idx=%u)\n", index);
                 return -1;
             }
             if (index >= array_data[0]) {
@@ -640,23 +652,30 @@ int interpreter_step(ExecutionContext* ctx) {
         }
         
         case OP_ARRAY_STORE: {
+            uint16_t raw_ref;
             uint16_t value;
             uint16_t index;
             uint16_t* array_data;
             
             value = stack_pop_shared(ctx);
             index = stack_pop_shared(ctx);
-            array_data = (uint16_t*)stack_pop_shared(ctx);
+            raw_ref = stack_pop_shared(ctx);
+            array_data = (uint16_t*)raw_ref;
             if (array_data == NULL) {
-                printf("ERROR: Null array reference\n");
+                printf("ERROR: Null array reference (ARRAY_STORE idx=%u val=%u)\n", index, value);
                 return -1;
             }
             if (index >= array_data[0]) {
-                printf("ERROR: Array index out of bounds\n");
+                printf("ERROR: Array index out of bounds (idx=%u len=%u val=%u raw=%u)\n",
+                    index, array_data[0], value, raw_ref);
                 return -1;
             }
             
             array_data[index + 1] = value;
+            if (stack_push_shared(ctx, value) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
             break;
         }
         
@@ -935,7 +954,7 @@ int interpreter_step(ExecutionContext* ctx) {
             CallFrame* frame;
             
             /* Check if this is main method return */
-            if (ctx->call_depth == 0) {
+            if (ctx->call_depth <= 1) {
                 ctx->running = 0;
                 return 1;
             }
@@ -966,7 +985,7 @@ int interpreter_step(ExecutionContext* ctx) {
             return_value = stack_pop_shared(ctx);
             
             /* Check if this is main method return */
-            if (ctx->call_depth == 0) {
+            if (ctx->call_depth <= 1) {
                 ctx->running = 0;
                 return 1;
             }

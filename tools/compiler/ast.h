@@ -187,6 +187,7 @@ typedef struct ASTNode {
         
         /* Assignment */
         struct {
+            uint16_t op;            /* 0='=', 1='+=', 2='-=' */
             uint16_t target;        /* Index of target (identifier/field access) */
             uint16_t value;         /* Index of value expression */
         } assign;

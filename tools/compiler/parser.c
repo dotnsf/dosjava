@@ -10,6 +10,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define ASSIGN_OP_SIMPLE 0
+#define ASSIGN_OP_ADD    1
+#define ASSIGN_OP_SUB    2
+
 /* Forward declarations */
 static int read_token_from_file(Parser* parser, Token* token);
 static uint16_t parse_if_stmt(Parser* parser);
@@ -1100,19 +1104,29 @@ uint16_t parse_expression(Parser* parser) {
 
 /**
  * Parse assignment
- * Assignment -> LogicalOr ('=' Assignment)?
+ * Assignment -> LogicalOr (('=' | '+=' | '-=') Assignment)?
  */
 uint16_t parse_assignment(Parser* parser) {
     uint16_t left;
     uint16_t assign_node;
     uint16_t right;
+    uint16_t assign_op;
     
     left = parse_logical_or(parser);
     if (left == 0) {
         return 0;
     }
     
+    assign_op = 0xFFFF;
     if (parser_consume(parser, TOK_ASSIGN)) {
+        assign_op = ASSIGN_OP_SIMPLE;
+    } else if (parser_consume(parser, TOK_PLUS_ASSIGN)) {
+        assign_op = ASSIGN_OP_ADD;
+    } else if (parser_consume(parser, TOK_MINUS_ASSIGN)) {
+        assign_op = ASSIGN_OP_SUB;
+    }
+    
+    if (assign_op != 0xFFFF) {
         right = parse_assignment(parser);
         if (right == 0) {
             return 0;
@@ -1123,6 +1137,7 @@ uint16_t parse_assignment(Parser* parser) {
             return 0;
         }
         
+        parser->nodes[assign_node - parser->total_nodes - 1].data.assign.op = assign_op;
         parser->nodes[assign_node - parser->total_nodes - 1].data.assign.target = left;
         parser->nodes[assign_node - parser->total_nodes - 1].data.assign.value = right;
         
