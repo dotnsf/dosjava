@@ -777,6 +777,81 @@ int interpreter_step(ExecutionContext* ctx) {
                             return -1;
                         }
                         break;
+                    } else if (strcmp(method_name, "concat") == 0) {
+                        uint16_t right_value;
+                        uint16_t left_value;
+                        const char* left_str;
+                        const char* right_str;
+                        char concat_buf[256];
+                        uint16_t left_len;
+                        uint16_t right_len;
+                        uint16_t total_len;
+                        uint16_t i;
+                        uint16_t j;
+                        uint16_t const_idx;
+                        
+                        if (arg_count != 2) {
+                            printf("ERROR: concat expects 2 arguments, got %u\n", arg_count);
+                            return -1;
+                        }
+                        
+                        right_value = stack_pop_shared(ctx);
+                        left_value = stack_pop_shared(ctx);
+                        left_str = NULL;
+                        right_str = NULL;
+                        
+                        if (left_value < ctx->djc_file->header.constant_pool_count &&
+                            ctx->djc_file->constants[left_value].tag == CONST_UTF8) {
+                            left_str = ctx->djc_file->constants[left_value].data.utf8_data;
+                        }
+                        if (right_value < ctx->djc_file->header.constant_pool_count &&
+                            ctx->djc_file->constants[right_value].tag == CONST_UTF8) {
+                            right_str = ctx->djc_file->constants[right_value].data.utf8_data;
+                        }
+                        
+                        if (!left_str || !right_str) {
+                            printf("ERROR: Invalid string constant index for concat: %d, %d\n",
+                                   left_value, right_value);
+                            return -1;
+                        }
+                        
+                        left_len = (uint16_t)strlen(left_str);
+                        right_len = (uint16_t)strlen(right_str);
+                        total_len = left_len + right_len;
+                        if (total_len >= sizeof(concat_buf)) {
+                            printf("ERROR: Concatenated string too long\n");
+                            return -1;
+                        }
+                        
+                        for (i = 0; i < left_len; i++) {
+                            concat_buf[i] = left_str[i];
+                        }
+                        for (j = 0; j < right_len; j++) {
+                            concat_buf[left_len + j] = right_str[j];
+                        }
+                        concat_buf[total_len] = '\0';
+                        
+                        const_idx = ctx->djc_file->header.constant_pool_count;
+                        if (const_idx >= DJC_MAX_CONSTANTS) {
+                            printf("ERROR: Constant pool full during concat\n");
+                            return -1;
+                        }
+                        
+                        ctx->djc_file->constants[const_idx].tag = CONST_UTF8;
+                        ctx->djc_file->constants[const_idx].length = total_len;
+                        ctx->djc_file->constants[const_idx].data.utf8_data = (char*)memory_alloc(total_len + 1);
+                        if (ctx->djc_file->constants[const_idx].data.utf8_data == NULL) {
+                            printf("ERROR: Out of memory during concat\n");
+                            return -1;
+                        }
+                        strcpy(ctx->djc_file->constants[const_idx].data.utf8_data, concat_buf);
+                        ctx->djc_file->header.constant_pool_count++;
+                        
+                        if (stack_push_shared(ctx, const_idx) != 0) {
+                            printf("ERROR: Stack overflow\n");
+                            return -1;
+                        }
+                        break;
                     }
                 }
                 

@@ -237,6 +237,7 @@ int check_identifier(SemanticAnalyzer* analyzer, ASTNode* id_node, TypeInfo* res
  * @return 0 on success, -1 on error
  */
 int check_method_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_type);
+int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_type);
 
 /* Type checking helpers */
 

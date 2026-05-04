@@ -409,7 +409,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "Hello World!\n12\n5" 
 echo.
 
-goto :completed
+goto :test11
 
 :test10_fail
 echo FAILED: Compilation error
@@ -426,6 +426,46 @@ goto :end
 :test10_badout
 echo FAILED: Output mismatch for Test 10
 echo Expected: "Hello World!\n12\n5"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test11
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 11: String concat
+echo ------------------------------
+..\build\bin\djc.exe strcat.jav
+if errorlevel 1 goto :test11_fail
+if not exist STRCAT.DJC goto :test11_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe STRCAT.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test11_runfail
+find "1234\nAABB\n123456" RT_OUT.TXT > nul
+if errorlevel 1 goto :test11_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "1234\nAABB\n123456" 
+echo.
+
+goto :completed
+
+:test11_fail
+echo FAILED: Compilation error
+goto :end
+
+:test11_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test11_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test11_badout
+echo FAILED: Output mismatch for Test 11
+echo Expected: "1234\nAABB\n123456"
 echo Actual:
 type RT_OUT.TXT
 goto :end

@@ -15,6 +15,7 @@
 static int read_ast_header(SemanticAnalyzer* analyzer);
 static int load_string_pool(SemanticAnalyzer* analyzer);
 static int current_scope_has_local_name(SemanticAnalyzer* analyzer, const char* name, SymbolKind kind);
+static int is_string_type(SemanticAnalyzer* analyzer, TypeInfo type);
 
 /* Initialize semantic analyzer */
 int semantic_init(SemanticAnalyzer* analyzer, const char* ast_file, const char* symbol_file) {
@@ -222,6 +223,17 @@ static int current_scope_has_local_name(SemanticAnalyzer* analyzer, const char* 
     }
     
     return 0;
+}
+
+static int is_string_type(SemanticAnalyzer* analyzer, TypeInfo type) {
+    const char* class_name;
+    
+    if (!analyzer || type.kind != TYPE_CLASS) {
+        return 0;
+    }
+    
+    class_name = semantic_get_string(analyzer, type.class_name);
+    return class_name && strcmp(class_name, "String") == 0;
 }
 
 /* Report semantic error */
@@ -872,25 +884,33 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     TypeInfo var_type;  /* Copy of variable type to avoid buffer overwrite */
     ASTNode* init_expr;
     uint16_t init_expr_index;
+    uint16_t var_name_off;
+    uint16_t err_line;
+    uint16_t err_col;
     
     if (!analyzer || !var_node) {
         return -1;
     }
     
-    /* Save variable type before any other node reads */
+    /* Save all fields needed after recursive reads because semantic_get_node()
+     * reuses a shared AST buffer.
+     */
     var_type = var_node->data.var_decl.type;
     init_expr_index = var_node->data.var_decl.init_expr;
+    var_name_off = var_node->data.var_decl.name;
+    err_line = var_node->line;
+    err_col = var_node->column;
     
     /* Get variable name */
-    var_name = semantic_get_string(analyzer, var_node->data.var_decl.name);
+    var_name = semantic_get_string(analyzer, var_name_off);
     if (!var_name) {
-        semantic_error_node(analyzer, var_node, "Invalid variable name");
+        semantic_error(analyzer, err_line, err_col, "Invalid variable name");
         return -1;
     }
     
     /* Check for duplicate local variable in current active scope only */
     if (current_scope_has_local_name(analyzer, var_name, SYM_LOCAL)) {
-        semantic_error_node(analyzer, var_node, "Duplicate variable declaration");
+        semantic_error(analyzer, err_line, err_col, "Duplicate variable declaration");
         return -1;
     }
     
@@ -901,7 +921,9 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
             if (check_expression(analyzer, init_expr, &init_type) == 0) {
                 /* Check type compatibility */
                 if (!types_compatible(var_type, init_type)) {
-                    semantic_error_node(analyzer, var_node, "Type mismatch in variable initialization");
+                    if (!(is_string_type(analyzer, var_type) && is_string_type(analyzer, init_type))) {
+                        semantic_error(analyzer, err_line, err_col, "Type mismatch in variable initialization");
+                    }
                 }
             }
         }
@@ -913,7 +935,7 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     /* Add variable name to string pool and use the new offset */
     var_sym.name_offset = semantic_add_string(analyzer, var_name);
     if (var_sym.name_offset == 0xFFFF) {
-        semantic_error_node(analyzer, var_node, "String pool full");
+        semantic_error(analyzer, err_line, err_col, "String pool full");
         return -1;
     }
     var_sym.type = var_type;  /* Use saved copy */
@@ -921,7 +943,7 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     
     /* Add variable to symbol table */
     if (symtable_add_symbol(analyzer->symtable, &var_sym) == 0xFFFF) {
-        semantic_error_node(analyzer, var_node, "Failed to add variable symbol");
+        semantic_error(analyzer, err_line, err_col, "Failed to add variable symbol");
         return -1;
     }
 
@@ -1261,15 +1283,19 @@ int check_binary_op(SemanticAnalyzer* analyzer, ASTNode* binop_node, TypeInfo* r
     uint16_t left_idx;
     uint16_t right_idx;
     uint16_t op;
+    uint16_t err_line;
+    uint16_t err_col;
     
     if (!analyzer || !binop_node || !result_type) {
         return -1;
     }
     
-    /* CRITICAL: Save indices and operator BEFORE any semantic_get_node calls */
+    /* CRITICAL: Save indices/operator/source location BEFORE any semantic_get_node calls */
     left_idx = binop_node->data.binary_op.left;
     right_idx = binop_node->data.binary_op.right;
     op = binop_node->data.binary_op.op;
+    err_line = binop_node->line;
+    err_col = binop_node->column;
     
     /* Check left operand */
     left_node = semantic_get_node(analyzer, left_idx);
@@ -1283,9 +1309,15 @@ int check_binary_op(SemanticAnalyzer* analyzer, ASTNode* binop_node, TypeInfo* r
         return -1;
     }
     
+    if (op == BINOP_ADD && is_string_type(analyzer, left_type) && is_string_type(analyzer, right_type)) {
+        result_type->kind = TYPE_CLASS;
+        result_type->class_name = left_type.class_name;
+        return 0;
+    }
+    
     /* Get result type */
     if (get_binary_op_result_type(op, left_type, right_type, result_type) != 0) {
-        semantic_error_node(analyzer, binop_node, "Invalid operand types for binary operation");
+        semantic_error(analyzer, err_line, err_col, "Invalid operand types for binary operation");
         return -1;
     }
     
@@ -1471,10 +1503,9 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                 uint16_t current_arg_idx = first_arg_idx;
                 
                 if (recv_name && strcmp(recv_name, "System") == 0) {
-                    uint16_t string_name_off = semantic_add_string(analyzer, "String");
-                    
                     while (current_arg_idx != 0 && checked_args < arg_count) {
                         TypeInfo arg_type;
+                        const char* arg_class_name = NULL;
                         uint16_t next_arg_idx;
                         
                         arg_node = semantic_get_node(analyzer, current_arg_idx);
@@ -1482,8 +1513,12 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                             return -1;
                         }
                         
+                        if (arg_type.kind == TYPE_CLASS && arg_type.class_name < analyzer->pool_size) {
+                            arg_class_name = semantic_get_string(analyzer, arg_type.class_name);
+                        }
+                        
                         if (!(is_numeric_type(arg_type) ||
-                              (arg_type.kind == TYPE_CLASS && arg_type.class_name == string_name_off))) {
+                              (arg_class_name && strcmp(arg_class_name, "String") == 0))) {
                             semantic_error_node(analyzer, call_node, "println supports only int or String in Phase 1");
                             return -1;
                         }
@@ -1650,7 +1685,10 @@ int get_binary_op_result_type(BinaryOp op, TypeInfo left_type, TypeInfo right_ty
         return -1;
     }
     
-    /* Arithmetic operations: int op int -> int */
+    /* Arithmetic operations: int op int -> int
+     * String concatenation is handled in check_binary_op() because nominal
+     * String detection needs analyzer access to resolve string-pool names.
+     */
     if (op == BINOP_ADD || op == BINOP_SUB || op == BINOP_MUL || op == BINOP_DIV || op == BINOP_MOD) {
         if (is_numeric_type(left_type) && is_numeric_type(right_type)) {
             result_type->kind = TYPE_INT;
