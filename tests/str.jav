@@ -1,7 +1,7 @@
 // str.jav
-class hello {
+class str {
     public static void main() {
         String str = "Hello World!";
-        System.out.println(str);
+        System.out.println(str);  // "Hello World!"
     }
 }

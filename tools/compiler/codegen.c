@@ -1281,7 +1281,6 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     const char* method_name;
     uint16_t arg_idx;
     ASTNode* arg_node;
-    ASTNode* object_node;
     uint16_t arg_count;
     uint16_t total_arg_count;
     uint16_t method_idx;
@@ -1294,6 +1293,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     const char* first_arg_name;
     uint16_t i;
     int first_arg_is_string;
+    int is_string_length;
+    uint16_t invoke_arg_count;
     
     if (!codegen || !call_node) {
         return -1;
@@ -1310,20 +1311,19 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         return -1;
     }
     
-    if (object_idx != 0) {
-        object_node = codegen_get_node(codegen, object_idx);
-        (void)object_node;
-    }
-    
     is_native = 0;
+    is_string_length = 0;
     if (strcmp(method_name, "println") == 0) {
         is_native = 1;
+    } else if (object_idx != 0 && strcmp(method_name, "length") == 0) {
+        is_native = 1;
+        is_string_length = 1;
     }
     
     arg_node_type = NODE_PROGRAM;
     first_arg_name = NULL;
     first_arg_is_string = 0;
-    if (saved_first_arg != 0) {
+    if (!is_string_length && saved_first_arg != 0) {
         arg_node = codegen_get_node(codegen, saved_first_arg);
         if (arg_node) {
             arg_node_type = arg_node->type;
@@ -1350,41 +1350,47 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     arg_count = 0;
-    arg_idx = saved_first_arg;
-    while (arg_idx != 0 && arg_count < total_arg_count) {
-        uint16_t next_arg_idx;
-        
-        arg_node = codegen_get_node(codegen, arg_idx);
-        if (!arg_node) {
-            break;
+    if (is_string_length) {
+        ASTNode* recv_node = codegen_get_node(codegen, object_idx);
+        if (!recv_node) {
+            codegen_error(codegen, "Invalid length receiver");
+            return -1;
         }
-        
-        next_arg_idx = arg_node->next_sibling;
-        generate_expression(codegen, arg_node);
-        
-        arg_idx = next_arg_idx;
-        arg_count++;
+        if (generate_expression(codegen, recv_node) != 0) {
+            return -1;
+        }
+        arg_count = 1;
+    } else {
+        arg_idx = saved_first_arg;
+        while (arg_idx != 0 && arg_count < total_arg_count) {
+            uint16_t next_arg_idx;
+            
+            arg_node = codegen_get_node(codegen, arg_idx);
+            if (!arg_node) {
+                break;
+            }
+            
+            next_arg_idx = arg_node->next_sibling;
+            if (generate_expression(codegen, arg_node) != 0) {
+                return -1;
+            }
+            
+            arg_idx = next_arg_idx;
+            arg_count++;
+        }
     }
+    
+    invoke_arg_count = arg_count;
     
     method_idx = find_method_index(codegen, method_name, is_native);
-    if (method_idx == 0xFFFF) {
-        codegen_error(codegen, "Failed to add method reference");
-        return -1;
-    }
-    
-    if (is_native && codegen->methods[method_idx].descriptor_index == 0) {
+    if (is_native) {
         uint16_t desc_idx;
-        char descriptor[32];
+        char descriptor[24];
         
-        if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
+        if (is_string_length) {
+            strcpy(descriptor, "(Ljava/lang/String;)I");
+        } else if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
             strcpy(descriptor, "(Ljava/lang/String;)V");
-        } else if (arg_node_type == NODE_LITERAL_INT ||
-                   arg_node_type == NODE_IDENTIFIER ||
-                   arg_node_type == NODE_BINARY_OP ||
-                   arg_node_type == NODE_UNARY_OP ||
-                   arg_node_type == NODE_POSTFIX_OP ||
-                   arg_node_type == NODE_CALL) {
-            strcpy(descriptor, "(I)V");
         } else {
             strcpy(descriptor, "(I)V");
         }
@@ -1395,8 +1401,15 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         }
     }
     
+    if (method_idx == 0xFFFF) {
+        codegen_error(codegen, "Failed to add method reference");
+        return -1;
+    }
+    
     returns_value = 0;
-    if (!is_native) {
+    if (is_string_length) {
+        returns_value = 1;
+    } else if (!is_native) {
         method_sym = symtable_lookup(codegen->symtable, method_name);
         if (method_sym && method_sym->kind == SYM_METHOD && method_sym->type.kind != TYPE_VOID) {
             returns_value = 1;
@@ -1405,9 +1418,9 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     
     emit_opcode(codegen, OP_INVOKE_STATIC);
     emit_u2(codegen, method_idx);
-    emit_u1(codegen, (uint8_t)arg_count);
+    emit_u1(codegen, (uint8_t)invoke_arg_count);
     
-    update_stack(codegen, -(int16_t)arg_count);
+    update_stack(codegen, -(int16_t)invoke_arg_count);
     if (returns_value) {
         update_stack(codegen, 1);
     }
@@ -1578,6 +1591,38 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
         return 0xFFFF;
     }
     
+    if (is_native) {
+        /* Native methods are keyed by descriptor string in this minimal runtime.
+         * This allows separate entries for println(String), println(int), and length(String).
+         */
+        name_idx = find_or_add_utf8(codegen, method_name);
+        if (name_idx == 0xFFFF) {
+            return 0xFFFF;
+        }
+        
+        for (i = 0; i < codegen->method_count; i++) {
+            if ((codegen->methods[i].flags & METHOD_NATIVE) != 0 &&
+                codegen->methods[i].descriptor_index == name_idx) {
+                return i;
+            }
+        }
+        
+        if (codegen->method_count >= 64) {
+            return 0xFFFF;
+        }
+        
+        codegen->methods[codegen->method_count].name_index = name_idx;
+        codegen->methods[codegen->method_count].descriptor_index = name_idx;
+        codegen->methods[codegen->method_count].code_offset = 0;
+        codegen->methods[codegen->method_count].code_length = 0;
+        codegen->methods[codegen->method_count].max_stack = 0;
+        codegen->methods[codegen->method_count].max_locals = 0;
+        codegen->methods[codegen->method_count].flags = METHOD_NATIVE;
+        
+        codegen->method_count++;
+        return (uint16_t)(codegen->method_count - 1);
+    }
+    
     for (i = 0; i < codegen->method_count; i++) {
         name_idx = codegen->methods[i].name_index;
         
@@ -1587,7 +1632,7 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
                 
                 if (strcmp(existing_name, method_name) == 0) {
                     int is_method_native = (codegen->methods[i].flags & METHOD_NATIVE) != 0;
-                    if (is_native == is_method_native) {
+                    if (!is_method_native) {
                         return i;
                     }
                 }
@@ -1610,7 +1655,7 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
     codegen->methods[codegen->method_count].code_length = 0;
     codegen->methods[codegen->method_count].max_stack = 0;
     codegen->methods[codegen->method_count].max_locals = 0;
-    codegen->methods[codegen->method_count].flags = is_native ? METHOD_NATIVE : 0;
+    codegen->methods[codegen->method_count].flags = 0;
     
     codegen->method_count++;
     return (uint16_t)(codegen->method_count - 1);

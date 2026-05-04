@@ -1501,6 +1501,38 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         }
     }
     
+    /* Special-case Phase 1 String.length() */
+    if (object_idx != 0 && method_name && strcmp(method_name, "length") == 0) {
+        TypeInfo object_type;
+        
+        if (arg_count != 0) {
+            semantic_error_node(analyzer, call_node, "length() takes no arguments");
+            return -1;
+        }
+        
+        object_node = semantic_get_node(analyzer, object_idx);
+        if (!object_node || check_expression(analyzer, object_node, &object_type) != 0) {
+            return -1;
+        }
+        
+        if (object_type.kind != TYPE_CLASS) {
+            semantic_error_node(analyzer, call_node, "length() requires String receiver");
+            return -1;
+        }
+        
+        {
+            uint16_t string_name_off = semantic_add_string(analyzer, "String");
+            if (object_type.class_name != string_name_off) {
+                semantic_error_node(analyzer, call_node, "length() requires String receiver");
+                return -1;
+            }
+        }
+        
+        result_type->kind = TYPE_INT;
+        result_type->class_name = 0;
+        return 0;
+    }
+    
     if (object_idx != 0) {
         semantic_error_node(analyzer, call_node, "Instance method calls are not supported");
         return -1;

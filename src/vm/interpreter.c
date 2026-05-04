@@ -725,11 +725,8 @@ int interpreter_step(ExecutionContext* ctx) {
                          * (Ljava/lang/String;)V - String parameter
                          * (I)V - int parameter
                          */
-                        if (descriptor && strstr(descriptor, "(I)") != NULL) {
-                            /* Integer parameter - print as integer */
-                            system_println_int((int16_t)value);
-                        } else if (descriptor && strstr(descriptor, "(Ljava/lang/String;)") != NULL) {
-                            /* String parameter - value is constant pool index */
+                        if (descriptor && strcmp(descriptor, "(Ljava/lang/String;)V") == 0) {
+                            /* String parameter - value is direct UTF8 constant index */
                             str = NULL;
                             if (value < ctx->djc_file->header.constant_pool_count) {
                                 if (ctx->djc_file->constants[value].tag == CONST_UTF8) {
@@ -743,18 +740,41 @@ int interpreter_step(ExecutionContext* ctx) {
                                 return -1;
                             }
                         } else {
-                            /* Fallback: try to detect if it's a string constant */
-                            str = NULL;
-                            if (value < ctx->djc_file->header.constant_pool_count) {
-                                if (ctx->djc_file->constants[value].tag == CONST_UTF8) {
-                                    str = ctx->djc_file->constants[value].data.utf8_data;
-                                }
+                            /* Native println(int) and any non-string fallback */
+                            system_println_int((int16_t)value);
+                        }
+                        break;
+                    } else if (strcmp(method_name, "length") == 0) {
+                        uint16_t value;
+                        const char* str;
+                        uint16_t len;
+                        
+                        if (arg_count != 1) {
+                            printf("ERROR: length expects 1 argument, got %u\n", arg_count);
+                            return -1;
+                        }
+                        
+                        value = stack_pop_shared(ctx);
+                        str = NULL;
+                        
+                        /* Phase 1 String values are stored as direct UTF8 constant indices,
+                         * identical to println(String) handling.
+                         */
+                        if (value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[value].tag == CONST_UTF8) {
+                                str = ctx->djc_file->constants[value].data.utf8_data;
                             }
-                            if (str) {
-                                system_println_cstr(str);
-                            } else {
-                                system_println_int((int16_t)value);
-                            }
+                        }
+                        
+                        if (!str) {
+                            printf("ERROR: Invalid string constant index for length: %d\n", value);
+                            return -1;
+                        }
+                        
+                        len = (uint16_t)strlen(str);
+                        if (stack_push_shared(ctx, len) != 0) {
+                            printf("ERROR: Stack overflow\n");
+                            return -1;
                         }
                         break;
                     }

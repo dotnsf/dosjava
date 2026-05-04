@@ -205,11 +205,11 @@ if not exist CALC.DJC goto :test5_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe CALC.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test5_runfail
-find "20" RT_OUT.TXT > nul
+find "20\n5\n0\n1\n0" RT_OUT.TXT > nul
 if errorlevel 1 goto :test5_badout
 echo Output:
 type RT_OUT.TXT
-echo SUCCESS: Output matched expected value
+echo SUCCESS: Output matched expected value "20\n5\n0\n1\n0"
 echo.
 
 goto :test6
@@ -228,7 +228,7 @@ goto :end
 
 :test5_badout
 echo FAILED: Output mismatch for Test 5
-echo Expected: 10
+echo Expected: "20\n5\n0\n1\n0"
 echo Actual:
 type RT_OUT.TXT
 goto :end
@@ -284,11 +284,11 @@ if not exist ARRAYS.DJC goto :test7_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe ARRAYS.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test7_runfail
-find "12" RT_OUT.TXT > nul
+find "12\n22\n25\n34\n64" RT_OUT.TXT > nul
 if errorlevel 1 goto :test7_badout
 echo Output:
 type RT_OUT.TXT
-echo SUCCESS: Output matched expected value 12
+echo SUCCESS: Output matched expected value "12\n22\n25\n34\n64"
 echo.
 
 goto :test8
@@ -307,7 +307,7 @@ goto :end
 
 :test7_badout
 echo FAILED: Output mismatch for Test 7
-echo Expected: 12
+echo Expected: "12\n22\n25\n34\n64"
 echo Actual:
 type RT_OUT.TXT
 goto :end
@@ -323,11 +323,11 @@ if not exist FUNC.DJC goto :test8_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe FUNC.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test8_runfail
-find "6" RT_OUT.TXT > nul
+find "3\n6\n6" RT_OUT.TXT > nul
 if errorlevel 1 goto :test8_badout
 echo Output:
 type RT_OUT.TXT
-echo SUCCESS: Output matched expected value 6
+echo SUCCESS: Output matched expected value "3\n6\n6"
 echo.
 
 goto :test9
@@ -346,7 +346,7 @@ goto :end
 
 :test8_badout
 echo FAILED: Output mismatch for Test 8
-echo Expected: 6
+echo Expected: "3\n6\n6"
 echo Actual:
 type RT_OUT.TXT
 goto :end
@@ -369,7 +369,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "Hello World!" 
 echo.
 
-goto :completed
+goto :test10
 
 :test9_fail
 echo FAILED: Compilation error
@@ -386,6 +386,46 @@ goto :end
 :test9_badout
 echo FAILED: Output mismatch for Test 9
 echo Expected: "Hello World!"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test10
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 10: String length
+echo ------------------------------
+..\build\bin\djc.exe strlen.jav
+if errorlevel 1 goto :test10_fail
+if not exist STRLEN.DJC goto :test10_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe STRLEN.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test10_runfail
+find "Hello World!\n12\n5" RT_OUT.TXT > nul
+if errorlevel 1 goto :test10_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "Hello World!\n12\n5" 
+echo.
+
+goto :completed
+
+:test10_fail
+echo FAILED: Compilation error
+goto :end
+
+:test10_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test10_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test10_badout
+echo FAILED: Output mismatch for Test 10
+echo Expected: "Hello World!\n12\n5"
 echo Actual:
 type RT_OUT.TXT
 goto :end

@@ -14,7 +14,7 @@ AR = wlib
 # -od: Disable optimizations (for debugging)
 # -d2: Full debugging info
 # -i: Include path
-CFLAGS = -ms -0 -w4 -zq -od -d2 -i=C:\WATCOM\h
+CFLAGS = -ms -0 -w4 -zq -os -s -i=C:\WATCOM\h
 
 # Linker flags
 LDFLAGS = system dos
