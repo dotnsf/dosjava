@@ -300,7 +300,9 @@ int generate_class(CodeGenerator* codegen, ASTNode* class_node) {
     
     
     /* Add class name to constant pool */
-    add_utf8_constant(codegen, class_name);
+    {
+        uint16_t class_idx = add_utf8_constant(codegen, class_name);
+    }
     
     /* Get class symbol */
     codegen->current_class = symtable_lookup(codegen->symtable, class_name);
@@ -382,7 +384,22 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
     }
     
     /* Get method symbol */
-    codegen->current_method = symtable_lookup(codegen->symtable, method_name);
+    codegen->current_method = NULL;
+    {
+        uint16_t i;
+        for (i = 0; i < codegen->symtable->symbol_count; i++) {
+            Symbol* sym = &codegen->symtable->symbols[i];
+            const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+            if (sym->kind == SYM_METHOD && sym_name && strcmp(sym_name, method_name) == 0) {
+                codegen->current_method = sym;
+                break;
+            }
+        }
+    }
+    if (!codegen->current_method) {
+        codegen_error(codegen, "Method symbol not found");
+        return -1;
+    }
     
     /* Create code generation context */
     codegen->context = (CodeGenContext*)malloc(sizeof(CodeGenContext));
@@ -457,11 +474,16 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
         for (method_idx = 0; method_idx < codegen->method_count; method_idx++) {
             if (codegen->methods[method_idx].name_index == name_idx) {
                 /* Found existing entry - update it */
-                codegen->methods[method_idx].descriptor_index = 0; /* TODO: type descriptor */
+                codegen->methods[method_idx].descriptor_index =
+                    build_method_descriptor(codegen, codegen->current_method);
                 codegen->methods[method_idx].code_offset = code_start;
                 codegen->methods[method_idx].code_length = code_length;
                 codegen->methods[method_idx].max_stack = codegen->context->max_stack;
-                codegen->methods[method_idx].max_locals = codegen->context->max_locals;
+                codegen->methods[method_idx].max_locals =
+                    (uint8_t)((codegen->current_method->data.method_data.param_count >
+                               codegen->context->max_locals)
+                                  ? codegen->current_method->data.method_data.param_count
+                                  : codegen->context->max_locals);
                 codegen->methods[method_idx].flags =
                     (is_static ? METHOD_STATIC : 0) |
                     (is_public ? METHOD_PUBLIC : 0);
@@ -474,11 +496,16 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
         /* If not found, add new entry */
         if (!found && codegen->method_count < 64) {
             codegen->methods[codegen->method_count].name_index = name_idx;
-            codegen->methods[codegen->method_count].descriptor_index = 0; /* TODO: type descriptor */
+            codegen->methods[codegen->method_count].descriptor_index =
+                build_method_descriptor(codegen, codegen->current_method);
             codegen->methods[codegen->method_count].code_offset = code_start;
             codegen->methods[codegen->method_count].code_length = code_length;
             codegen->methods[codegen->method_count].max_stack = codegen->context->max_stack;
-            codegen->methods[codegen->method_count].max_locals = codegen->context->max_locals;
+            codegen->methods[codegen->method_count].max_locals =
+                (uint8_t)((codegen->current_method->data.method_data.param_count >
+                           codegen->context->max_locals)
+                              ? codegen->current_method->data.method_data.param_count
+                              : codegen->context->max_locals);
             codegen->methods[codegen->method_count].flags =
                 (is_static ? METHOD_STATIC : 0) |
                 (is_public ? METHOD_PUBLIC : 0);
@@ -797,10 +824,18 @@ int generate_for_stmt(CodeGenerator* codegen, ASTNode* for_node) {
     if (init_index != 0) {
         init_node = codegen_get_node(codegen, init_index);
         if (init_node) {
-            generate_expression(codegen, init_node);
-            /* Pop the result if it's an expression statement */
-            emit_opcode(codegen, OP_POP);
-            update_stack(codegen, -1);
+            if (init_node->type == NODE_VAR_DECL) {
+                if (generate_var_decl(codegen, init_node) != 0) {
+                    return -1;
+                }
+            } else {
+                if (generate_expression(codegen, init_node) != 0) {
+                    return -1;
+                }
+                /* Pop the result if it's an expression statement */
+                emit_opcode(codegen, OP_POP);
+                update_stack(codegen, -1);
+            }
         }
     }
     
@@ -897,8 +932,14 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
         case NODE_LITERAL_STRING: {
             const char* str_value;
             uint16_t const_idx;
+            uint16_t literal_off;
             
-            str_value = codegen_get_string(codegen, expr_node->data.literal_string.str_offset);
+            literal_off = expr_node->data.literal_string.str_offset;
+            if (literal_off < codegen->pool_size) {
+                str_value = &codegen->string_pool[literal_off];
+            } else {
+                str_value = NULL;
+            }
             if (!str_value) {
                 codegen_error(codegen, "Invalid string literal");
                 return -1;
@@ -1032,33 +1073,64 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
         ASTNode* test_right;
         uint16_t left_type;
         uint16_t right_type;
-        uint16_t left_name_off;
-        uint16_t right_name_off;
-        const char* left_name;
-        const char* right_name;
         
         test_left = codegen_get_node(codegen, left_index);
-        left_type = test_left ? test_left->type : 0xFFFF;
-        left_name_off = (test_left && left_type == NODE_IDENTIFIER) ? test_left->data.identifier.name : 0;
-        
         test_right = codegen_get_node(codegen, right_index);
+        left_type = test_left ? test_left->type : 0xFFFF;
         right_type = test_right ? test_right->type : 0xFFFF;
-        right_name_off = (test_right && right_type == NODE_IDENTIFIER) ? test_right->data.identifier.name : 0;
         
-        left_name = left_name_off ? codegen_get_string(codegen, left_name_off) : NULL;
-        right_name = right_name_off ? codegen_get_string(codegen, right_name_off) : NULL;
-        
-        if (left_type == NODE_LITERAL_STRING ||
-            right_type == NODE_LITERAL_STRING ||
-            left_type == NODE_BINARY_OP ||
-            right_type == NODE_BINARY_OP ||
-            (left_name && (strcmp(left_name, "a") == 0 || strcmp(left_name, "b") == 0 ||
-                           strcmp(left_name, "c") == 0 || strcmp(left_name, "d") == 0 ||
-                           strcmp(left_name, "e") == 0)) ||
-            (right_name && (strcmp(right_name, "a") == 0 || strcmp(right_name, "b") == 0 ||
-                            strcmp(right_name, "c") == 0 || strcmp(right_name, "d") == 0 ||
-                            strcmp(right_name, "e") == 0))) {
+        if (left_type == NODE_LITERAL_STRING || right_type == NODE_LITERAL_STRING) {
             is_string_concat = 1;
+        } else {
+            const char* left_name = NULL;
+            const char* right_name = NULL;
+            Symbol* left_sym = NULL;
+            Symbol* right_sym = NULL;
+            uint16_t best_scope;
+            uint16_t i;
+            
+            if (test_left && left_type == NODE_IDENTIFIER) {
+                left_name = codegen_get_string(codegen, test_left->data.identifier.name);
+            }
+            if (test_right && right_type == NODE_IDENTIFIER) {
+                right_name = codegen_get_string(codegen, test_right->data.identifier.name);
+            }
+            
+            if (left_name) {
+                best_scope = 0;
+                for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                    Symbol* sym = &codegen->symtable->symbols[i];
+                    const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                    if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                        sym_name && strcmp(sym_name, left_name) == 0) {
+                        if (!left_sym || sym->scope_level >= best_scope) {
+                            left_sym = sym;
+                            best_scope = sym->scope_level;
+                        }
+                    }
+                }
+            }
+            
+            if (right_name) {
+                best_scope = 0;
+                for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                    Symbol* sym = &codegen->symtable->symbols[i];
+                    const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                    if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                        sym_name && strcmp(sym_name, right_name) == 0) {
+                        if (!right_sym || sym->scope_level >= best_scope) {
+                            right_sym = sym;
+                            best_scope = sym->scope_level;
+                        }
+                    }
+                }
+            }
+            
+            if (left_sym && right_sym &&
+                left_sym->type.kind == TYPE_CLASS &&
+                right_sym->type.kind == TYPE_CLASS) {
+                is_string_concat = 1;
+            }
         }
     }
     
@@ -1263,6 +1335,7 @@ int generate_postfix_op(CodeGenerator* codegen, ASTNode* postop_node) {
 int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     ASTNode* target_node;
     ASTNode* value_node;
+    ASTNode value_expr_copy;
     const char* var_name;
     uint16_t local_idx;
     uint16_t target_index;
@@ -1272,6 +1345,7 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     uint16_t array_idx;
     uint16_t index_idx;
     uint16_t assign_op;
+    uint16_t i;
     
     if (!codegen || !assign_node) {
         return -1;
@@ -1305,12 +1379,12 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
         codegen_error(codegen, "Invalid assignment");
         return -1;
     }
+    memcpy(&value_expr_copy, value_node, sizeof(ASTNode));
     
     if (target_type == NODE_ARRAY_ACCESS) {
         if (assign_op == 0) {
             ASTNode array_expr_copy;
             ASTNode index_expr_copy;
-            ASTNode value_expr_copy;
             
             {
                 ASTNode* array_src = codegen_get_node(codegen, array_idx);
@@ -1328,15 +1402,6 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
                     return -1;
                 }
                 memcpy(&index_expr_copy, index_src, sizeof(ASTNode));
-            }
-            
-            {
-                ASTNode* value_src = codegen_get_node(codegen, value_index);
-                if (!value_src) {
-                    codegen_error(codegen, "Invalid assignment");
-                    return -1;
-                }
-                memcpy(&value_expr_copy, value_src, sizeof(ASTNode));
             }
             
             if (generate_expression(codegen, &array_expr_copy) != 0) {
@@ -1376,7 +1441,9 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     local_idx = get_local_index(codegen, var_name);
     
     if (assign_op == 0) {
-        generate_expression(codegen, value_node);
+        if (generate_expression(codegen, &value_expr_copy) != 0) {
+            return -1;
+        }
         emit_opcode(codegen, OP_DUP);
         update_stack(codegen, 1);
         
@@ -1391,6 +1458,77 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     }
     
     if (assign_op == 1 || assign_op == 2) {
+        Symbol* value_sym = NULL;
+        const char* class_name = NULL;
+        int target_is_string = 0;
+        uint16_t method_idx;
+        uint16_t desc_idx;
+        
+        if (local_idx == 0xFFFF) {
+            codegen_error(codegen, "Undefined assignment target");
+            return -1;
+        }
+        
+        for (i = 0; i < codegen->symtable->symbol_count; i++) {
+            Symbol* sym = &codegen->symtable->symbols[i];
+            const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+            if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                sym_name && strcmp(sym_name, var_name) == 0) {
+                value_sym = sym;
+            }
+        }
+        
+        if (value_sym && value_sym->type.kind == TYPE_CLASS) {
+            class_name = symtable_get_string(codegen->symtable, value_sym->type.class_name);
+            if (class_name && strcmp(class_name, "String") == 0) {
+                target_is_string = 1;
+            }
+        }
+        
+        if (target_is_string && assign_op == 1) {
+            if (local_idx <= 2) {
+                emit_opcode(codegen, OP_LOAD_0 + local_idx);
+            } else {
+                emit_opcode(codegen, OP_LOAD_LOCAL);
+                emit_u1(codegen, (uint8_t)local_idx);
+            }
+            update_stack(codegen, 1);
+            
+            if (generate_expression(codegen, &value_expr_copy) != 0) {
+                return -1;
+            }
+            
+            method_idx = find_method_index(codegen, "concat", 1);
+            if (method_idx == 0xFFFF) {
+                codegen_error(codegen, "Failed to add concat method reference");
+                return -1;
+            }
+            
+            desc_idx = find_or_add_utf8(codegen, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            if (desc_idx == 0xFFFF) {
+                codegen_error(codegen, "Failed to add concat descriptor");
+                return -1;
+            }
+            codegen->methods[method_idx].descriptor_index = desc_idx;
+            
+            emit_opcode(codegen, OP_INVOKE_STATIC);
+            emit_u2(codegen, method_idx);
+            emit_u1(codegen, 2);
+            update_stack(codegen, -1);
+            
+            emit_opcode(codegen, OP_DUP);
+            update_stack(codegen, 1);
+            
+            if (local_idx <= 2) {
+                emit_opcode(codegen, OP_STORE_0 + local_idx);
+            } else {
+                emit_opcode(codegen, OP_STORE_LOCAL);
+                emit_u1(codegen, (uint8_t)local_idx);
+            }
+            update_stack(codegen, -1);
+            return 0;
+        }
+        
         if (local_idx <= 2) {
             emit_opcode(codegen, OP_LOAD_0 + local_idx);
         } else {
@@ -1399,7 +1537,9 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
         }
         update_stack(codegen, 1);
         
-        generate_expression(codegen, value_node);
+        if (generate_expression(codegen, &value_expr_copy) != 0) {
+            return -1;
+        }
         if (assign_op == 1) {
             emit_opcode(codegen, OP_ADD);
         } else {
@@ -1477,7 +1617,13 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         arg_node = codegen_get_node(codegen, saved_first_arg);
         if (arg_node) {
             arg_node_type = arg_node->type;
+            if (arg_node_type == NODE_LITERAL_STRING) {
+                first_arg_is_string = 1;
+            }
             if (arg_node_type == NODE_IDENTIFIER) {
+                Symbol* best_sym = NULL;
+                uint16_t best_scope = 0;
+                
                 first_arg_name = codegen_get_string(codegen, arg_node->data.identifier.name);
                 if (first_arg_name) {
                     for (i = 0; i < codegen->symtable->symbol_count; i++) {
@@ -1485,14 +1631,15 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
                         const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
                         if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                             sym_name &&
-                            strcmp(sym_name, first_arg_name) == 0 &&
-                            sym->type.kind == TYPE_CLASS) {
-                            const char* class_name = symtable_get_string(codegen->symtable, sym->type.class_name);
-                            if (class_name && strcmp(class_name, "String") == 0) {
-                                first_arg_is_string = 1;
-                                break;
+                            strcmp(sym_name, first_arg_name) == 0) {
+                            if (!best_sym || sym->scope_level >= best_scope) {
+                                best_sym = sym;
+                                best_scope = sym->scope_level;
                             }
                         }
+                    }
+                    if (best_sym && best_sym->type.kind == TYPE_CLASS) {
+                        first_arg_is_string = 1;
                     }
                 }
             }
@@ -1533,6 +1680,11 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     invoke_arg_count = arg_count;
     
     method_idx = find_method_index(codegen, method_name, is_native);
+    if (method_idx == 0xFFFF) {
+        codegen_error(codegen, "Failed to add method reference");
+        return -1;
+    }
+    
     if (is_native) {
         uint16_t desc_idx;
         char descriptor[24];
@@ -1553,17 +1705,20 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         }
     }
     
-    if (method_idx == 0xFFFF) {
-        codegen_error(codegen, "Failed to add method reference");
-        return -1;
-    }
-    
     returns_value = 0;
     if (is_string_length || strcmp(method_name, "concat") == 0) {
         returns_value = 1;
     } else if (!is_native) {
-        method_sym = symtable_lookup(codegen->symtable, method_name);
-        if (method_sym && method_sym->kind == SYM_METHOD && method_sym->type.kind != TYPE_VOID) {
+        method_sym = NULL;
+        for (i = 0; i < codegen->symtable->symbol_count; i++) {
+            Symbol* sym = &codegen->symtable->symbols[i];
+            const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+            if (sym->kind == SYM_METHOD && sym_name && strcmp(sym_name, method_name) == 0) {
+                method_sym = sym;
+                break;
+            }
+        }
+        if (method_sym && method_sym->type.kind != TYPE_VOID) {
             returns_value = 1;
         }
     }
@@ -1681,7 +1836,7 @@ uint16_t add_utf8_constant(CodeGenerator* codegen, const char* str) {
     idx = codegen->constants->count;
     codegen->constants->constants[idx].tag = CONST_UTF8;
     codegen->constants->constants[idx].length = len;
-    codegen->constants->constants[idx].data.utf8_data = 
+    codegen->constants->constants[idx].data.utf8_data =
         &codegen->constants->string_data[codegen->constants->string_size];
     
     /* Copy string */
@@ -1734,10 +1889,110 @@ uint16_t find_or_add_utf8(CodeGenerator* codegen, const char* str) {
     return add_utf8_constant(codegen, str);
 }
 
+uint16_t build_method_descriptor(CodeGenerator* codegen, Symbol* method_sym) {
+    char descriptor[64];
+    char param_desc[8][20];
+    uint16_t method_pos;
+    uint16_t symbol_idx;
+    uint16_t method_index;
+    uint16_t param_count;
+    uint16_t found_params;
+    uint16_t param_idx;
+    
+    if (!codegen || !method_sym || !codegen->symtable || method_sym->kind != SYM_METHOD) {
+        return 0xFFFF;
+    }
+    
+    method_index = 0xFFFF;
+    for (symbol_idx = 0; symbol_idx < codegen->symtable->symbol_count; symbol_idx++) {
+        if (&codegen->symtable->symbols[symbol_idx] == method_sym) {
+            method_index = symbol_idx;
+            break;
+        }
+    }
+    if (method_index == 0xFFFF) {
+        return 0xFFFF;
+    }
+    
+    param_count = method_sym->data.method_data.param_count;
+    if (param_count > 8) {
+        return 0xFFFF;
+    }
+    
+    for (param_idx = 0; param_idx < 8; param_idx++) {
+        param_desc[param_idx][0] = '\0';
+    }
+    
+    found_params = 0;
+    for (symbol_idx = method_index + 1; symbol_idx < codegen->symtable->symbol_count && found_params < param_count; symbol_idx++) {
+        Symbol* sym = &codegen->symtable->symbols[symbol_idx];
+        if (sym->kind == SYM_METHOD) {
+            break;
+        }
+        if (sym->kind != SYM_PARAM) {
+            continue;
+        }
+        if (sym->data.param_data.index >= param_count) {
+            continue;
+        }
+        
+        if (sym->type.kind == TYPE_INT) {
+            strcpy(param_desc[sym->data.param_data.index], "I");
+        } else if (sym->type.kind == TYPE_CLASS) {
+            const char* class_name = symtable_get_string(codegen->symtable, sym->type.class_name);
+            if (class_name && strcmp(class_name, "String") == 0) {
+                strcpy(param_desc[sym->data.param_data.index], "Ljava/lang/String;");
+            } else {
+                return 0xFFFF;
+            }
+        } else {
+            return 0xFFFF;
+        }
+        found_params++;
+    }
+    
+    if (found_params != param_count) {
+        return 0xFFFF;
+    }
+    
+    method_pos = 0;
+    descriptor[method_pos++] = '(';
+    for (param_idx = 0; param_idx < param_count; param_idx++) {
+        uint16_t len = (uint16_t)strlen(param_desc[param_idx]);
+        if (len == 0) {
+            return 0xFFFF;
+        }
+        strcpy(&descriptor[method_pos], param_desc[param_idx]);
+        method_pos += len;
+    }
+    
+    descriptor[method_pos++] = ')';
+    if (method_sym->type.kind == TYPE_VOID) {
+        descriptor[method_pos++] = 'V';
+    } else if (method_sym->type.kind == TYPE_INT) {
+        descriptor[method_pos++] = 'I';
+    } else if (method_sym->type.kind == TYPE_CLASS) {
+        const char* class_name = symtable_get_string(codegen->symtable, method_sym->type.class_name);
+        if (class_name && strcmp(class_name, "String") == 0) {
+            strcpy(&descriptor[method_pos], "Ljava/lang/String;");
+            method_pos += 18;
+        } else {
+            return 0xFFFF;
+        }
+    } else {
+        return 0xFFFF;
+    }
+    
+    descriptor[method_pos] = '\0';
+    return find_or_add_utf8(codegen, descriptor);
+}
+
 /* Find or create method index */
 uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int is_native) {
     uint16_t i;
     uint16_t name_idx;
+    uint16_t descriptor_idx;
+    Symbol* target_method_sym;
     
     if (!codegen || !method_name) {
         return 0xFFFF;
@@ -1775,6 +2030,22 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
         return (uint16_t)(codegen->method_count - 1);
     }
     
+    target_method_sym = NULL;
+    for (i = 0; i < codegen->symtable->symbol_count; i++) {
+        Symbol* sym = &codegen->symtable->symbols[i];
+        const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+        if (sym->kind == SYM_METHOD && sym_name && strcmp(sym_name, method_name) == 0) {
+            target_method_sym = sym;
+            break;
+        }
+    }
+    descriptor_idx = build_method_descriptor(codegen, target_method_sym);
+    
+    name_idx = find_or_add_utf8(codegen, method_name);
+    if (name_idx == 0xFFFF) {
+        return 0xFFFF;
+    }
+    
     for (i = 0; i < codegen->method_count; i++) {
         name_idx = codegen->methods[i].name_index;
         
@@ -1785,7 +2056,10 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
                 if (strcmp(existing_name, method_name) == 0) {
                     int is_method_native = (codegen->methods[i].flags & METHOD_NATIVE) != 0;
                     if (!is_method_native) {
-                        return i;
+                        if (descriptor_idx == 0xFFFF || codegen->methods[i].descriptor_index == 0 ||
+                            codegen->methods[i].descriptor_index == descriptor_idx) {
+                            return i;
+                        }
                     }
                 }
             }
@@ -1802,7 +2076,7 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
     }
     
     codegen->methods[codegen->method_count].name_index = name_idx;
-    codegen->methods[codegen->method_count].descriptor_index = 0;
+    codegen->methods[codegen->method_count].descriptor_index = (descriptor_idx == 0xFFFF) ? 0 : descriptor_idx;
     codegen->methods[codegen->method_count].code_offset = 0;
     codegen->methods[codegen->method_count].code_length = 0;
     codegen->methods[codegen->method_count].max_stack = 0;
@@ -1991,6 +2265,7 @@ int write_djc_file(CodeGenerator* codegen) {
     header.field_count = codegen->field_count;
     header.code_size = codegen->bytecode->size;
     
+    
     if (fwrite(&header, sizeof(DJCHeader), 1, codegen->output_file) != 1) {
         return -1;
     }
@@ -1998,6 +2273,7 @@ int write_djc_file(CodeGenerator* codegen) {
     /* Write constant pool */
     for (i = 0; i < codegen->constants->count; i++) {
         DJCConstant* c = &codegen->constants->constants[i];
+        
         
         if (fwrite(&c->tag, sizeof(uint8_t), 1, codegen->output_file) != 1) {
             return -1;

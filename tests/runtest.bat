@@ -448,7 +448,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "1234\nAABB\n123456" 
 echo.
 
-goto :completed
+goto :test12
 
 :test11_fail
 echo FAILED: Compilation error
@@ -469,6 +469,45 @@ echo Actual:
 type RT_OUT.TXT
 goto :end
 
+
+:test12
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 12: String in function
+echo ------------------------------
+..\build\bin\djc.exe strfunc.jav
+if errorlevel 1 goto :test12_fail
+if not exist STRFUNC.DJC goto :test12_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe STRFUNC.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test12_runfail
+find "ABC\nHello ABC\nABCABCABC" RT_OUT.TXT > nul
+if errorlevel 1 goto :test12_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "ABC\nHello ABC\nABCABCABC" 
+echo.
+
+goto :completed
+
+:test12_fail
+echo FAILED: Compilation error
+goto :end
+
+:test12_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test12_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test12_badout
+echo FAILED: Output mismatch for Test 12
+echo Expected: "ABC\nHello ABC\nABCABCABC"
+echo Actual:
+type RT_OUT.TXT
+goto :end
 
 
 :completed

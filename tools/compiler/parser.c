@@ -450,8 +450,14 @@ uint16_t parse_member(Parser* parser) {
         is_static = 1;
     }
     
-    /* Parse return type (optional - defaults to void) */
-    if (parser_match(parser, TOK_VOID) || parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN)) {
+    /* Parse return type (optional - defaults to void)
+     * Also accept identifier-based reference types such as String.
+     * Without this, "public static String func2(...)" leaves "String"
+     * unconsumed and parse_method() mistakenly treats it as the method name,
+     * then fails expecting '(' when it sees the real name token.
+     */
+    if (parser_match(parser, TOK_VOID) || parser_match(parser, TOK_INT) ||
+        parser_match(parser, TOK_BOOLEAN) || parser_match(parser, TOK_IDENTIFIER)) {
         if (parse_type(parser, &return_type) < 0) {
             return 0;
         }
@@ -985,17 +991,29 @@ uint16_t parse_for(Parser* parser) {
         return 0;
     }
     
-    /* Parse init (can be expression or empty) */
+    /* Parse init (can be variable declaration, expression, or empty) */
     init = 0;
     if (!parser_match(parser, TOK_SEMICOLON)) {
-        /* Parse init expression */
-        init = parse_expression(parser);
-        if (init == 0) {
-            return 0;
+        if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN) ||
+            (parser_match(parser, TOK_IDENTIFIER) &&
+             parser_get_string(parser, parser->current.value.str_offset) &&
+             strcmp(parser_get_string(parser, parser->current.value.str_offset), "String") == 0)) {
+            /* for (int i = 0; ... ) and similar typed init */
+            init = parse_var_decl(parser);
+        } else {
+            /* for (i = 0; ... ) */
+            init = parse_expression(parser);
+            if (init == 0) {
+                return 0;
+            }
+            
+            /* Expect ';' after init expression */
+            if (parser_expect(parser, TOK_SEMICOLON) < 0) {
+                return 0;
+            }
         }
         
-        /* Expect ';' after init */
-        if (parser_expect(parser, TOK_SEMICOLON) < 0) {
+        if (init == 0) {
             return 0;
         }
     } else {

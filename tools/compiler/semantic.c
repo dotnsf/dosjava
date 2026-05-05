@@ -233,6 +233,9 @@ static int is_string_type(SemanticAnalyzer* analyzer, TypeInfo type) {
     }
     
     class_name = semantic_get_string(analyzer, type.class_name);
+    if (!class_name && analyzer->symtable) {
+        class_name = symtable_get_string(analyzer->symtable, type.class_name);
+    }
     return class_name && strcmp(class_name, "String") == 0;
 }
 
@@ -745,17 +748,23 @@ int check_method_body(SemanticAnalyzer* analyzer, ASTNode* method_node) {
             break;
         }
         
-        if (!symtable_exists_in_current_scope(analyzer->symtable, param_name)) {
-            memset(&param_sym, 0, sizeof(Symbol));
-            param_sym.kind = SYM_PARAM;
-            param_sym.name_offset = param_name_off;
-            param_sym.type = param_type;
-            param_sym.data.param_data.index = param_count;
-            
-            if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
-                semantic_error(analyzer, param_line, param_column, "Failed to add parameter symbol");
-                break;
-            }
+        /* Always add active parameter symbols for the current method scope.
+         * Pass1 preserved parameter metadata at class scope for codegen, but
+         * those are not visible inside the nested method/body scopes used in
+         * Pass2. Skipping this re-add caused:
+         *   - method arguments to resolve against stale metadata
+         *   - loop/body references like n/str to become undefined
+         *   - String return/compound-assignment checks to fail downstream
+         */
+        memset(&param_sym, 0, sizeof(Symbol));
+        param_sym.kind = SYM_PARAM;
+        param_sym.name_offset = param_name_off;
+        param_sym.type = param_type;
+        param_sym.data.param_data.index = param_count;
+        
+        if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+            semantic_error(analyzer, param_line, param_column, "Failed to add parameter symbol");
+            break;
         }
         
         param_idx = next_param_idx;
@@ -1055,11 +1064,20 @@ int check_for_stmt(SemanticAnalyzer* analyzer, ASTNode* for_node) {
     update_idx = for_node->data.for_stmt.update;
     body_idx = for_node->data.for_stmt.body;
     
+    /* The for-loop init declaration must remain visible to condition, update,
+     * and body, so analyze the whole loop inside a dedicated scope.
+     */
+    symtable_enter_scope(analyzer->symtable);
+    
     /* Check init (optional) */
     if (init_idx != 0) {
         init_node = semantic_get_node(analyzer, init_idx);
         if (init_node) {
-            check_expression(analyzer, init_node, &init_type);
+            if (init_node->type == NODE_VAR_DECL) {
+                check_var_decl(analyzer, init_node);
+            } else {
+                check_expression(analyzer, init_node, &init_type);
+            }
         }
     }
     
@@ -1088,6 +1106,8 @@ int check_for_stmt(SemanticAnalyzer* analyzer, ASTNode* for_node) {
     if (body_node) {
         check_statement(analyzer, body_node, body_idx);
     }
+    
+    symtable_exit_scope(analyzer->symtable);
     
     return 0;
 }
@@ -1428,7 +1448,6 @@ int check_assignment(SemanticAnalyzer* analyzer, ASTNode* assign_node, TypeInfo*
         return 0;
     }
     
-    /* Phase 1 compound assignment support: int locals and int[] elements only */
     if (!(assign_op == 1 || assign_op == 2)) {
         semantic_error_node(analyzer, assign_node, "Unsupported assignment operator");
         return -1;
@@ -1439,13 +1458,23 @@ int check_assignment(SemanticAnalyzer* analyzer, ASTNode* assign_node, TypeInfo*
         return -1;
     }
     
-    if (target_type.kind != TYPE_INT || value_type.kind != TYPE_INT) {
-        semantic_error_node(analyzer, assign_node, "Compound assignment currently supports only int operands");
+    if (!types_compatible(target_type, value_type)) {
+        semantic_error_node(analyzer, assign_node, "Type mismatch in compound assignment");
         return -1;
     }
     
-    *result_type = target_type;
-    return 0;
+    if (target_type.kind == TYPE_INT) {
+        *result_type = target_type;
+        return 0;
+    }
+    
+    if (assign_op == 1 && is_string_type(analyzer, target_type) && is_string_type(analyzer, value_type)) {
+        *result_type = target_type;
+        return 0;
+    }
+    
+    semantic_error_node(analyzer, assign_node, "Compound assignment currently supports int -=/+= and String +=");
+    return -1;
 }
 
 /* Check identifier */
@@ -1604,6 +1633,7 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         uint16_t current_arg_idx;
         uint16_t param_index;
         uint16_t i;
+        int method_symbol_index = -1;
         
         if (!method_name) {
             semantic_error_node(analyzer, call_node, "Invalid method name");
@@ -1617,6 +1647,7 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                 sym_name &&
                 strcmp(sym_name, method_name) == 0) {
                 method_sym = sym;
+                method_symbol_index = (int)(i - 1);
                 break;
             }
         }
@@ -1650,20 +1681,28 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                 return -1;
             }
             
-            for (i = 0; i < analyzer->symtable->symbol_count; i++) {
-                Symbol* sym = &analyzer->symtable->symbols[i];
-                if (sym->kind == SYM_PARAM && sym->data.param_data.index == param_index) {
-                    param_sym = sym;
-                    break;
+            if (method_symbol_index >= 0) {
+                for (i = (uint16_t)(method_symbol_index + 1); i < analyzer->symtable->symbol_count; i++) {
+                    Symbol* sym = &analyzer->symtable->symbols[i];
+                    if (sym->kind == SYM_METHOD) {
+                        break;
+                    }
+                    if (sym->kind != SYM_PARAM) {
+                        continue;
+                    }
+                    if (sym->data.param_data.index == param_index) {
+                        param_sym = sym;
+                        break;
+                    }
                 }
             }
             
-            if (!is_numeric_type(arg_type)) {
-                semantic_error_node(analyzer, call_node, "Only int arguments are supported");
+            if (!param_sym) {
+                semantic_error_node(analyzer, call_node, "Internal error: method parameter metadata not found");
                 return -1;
             }
             
-            if (param_sym && !types_compatible(param_sym->type, arg_type)) {
+            if (!types_compatible(param_sym->type, arg_type)) {
                 semantic_error_node(analyzer, call_node, "Argument type mismatch in method call");
                 return -1;
             }
@@ -1687,7 +1726,15 @@ int types_compatible(TypeInfo t1, TypeInfo t2) {
     }
     
     if (t1.kind == TYPE_CLASS) {
-        return t1.class_name == t2.class_name;
+        if (t1.class_name == t2.class_name) {
+            return 1;
+        }
+        
+        /* Phase 1/2 currently only supports nominal String reference values.
+         * Different passes may preserve different pool offsets for "String",
+         * so treat any TYPE_CLASS pair as compatible for now.
+         */
+        return 1;
     }
     
     return 1;

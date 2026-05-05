@@ -247,6 +247,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node);
  * @return Method index, or 0xFFFF on error
  */
 uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int is_native);
+uint16_t build_method_descriptor(CodeGenerator* codegen, Symbol* method_sym);
 
 /* Bytecode emission */
 

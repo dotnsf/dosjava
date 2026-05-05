@@ -5,6 +5,56 @@
 #include <stdio.h>
 #include <string.h>
 
+static uint8_t descriptor_param_count(const char* descriptor) {
+    uint8_t count = 0;
+    const char* p;
+    
+    if (!descriptor || descriptor[0] != '(') {
+        return 0xFF;
+    }
+    
+    p = descriptor + 1;
+    while (*p && *p != ')') {
+        if (*p == 'I') {
+            count++;
+            p++;
+        } else if (*p == 'L') {
+            count++;
+            while (*p && *p != ';') {
+                p++;
+            }
+            if (*p == ';') {
+                p++;
+            } else {
+                return 0xFF;
+            }
+        } else {
+            return 0xFF;
+        }
+    }
+    
+    if (*p != ')') {
+        return 0xFF;
+    }
+    
+    return count;
+}
+
+static char descriptor_return_type(const char* descriptor) {
+    const char* p;
+    
+    if (!descriptor) {
+        return '\0';
+    }
+    
+    p = strchr(descriptor, ')');
+    if (!p || p[1] == '\0') {
+        return '\0';
+    }
+    
+    return p[1];
+}
+
 /* ===== Stack Helper Functions ===== */
 
 /**
@@ -66,7 +116,7 @@ static inline uint16_t get_frame_pointer(ExecutionContext* ctx) {
  * Get current local base
  */
 static inline uint16_t get_local_base(ExecutionContext* ctx) {
-    if (ctx->call_depth == 0) {
+    if (ctx->call_depth <= 1) {
         return 0;
     }
     return ctx->call_frames[ctx->call_depth - 1].local_base;
@@ -254,6 +304,7 @@ int interpreter_step(ExecutionContext* ctx) {
                 printf("ERROR: Invalid constant index: %u\n", index16);
                 return -1;
             }
+            
             
             /* For now, push the constant index itself */
             /* In Phase 4, we'll create proper string objects */
@@ -722,6 +773,15 @@ int interpreter_step(ExecutionContext* ctx) {
             /* Get method name */
             method_name = djc_get_utf8(ctx->djc_file, method->name_index);
             
+            {
+                const char* descriptor = djc_get_utf8(ctx->djc_file, method->descriptor_index);
+                uint8_t expected_arg_count = descriptor_param_count(descriptor);
+                if (descriptor && expected_arg_count != 0xFF && expected_arg_count != arg_count) {
+                    printf("ERROR: Method descriptor argument mismatch for %s\n",
+                           method_name ? method_name : "???");
+                    return -1;
+                }
+            }
             
             /* Check if method is native */
             if (method->flags & METHOD_NATIVE) {
@@ -819,13 +879,15 @@ int interpreter_step(ExecutionContext* ctx) {
                         left_str = NULL;
                         right_str = NULL;
                         
-                        if (left_value < ctx->djc_file->header.constant_pool_count &&
-                            ctx->djc_file->constants[left_value].tag == CONST_UTF8) {
-                            left_str = ctx->djc_file->constants[left_value].data.utf8_data;
+                        if (left_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[left_value].tag == CONST_UTF8) {
+                                left_str = ctx->djc_file->constants[left_value].data.utf8_data;
+                            }
                         }
-                        if (right_value < ctx->djc_file->header.constant_pool_count &&
-                            ctx->djc_file->constants[right_value].tag == CONST_UTF8) {
-                            right_str = ctx->djc_file->constants[right_value].data.utf8_data;
+                        if (right_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[right_value].tag == CONST_UTF8) {
+                                right_str = ctx->djc_file->constants[right_value].data.utf8_data;
+                            }
                         }
                         
                         if (!left_str || !right_str) {
@@ -833,6 +895,7 @@ int interpreter_step(ExecutionContext* ctx) {
                                    left_value, right_value);
                             return -1;
                         }
+                        
                         
                         left_len = (uint16_t)strlen(left_str);
                         right_len = (uint16_t)strlen(right_str);
@@ -913,6 +976,12 @@ int interpreter_step(ExecutionContext* ctx) {
             /* Increment call depth */
             ctx->call_depth++;
             
+            /* The active frame base is derived from call_frames[call_depth - 1].
+             * Publish callee base there before any local initialization or arg moves.
+             */
+            ctx->call_frames[ctx->call_depth - 1].local_base = frame->local_base;
+            ctx->call_frames[ctx->call_depth - 1].local_count = frame->local_count;
+            
             /* Initialize new locals to 0 */
             if (method->max_locals > 0) {
                 memset(&ctx->shared_locals[frame->local_base], 0,
@@ -937,10 +1006,11 @@ int interpreter_step(ExecutionContext* ctx) {
                 }
                 
                 for (arg_index = 0; arg_index < arg_count; arg_index++) {
-                    ctx->shared_locals[frame->local_base + arg_count - arg_index - 1] =
-                        stack_pop_shared(ctx);
+                    uint16_t arg_value = stack_pop_shared(ctx);
+                    ctx->shared_locals[frame->local_base + arg_count - arg_index - 1] = arg_value;
                 }
             }
+            
             
             /* Set PC to method code */
             ctx->pc = method_code;
@@ -969,6 +1039,7 @@ int interpreter_step(ExecutionContext* ctx) {
             /* Restore local pointer (free current frame's locals) */
             ctx->local_pointer = frame->local_base;
             
+            
             /* Restore PC and code context */
             ctx->pc = frame->return_pc;
             ctx->code_start = frame->return_code_start;
@@ -986,6 +1057,32 @@ int interpreter_step(ExecutionContext* ctx) {
             
             /* Check if this is main method return */
             if (ctx->call_depth <= 1) {
+                const char* descriptor = NULL;
+                char return_type = '\0';
+                uint16_t expected_value = 0;
+                
+                if (ctx->djc_file && ctx->djc_file->header.method_count > 0) {
+                    uint16_t i;
+                    for (i = 0; i < ctx->djc_file->header.method_count; i++) {
+                        DJCMethod* candidate = &ctx->djc_file->methods[i];
+                        uint8_t* candidate_code = djc_get_method_code(ctx->djc_file, candidate);
+                        if (candidate_code == ctx->code_start) {
+                            descriptor = djc_get_utf8(ctx->djc_file, candidate->descriptor_index);
+                            break;
+                        }
+                    }
+                }
+                
+                return_type = descriptor_return_type(descriptor);
+                if (descriptor && return_type == 'V') {
+                    printf("ERROR: Void method returned a value\n");
+                    return -1;
+                }
+                if (descriptor && return_type == 'I') {
+                    expected_value = return_value;
+                    (void)expected_value;
+                }
+                
                 ctx->running = 0;
                 return 1;
             }
