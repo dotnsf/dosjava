@@ -528,7 +528,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "1\n0\n1\n0\n6\n11\n4\n6\n11\n7\nel\nWorld!" 
 echo.
 
-goto :completed
+goto :test14
 
 :test13_fail
 echo FAILED: Compilation error
@@ -545,6 +545,47 @@ goto :end
 :test13_badout
 echo FAILED: Output mismatch for Test 13
 echo Expected: "1\n0\n1\n0\n6\n11\n4\n6\n11\n7\nel\nWorld!"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test14
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 14: File open("r","w","a"), readLine, writeLine
+echo ------------------------------
+..\build\bin\djc.exe files.jav
+if errorlevel 1 goto :test14_fail
+if not exist FILES.DJC goto :test14_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe FILES.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test14_runfail
+find "ABC\n123\nHello World!" RT_OUT.TXT > nul
+
+if errorlevel 1 goto :test14_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "ABC\n123\nHello World!" 
+echo.
+
+goto :completed
+
+:test14_fail
+echo FAILED: Compilation error
+goto :end
+
+:test14_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test14_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test14_badout
+echo FAILED: Output mismatch for Test 14
+echo Expected: "ABC\n123\nHello World!"
 echo Actual:
 type RT_OUT.TXT
 goto :end
