@@ -1077,6 +1077,76 @@ int interpreter_step(ExecutionContext* ctx) {
                             return -1;
                         }
                         break;
+                    } else if (strcmp(method_name, "indexOf") == 0) {
+                        uint16_t search_value;
+                        uint16_t str_value;
+                        uint16_t from_index;
+                        const char* str;
+                        const char* search_str;
+                        const char* found_pos;
+                        uint16_t str_len;
+                        int result;
+                        int has_from_index;
+                        
+                        has_from_index = (arg_count == 3);
+                        
+                        if (arg_count != 2 && arg_count != 3) {
+                            printf("ERROR: indexOf expects 2 or 3 arguments, got %u\n", arg_count);
+                            return -1;
+                        }
+                        
+                        /* Pop arguments from stack */
+                        if (has_from_index) {
+                            from_index = stack_pop_shared(ctx);
+                        } else {
+                            from_index = 0;
+                        }
+                        search_value = stack_pop_shared(ctx);
+                        str_value = stack_pop_shared(ctx);
+                        
+                        str = NULL;
+                        search_str = NULL;
+                        
+                        /* Get target string from constant pool */
+                        if (str_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+                                str = ctx->djc_file->constants[str_value].data.utf8_data;
+                            }
+                        }
+                        
+                        /* Get search string from constant pool */
+                        if (search_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[search_value].tag == CONST_UTF8) {
+                                search_str = ctx->djc_file->constants[search_value].data.utf8_data;
+                            }
+                        }
+                        
+                        if (!str || !search_str) {
+                            printf("ERROR: Invalid string constant index for indexOf: %d, %d\n",
+                                   str_value, search_value);
+                            return -1;
+                        }
+                        
+                        str_len = (uint16_t)strlen(str);
+                        
+                        /* Validate from_index */
+                        if (from_index > str_len) {
+                            from_index = str_len;
+                        }
+                        
+                        /* Search for substring starting from from_index */
+                        result = -1;
+                        found_pos = strstr(str + from_index, search_str);
+                        if (found_pos != NULL) {
+                            result = (int)(found_pos - str);
+                        }
+                        
+                        /* Push result to stack */
+                        if (stack_push_shared(ctx, (uint16_t)result) != 0) {
+                            printf("ERROR: Stack overflow\n");
+                            return -1;
+                        }
+                        break;
                     }
                 }
                 

@@ -1596,13 +1596,16 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
          strcmp(method_name, "toUpperCase") == 0 ||
          strcmp(method_name, "toLowerCase") == 0 ||
          strcmp(method_name, "startsWith") == 0 ||
-         strcmp(method_name, "endsWith") == 0)) {
+         strcmp(method_name, "endsWith") == 0 ||
+         strcmp(method_name, "indexOf") == 0)) {
         TypeInfo object_type;
         uint16_t string_name_off;
         int is_comparison_method;
+        int is_index_method;
         
         is_comparison_method = (strcmp(method_name, "startsWith") == 0 ||
                                 strcmp(method_name, "endsWith") == 0);
+        is_index_method = (strcmp(method_name, "indexOf") == 0);
         
         if (strcmp(method_name, "length") == 0 ||
             strcmp(method_name, "toUpperCase") == 0 ||
@@ -1618,6 +1621,11 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         } else if (is_comparison_method) {
             if (arg_count != 1) {
                 semantic_error_node(analyzer, call_node, "startsWith/endsWith requires 1 argument");
+                return -1;
+            }
+        } else if (is_index_method) {
+            if (arg_count != 1 && arg_count != 2) {
+                semantic_error_node(analyzer, call_node, "indexOf requires 1 or 2 arguments");
                 return -1;
             }
         }
@@ -1638,7 +1646,7 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
             return -1;
         }
         
-        if (strcmp(method_name, "length") == 0 || is_comparison_method) {
+        if (strcmp(method_name, "length") == 0 || is_comparison_method || is_index_method) {
             result_type->kind = TYPE_INT;
             result_type->class_name = 0;
         } else {

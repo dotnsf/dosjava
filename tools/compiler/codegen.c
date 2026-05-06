@@ -1588,6 +1588,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     int is_string_length;
     int is_string_caseconv;
     int is_string_compare;
+    int is_string_indexof;
     uint16_t invoke_arg_count;
     
     if (!codegen || !call_node) {
@@ -1609,6 +1610,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     is_string_length = 0;
     is_string_caseconv = 0;
     is_string_compare = 0;
+    is_string_indexof = 0;
     if (strcmp(method_name, "println") == 0) {
         is_native = 1;
     } else if (strcmp(method_name, "concat") == 0 && object_idx == 0) {
@@ -1626,6 +1628,9 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
                 strcmp(method_name, "endsWith") == 0)) {
         is_native = 1;
         is_string_compare = 1;
+    } else if (object_idx != 0 && strcmp(method_name, "indexOf") == 0) {
+        is_native = 1;
+        is_string_indexof = 1;
     }
     
     arg_node_type = NODE_PROGRAM;
@@ -1665,7 +1670,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     arg_count = 0;
-    if (is_string_length || is_string_caseconv || is_string_compare) {
+    if (is_string_length || is_string_caseconv || is_string_compare || is_string_indexof) {
         ASTNode* recv_node = codegen_get_node(codegen, object_idx);
         if (!recv_node) {
             codegen_error(codegen, "Invalid String receiver");
@@ -1676,8 +1681,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         }
         arg_count = 1;
         
-        /* For string comparison methods, also push the argument */
-        if (is_string_compare) {
+        /* For string comparison and indexOf methods, also push the argument(s) */
+        if (is_string_compare || is_string_indexof) {
             arg_idx = saved_first_arg;
             while (arg_idx != 0 && arg_count < total_arg_count + 1) {
                 uint16_t next_arg_idx;
@@ -1734,6 +1739,14 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             strcpy(descriptor, "(Ljava/lang/String;)Ljava/lang/String;");
         } else if (is_string_compare) {
             strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)I");
+        } else if (is_string_indexof) {
+            /* indexOf can have 1 or 2 arguments (not counting receiver) */
+            /* arg_count includes receiver, so: 1-arg version has arg_count=2, 2-arg version has arg_count=3 */
+            if (arg_count == 2) {
+                strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)I");
+            } else {
+                strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;I)I");
+            }
         } else if (strcmp(method_name, "concat") == 0) {
             strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
         } else if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
@@ -1749,7 +1762,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     returns_value = 0;
-    if (is_string_length || is_string_caseconv || is_string_compare ||
+    if (is_string_length || is_string_caseconv || is_string_compare || is_string_indexof ||
         strcmp(method_name, "concat") == 0) {
         returns_value = 1;
     } else if (!is_native) {
@@ -2044,16 +2057,19 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
     
     if (is_native) {
         /* Native methods are keyed by name first; caller updates descriptor afterward.
-         * This is sufficient now that concat has its own distinct method name.
+         * For overloaded methods (like indexOf), we need to create separate entries.
+         * We'll return the existing one only if it doesn't have a descriptor yet (descriptor_index == 0).
          */
         name_idx = find_or_add_utf8(codegen, method_name);
         if (name_idx == 0xFFFF) {
             return 0xFFFF;
         }
         
+        /* Only reuse if descriptor hasn't been set yet (to support overloading) */
         for (i = 0; i < codegen->method_count; i++) {
             if ((codegen->methods[i].flags & METHOD_NATIVE) != 0 &&
-                codegen->methods[i].name_index == name_idx) {
+                codegen->methods[i].name_index == name_idx &&
+                codegen->methods[i].descriptor_index == 0) {
                 return i;
             }
         }
