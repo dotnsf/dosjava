@@ -1,6 +1,7 @@
 // tests/file1.jav
 class file1 {
     public static void main() {
+        //File.open("test.txt", "r");
         File.open("test.txt");
         
         String line1 = File.readLine();

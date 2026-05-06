@@ -1671,6 +1671,7 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
     if (method_name &&
         (strcmp(method_name, "open") == 0 ||
          strcmp(method_name, "readLine") == 0 ||
+         strcmp(method_name, "writeLine") == 0 ||
          strcmp(method_name, "close") == 0)) {
         
         /* Check if this is File.method() call */
@@ -1681,9 +1682,9 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                 if (obj_name && strcmp(obj_name, "File") == 0) {
                     /* This is a File.method() call */
                     if (strcmp(method_name, "open") == 0) {
-                        /* File.open(String filename) */
-                        if (arg_count != 1) {
-                            semantic_error_node(analyzer, call_node, "File.open requires 1 argument");
+                        /* File.open(String filename) or File.open(String filename, String mode) */
+                        if (arg_count != 1 && arg_count != 2) {
+                            semantic_error_node(analyzer, call_node, "File.open requires 1 or 2 arguments");
                             return -1;
                         }
                         /* Returns void */
@@ -1698,6 +1699,15 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                         /* Returns String */
                         result_type->kind = TYPE_CLASS;
                         result_type->class_name = semantic_add_string(analyzer, "String");
+                    } else if (strcmp(method_name, "writeLine") == 0) {
+                        /* File.writeLine(String text) */
+                        if (arg_count != 1) {
+                            semantic_error_node(analyzer, call_node, "File.writeLine requires 1 argument");
+                            return -1;
+                        }
+                        /* Returns void */
+                        result_type->kind = TYPE_VOID;
+                        result_type->class_name = 0;
                     } else if (strcmp(method_name, "close") == 0) {
                         /* File.close() */
                         if (arg_count != 0) {

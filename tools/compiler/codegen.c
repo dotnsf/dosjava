@@ -1643,6 +1643,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         is_string_substr = 1;
     } else if (strcmp(method_name, "open") == 0 ||
                strcmp(method_name, "readLine") == 0 ||
+               strcmp(method_name, "writeLine") == 0 ||
                strcmp(method_name, "close") == 0) {
         /* Check if this is File.method() call */
         if (object_idx != 0) {
@@ -1781,9 +1782,16 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         } else if (strcmp(method_name, "concat") == 0) {
             strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
         } else if (strcmp(method_name, "open") == 0) {
-            strcpy(descriptor, "(Ljava/lang/String;)V");
+            /* File.open() can have 1 or 2 arguments */
+            if (arg_count == 1) {
+                strcpy(descriptor, "(Ljava/lang/String;)V");
+            } else {
+                strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)V");
+            }
         } else if (strcmp(method_name, "readLine") == 0) {
             strcpy(descriptor, "()Ljava/lang/String;");
+        } else if (strcmp(method_name, "writeLine") == 0) {
+            strcpy(descriptor, "(Ljava/lang/String;)V");
         } else if (strcmp(method_name, "close") == 0) {
             strcpy(descriptor, "()V");
         } else if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {

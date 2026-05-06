@@ -1337,18 +1337,28 @@ int interpreter_step(ExecutionContext* ctx) {
                         }
                         break;
                     } else if (strcmp(method_name, "open") == 0) {
-                    /* File.open(String filename) */
+                    /* File.open(String filename) or File.open(String filename, String mode) */
                     uint16_t filename_value;
+                    uint16_t mode_value;
                     const char* filename;
+                    const char* mode;
                     
-                    if (arg_count != 1) {
-                        printf("ERROR: File.open expects 1 argument, got %u\n", arg_count);
+                    if (arg_count != 1 && arg_count != 2) {
+                        printf("ERROR: File.open expects 1 or 2 arguments, got %u\n", arg_count);
                         return -1;
                     }
                     
-                    /* Pop filename from stack */
-                    filename_value = stack_pop_shared(ctx);
+                    /* Pop arguments from stack (in reverse order) */
+                    if (arg_count == 2) {
+                        mode_value = stack_pop_shared(ctx);
+                        filename_value = stack_pop_shared(ctx);
+                    } else {
+                        filename_value = stack_pop_shared(ctx);
+                        mode_value = 0;  /* Default to read mode */
+                    }
+                    
                     filename = NULL;
+                    mode = "r";  /* Default mode */
                     
                     /* Get filename from constant pool */
                     if (filename_value < ctx->djc_file->header.constant_pool_count) {
@@ -1362,16 +1372,29 @@ int interpreter_step(ExecutionContext* ctx) {
                         return -1;
                     }
                     
+                    /* Get mode from constant pool if provided */
+                    if (arg_count == 2 && mode_value < ctx->djc_file->header.constant_pool_count) {
+                        if (ctx->djc_file->constants[mode_value].tag == CONST_UTF8) {
+                            mode = ctx->djc_file->constants[mode_value].data.utf8_data;
+                        }
+                    }
+                    
+                    /* Validate mode */
+                    if (strcmp(mode, "r") != 0 && strcmp(mode, "w") != 0 && strcmp(mode, "a") != 0) {
+                        printf("ERROR: Invalid file mode: %s (must be 'r', 'w', or 'a')\n", mode);
+                        return -1;
+                    }
+                    
                     /* Close previous file if open */
                     if (g_file_handle != NULL) {
                         fclose(g_file_handle);
                         g_file_handle = NULL;
                     }
                     
-                    /* Open file for reading */
-                    g_file_handle = fopen(filename, "r");
+                    /* Open file with specified mode */
+                    g_file_handle = fopen(filename, mode);
                     if (g_file_handle == NULL) {
-                        printf("ERROR: Cannot open file: %s\n", filename);
+                        printf("ERROR: Cannot open file: %s (mode: %s)\n", filename, mode);
                         return -1;
                     }
                     break;
@@ -1431,6 +1454,47 @@ int interpreter_step(ExecutionContext* ctx) {
                         printf("ERROR: Stack overflow\n");
                         return -1;
                     }
+                    break;
+                } else if (strcmp(method_name, "writeLine") == 0) {
+                    /* File.writeLine(String text) */
+                    uint16_t text_value;
+                    const char* text;
+                    
+                    if (arg_count != 1) {
+                        printf("ERROR: File.writeLine expects 1 argument, got %u\n", arg_count);
+                        return -1;
+                    }
+                    
+                    /* Check if file is open */
+                    if (g_file_handle == NULL) {
+                        printf("ERROR: No file is open for writing\n");
+                        return -1;
+                    }
+                    
+                    /* Pop text from stack */
+                    text_value = stack_pop_shared(ctx);
+                    text = NULL;
+                    
+                    /* Get text from constant pool */
+                    if (text_value < ctx->djc_file->header.constant_pool_count) {
+                        if (ctx->djc_file->constants[text_value].tag == CONST_UTF8) {
+                            text = ctx->djc_file->constants[text_value].data.utf8_data;
+                        }
+                    }
+                    
+                    if (!text) {
+                        printf("ERROR: Invalid text constant index: %d\n", text_value);
+                        return -1;
+                    }
+                    
+                    /* Write text with CR+LF line ending */
+                    if (fprintf(g_file_handle, "%s\r\n", text) < 0) {
+                        printf("ERROR: Failed to write to file\n");
+                        return -1;
+                    }
+                    
+                    /* Flush to ensure data is written */
+                    fflush(g_file_handle);
                     break;
                 } else if (strcmp(method_name, "close") == 0) {
                     /* File.close() */
