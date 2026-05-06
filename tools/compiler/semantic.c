@@ -1594,17 +1594,32 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
     if (object_idx != 0 && method_name &&
         (strcmp(method_name, "length") == 0 ||
          strcmp(method_name, "toUpperCase") == 0 ||
-         strcmp(method_name, "toLowerCase") == 0)) {
+         strcmp(method_name, "toLowerCase") == 0 ||
+         strcmp(method_name, "startsWith") == 0 ||
+         strcmp(method_name, "endsWith") == 0)) {
         TypeInfo object_type;
         uint16_t string_name_off;
+        int is_comparison_method;
         
-        if (arg_count != 0) {
-            if (strcmp(method_name, "length") == 0) {
-                semantic_error_node(analyzer, call_node, "length() takes no arguments");
-            } else {
-                semantic_error_node(analyzer, call_node, "String case conversion takes no arguments");
+        is_comparison_method = (strcmp(method_name, "startsWith") == 0 ||
+                                strcmp(method_name, "endsWith") == 0);
+        
+        if (strcmp(method_name, "length") == 0 ||
+            strcmp(method_name, "toUpperCase") == 0 ||
+            strcmp(method_name, "toLowerCase") == 0) {
+            if (arg_count != 0) {
+                if (strcmp(method_name, "length") == 0) {
+                    semantic_error_node(analyzer, call_node, "length() takes no arguments");
+                } else {
+                    semantic_error_node(analyzer, call_node, "String case conversion takes no arguments");
+                }
+                return -1;
             }
-            return -1;
+        } else if (is_comparison_method) {
+            if (arg_count != 1) {
+                semantic_error_node(analyzer, call_node, "startsWith/endsWith requires 1 argument");
+                return -1;
+            }
         }
         
         object_node = semantic_get_node(analyzer, object_idx);
@@ -1623,7 +1638,7 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
             return -1;
         }
         
-        if (strcmp(method_name, "length") == 0) {
+        if (strcmp(method_name, "length") == 0 || is_comparison_method) {
             result_type->kind = TYPE_INT;
             result_type->class_name = 0;
         } else {

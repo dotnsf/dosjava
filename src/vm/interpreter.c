@@ -1007,6 +1007,76 @@ int interpreter_step(ExecutionContext* ctx) {
                             return -1;
                         }
                         break;
+                    } else if (strcmp(method_name, "startsWith") == 0 ||
+                               strcmp(method_name, "endsWith") == 0) {
+                        uint16_t cmp_value;
+                        uint16_t str_value;
+                        const char* str;
+                        const char* cmp_str;
+                        uint16_t str_len;
+                        uint16_t cmp_len;
+                        int result;
+                        int is_starts;
+                        
+                        if (arg_count != 2) {
+                            printf("ERROR: %s expects 2 arguments, got %u\n", method_name, arg_count);
+                            return -1;
+                        }
+                        
+                        /* Pop comparison string and target string from stack */
+                        cmp_value = stack_pop_shared(ctx);
+                        str_value = stack_pop_shared(ctx);
+                        str = NULL;
+                        cmp_str = NULL;
+                        
+                        /* Get target string from constant pool */
+                        if (str_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+                                str = ctx->djc_file->constants[str_value].data.utf8_data;
+                            }
+                        }
+                        
+                        /* Get comparison string from constant pool */
+                        if (cmp_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[cmp_value].tag == CONST_UTF8) {
+                                cmp_str = ctx->djc_file->constants[cmp_value].data.utf8_data;
+                            }
+                        }
+                        
+                        if (!str || !cmp_str) {
+                            printf("ERROR: Invalid string constant index for %s: %d, %d\n",
+                                   method_name, str_value, cmp_value);
+                            return -1;
+                        }
+                        
+                        str_len = (uint16_t)strlen(str);
+                        cmp_len = (uint16_t)strlen(cmp_str);
+                        
+                        is_starts = (strcmp(method_name, "startsWith") == 0);
+                        result = 0;
+                        
+                        if (is_starts) {
+                            /* startsWith: check if str begins with cmp_str */
+                            if (cmp_len <= str_len) {
+                                if (strncmp(str, cmp_str, cmp_len) == 0) {
+                                    result = 1;
+                                }
+                            }
+                        } else {
+                            /* endsWith: check if str ends with cmp_str */
+                            if (cmp_len <= str_len) {
+                                if (strcmp(str + (str_len - cmp_len), cmp_str) == 0) {
+                                    result = 1;
+                                }
+                            }
+                        }
+                        
+                        /* Push result (0 or 1) to stack */
+                        if (stack_push_shared(ctx, (uint16_t)result) != 0) {
+                            printf("ERROR: Stack overflow\n");
+                            return -1;
+                        }
+                        break;
                     }
                 }
                 

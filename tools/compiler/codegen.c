@@ -1587,6 +1587,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     int first_arg_is_string;
     int is_string_length;
     int is_string_caseconv;
+    int is_string_compare;
     uint16_t invoke_arg_count;
     
     if (!codegen || !call_node) {
@@ -1607,6 +1608,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     is_native = 0;
     is_string_length = 0;
     is_string_caseconv = 0;
+    is_string_compare = 0;
     if (strcmp(method_name, "println") == 0) {
         is_native = 1;
     } else if (strcmp(method_name, "concat") == 0 && object_idx == 0) {
@@ -1619,6 +1621,11 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
                 strcmp(method_name, "toLowerCase") == 0)) {
         is_native = 1;
         is_string_caseconv = 1;
+    } else if (object_idx != 0 &&
+               (strcmp(method_name, "startsWith") == 0 ||
+                strcmp(method_name, "endsWith") == 0)) {
+        is_native = 1;
+        is_string_compare = 1;
     }
     
     arg_node_type = NODE_PROGRAM;
@@ -1658,16 +1665,37 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     arg_count = 0;
-    if (is_string_length || is_string_caseconv) {
+    if (is_string_length || is_string_caseconv || is_string_compare) {
         ASTNode* recv_node = codegen_get_node(codegen, object_idx);
         if (!recv_node) {
-            codegen_error(codegen, is_string_length ? "Invalid length receiver" : "Invalid String receiver");
+            codegen_error(codegen, "Invalid String receiver");
             return -1;
         }
         if (generate_expression(codegen, recv_node) != 0) {
             return -1;
         }
         arg_count = 1;
+        
+        /* For string comparison methods, also push the argument */
+        if (is_string_compare) {
+            arg_idx = saved_first_arg;
+            while (arg_idx != 0 && arg_count < total_arg_count + 1) {
+                uint16_t next_arg_idx;
+                
+                arg_node = codegen_get_node(codegen, arg_idx);
+                if (!arg_node) {
+                    break;
+                }
+                
+                next_arg_idx = arg_node->next_sibling;
+                if (generate_expression(codegen, arg_node) != 0) {
+                    return -1;
+                }
+                
+                arg_idx = next_arg_idx;
+                arg_count++;
+            }
+        }
     } else {
         arg_idx = saved_first_arg;
         while (arg_idx != 0 && arg_count < total_arg_count) {
@@ -1704,6 +1732,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             strcpy(descriptor, "(Ljava/lang/String;)I");
         } else if (is_string_caseconv) {
             strcpy(descriptor, "(Ljava/lang/String;)Ljava/lang/String;");
+        } else if (is_string_compare) {
+            strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)I");
         } else if (strcmp(method_name, "concat") == 0) {
             strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
         } else if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
@@ -1719,7 +1749,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     returns_value = 0;
-    if (is_string_length || is_string_caseconv || strcmp(method_name, "concat") == 0) {
+    if (is_string_length || is_string_caseconv || is_string_compare ||
+        strcmp(method_name, "concat") == 0) {
         returns_value = 1;
     } else if (!is_native) {
         method_sym = NULL;
