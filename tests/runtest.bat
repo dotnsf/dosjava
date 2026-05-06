@@ -521,11 +521,11 @@ if not exist STREXT.DJC goto :test13_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe STREXT.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test13_runfail
-find "1\n0\n1\n0\n6\n11\n4\n6\n11\n7" RT_OUT.TXT > nul
+find "1\n0\n1\n0\n6\n11\n4\n6\n11\n7\nel\nWorld!" RT_OUT.TXT > nul
 if errorlevel 1 goto :test13_badout
 echo Output:
 type RT_OUT.TXT
-echo SUCCESS: Output matched expected value "1\n0\n1\n0\n6\n11\n4\n6\n11\n7" 
+echo SUCCESS: Output matched expected value "1\n0\n1\n0\n6\n11\n4\n6\n11\n7\nel\nWorld!" 
 echo.
 
 goto :completed
@@ -544,7 +544,7 @@ goto :end
 
 :test13_badout
 echo FAILED: Output mismatch for Test 13
-echo Expected: "1\n0\n1\n0\n6\n11\n4\n6\n11\n7"
+echo Expected: "1\n0\n1\n0\n6\n11\n4\n6\n11\n7\nel\nWorld!"
 echo Actual:
 type RT_OUT.TXT
 goto :end

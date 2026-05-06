@@ -1235,6 +1235,104 @@ int interpreter_step(ExecutionContext* ctx) {
                             return -1;
                         }
                         break;
+                    } else if (strcmp(method_name, "substr") == 0) {
+                        uint16_t str_value;
+                        uint16_t from_index;
+                        uint16_t end_index;
+                        const char* src_str;
+                        char substr_buf[256];
+                        uint16_t str_len;
+                        uint16_t substr_len;
+                        uint16_t const_idx;
+                        int has_end_index;
+                        uint16_t i;
+                        
+                        has_end_index = (arg_count == 3);
+                        
+                        if (arg_count != 2 && arg_count != 3) {
+                            printf("ERROR: substr expects 2 or 3 arguments, got %u\n", arg_count);
+                            return -1;
+                        }
+                        
+                        /* Pop arguments from stack */
+                        if (has_end_index) {
+                            end_index = stack_pop_shared(ctx);
+                        } else {
+                            end_index = 0xFFFF;  /* Use max value as sentinel */
+                        }
+                        from_index = stack_pop_shared(ctx);
+                        str_value = stack_pop_shared(ctx);
+                        
+                        src_str = NULL;
+                        
+                        /* Get source string from constant pool */
+                        if (str_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+                                src_str = ctx->djc_file->constants[str_value].data.utf8_data;
+                            }
+                        }
+                        
+                        if (!src_str) {
+                            printf("ERROR: Invalid string constant index for substr: %d\n", str_value);
+                            return -1;
+                        }
+                        
+                        str_len = (uint16_t)strlen(src_str);
+                        
+                        /* Validate and adjust from_index */
+                        if (from_index > str_len) {
+                            from_index = str_len;
+                        }
+                        
+                        /* Validate and adjust end_index */
+                        if (has_end_index) {
+                            if (end_index > str_len) {
+                                end_index = str_len;
+                            }
+                            if (end_index < from_index) {
+                                end_index = from_index;
+                            }
+                        } else {
+                            end_index = str_len;
+                        }
+                        
+                        /* Calculate substring length */
+                        substr_len = end_index - from_index;
+                        
+                        if (substr_len >= sizeof(substr_buf)) {
+                            printf("ERROR: Substring too long\n");
+                            return -1;
+                        }
+                        
+                        /* Extract substring */
+                        for (i = 0; i < substr_len; i++) {
+                            substr_buf[i] = src_str[from_index + i];
+                        }
+                        substr_buf[substr_len] = '\0';
+                        
+                        /* Add new string to constant pool */
+                        const_idx = ctx->djc_file->header.constant_pool_count;
+                        if (const_idx >= DJC_MAX_CONSTANTS) {
+                            printf("ERROR: Constant pool full during substr\n");
+                            return -1;
+                        }
+                        
+                        ctx->djc_file->constants[const_idx].tag = CONST_UTF8;
+                        ctx->djc_file->constants[const_idx].length = substr_len;
+                        ctx->djc_file->constants[const_idx].data.utf8_data = (char*)memory_alloc(substr_len + 1);
+                        if (ctx->djc_file->constants[const_idx].data.utf8_data == NULL) {
+                            printf("ERROR: Out of memory during substr\n");
+                            return -1;
+                        }
+                        strcpy(ctx->djc_file->constants[const_idx].data.utf8_data, substr_buf);
+                        ctx->djc_file->header.constant_pool_count++;
+                        
+                        /* Push result to stack */
+                        if (stack_push_shared(ctx, const_idx) != 0) {
+                            printf("ERROR: Stack overflow\n");
+                            return -1;
+                        }
+                        break;
                     }
                 }
                 

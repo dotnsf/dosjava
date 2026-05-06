@@ -30,5 +30,11 @@ class strext {
         System.out.println(n8);  // 6
         System.out.println(n9);  // 11
         System.out.println(n10); // 7
+
+        String str3 = str.substr( 1, 3 );
+        String str4 = str.substr( 6 );
+
+        System.out.println(str3);  // "el"
+        System.out.println(str4);  // "World!"
     }
 }
