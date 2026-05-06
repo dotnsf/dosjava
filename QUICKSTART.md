@@ -6,10 +6,12 @@
 
 - DOSBox または 16-bit DOS環境
 - djc.exe（コンパイラ）
+- djvm.exe（実行マシン）
+- Java の基本概念である **"Write once, Run anywhere"** を無視しています
 
 ## ステップ1: 最初のプログラムを書く
 
-`Hello.java`というファイルを作成します：
+`Hello.jav`というファイルを作成します：
 
 ```java
 class Hello {
@@ -23,26 +25,26 @@ class Hello {
 ## ステップ2: コンパイルする
 
 ```batch
-djc Hello.java
+djc Hello.jav
 ```
 
 成功すると以下のように表示されます：
 
 ```
-Compiled: Hello.java -> Hello.djc
+Compiled: Hello.jav -> Hello.djc
 ```
 
 ## ステップ3: 詳細出力で確認
 
 ```batch
-djc -v Hello.java
+djc -v Hello.jav
 ```
 
 出力例：
 
 ```
 DOS Java Compiler v1.0
-Compiling: Hello.java
+Compiling: Hello.jav
 Output: Hello.djc
 
 [1/4] Lexical analysis...
@@ -68,7 +70,7 @@ Statistics:
 
 ### 算術演算
 
-`Math.java`:
+`Math.jav`:
 ```java
 class Math {
     public static void main() {
@@ -84,12 +86,12 @@ class Math {
 
 コンパイル:
 ```batch
-djc Math.java
+djc Math.jav
 ```
 
 ### 条件分岐
 
-`Conditional.java`:
+`Conditional.jav`:
 ```java
 class Conditional {
     public static void main() {
@@ -111,7 +113,7 @@ class Conditional {
 
 ### ループ
 
-`Loop.java`:
+`Loop.jav`:
 ```java
 class Loop {
     public static void main() {
@@ -130,7 +132,7 @@ class Loop {
 
 ### フィボナッチ数列
 
-`Fibonacci.java`:
+`Fibonacci.jav`:
 ```java
 class Fibonacci {
     public static void main() {
@@ -156,7 +158,7 @@ class Fibonacci {
 中間ファイルを保持してコンパイルプロセスを確認：
 
 ```batch
-djc -k Hello.java
+djc -k Hello.jav
 ```
 
 生成されるファイル：
@@ -170,7 +172,7 @@ djc -k Hello.java
 ### 問題1: ファイルが見つからない
 
 ```
-Error: Input file not found: Hello.java
+Error: Input file not found: Hello.jav
 ```
 
 **解決方法**: ファイル名とパスを確認してください。
@@ -199,16 +201,16 @@ Error: Type mismatch
 
 ```batch
 # 出力ファイル指定
-djc -o output.djc source.java
+djc -o output.djc source.jav
 
 # 詳細出力
-djc -v source.java
+djc -v source.jav
 
 # 中間ファイル保持
-djc -k source.java
+djc -k source.jav
 
 # 複数オプション
-djc -k -v source.java
+djc -k -v source.jav
 ```
 
 ### ヘルプとバージョン
@@ -227,20 +229,24 @@ djc --version
 
 - `int`型変数
 - `boolean`型変数
-- 算術演算（`+`, `-`, `*`, `/`, `%`）
+- 算術演算（`+`, `-`, `*`, `/`, `%`, `++`, `--`, `+=`, `-=` ）
 - 比較演算（`==`, `!=`, `<`, `>`, `<=`, `>=`）
 - 論理演算（`&&`, `||`, `!`）
 - `if`文
-- `while`ループ
+- `while`ループ、`for`ループ
 - ローカル変数
 - staticメソッド
+- 配列
+- 文字列リテラル（`String`型変数）
+- (String).length() などの一部文字列関数
+  - .length(), .toUpperCase(), .toLowerCase(), .startsWith(), .endsWith(), .indexOf(), lastIndexOf(), .substr()
+- File.open() などの一部ファイル関数
+  - .open(), .readLine(), .writeLine(), .close()
+
 
 ### ❌ 使用不可
 
 - オブジェクト生成（`new`）
-- 配列
-- 文字列リテラル
-- `for`ループ
 - `switch`文
 - 継承・インターフェース
 - 例外処理
