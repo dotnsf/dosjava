@@ -8,6 +8,9 @@
 /* Global debug flag (set by djvm.c) */
 extern int g_debug_mode;
 
+/* Global file handle for File I/O operations */
+static FILE* g_file_handle = NULL;
+
 static uint8_t descriptor_param_count(const char* descriptor) {
     uint8_t count = 0;
     const char* p;
@@ -1333,7 +1336,119 @@ int interpreter_step(ExecutionContext* ctx) {
                             return -1;
                         }
                         break;
+                    } else if (strcmp(method_name, "open") == 0) {
+                    /* File.open(String filename) */
+                    uint16_t filename_value;
+                    const char* filename;
+                    
+                    if (arg_count != 1) {
+                        printf("ERROR: File.open expects 1 argument, got %u\n", arg_count);
+                        return -1;
                     }
+                    
+                    /* Pop filename from stack */
+                    filename_value = stack_pop_shared(ctx);
+                    filename = NULL;
+                    
+                    /* Get filename from constant pool */
+                    if (filename_value < ctx->djc_file->header.constant_pool_count) {
+                        if (ctx->djc_file->constants[filename_value].tag == CONST_UTF8) {
+                            filename = ctx->djc_file->constants[filename_value].data.utf8_data;
+                        }
+                    }
+                    
+                    if (!filename) {
+                        printf("ERROR: Invalid filename constant index: %d\n", filename_value);
+                        return -1;
+                    }
+                    
+                    /* Close previous file if open */
+                    if (g_file_handle != NULL) {
+                        fclose(g_file_handle);
+                        g_file_handle = NULL;
+                    }
+                    
+                    /* Open file for reading */
+                    g_file_handle = fopen(filename, "r");
+                    if (g_file_handle == NULL) {
+                        printf("ERROR: Cannot open file: %s\n", filename);
+                        return -1;
+                    }
+                    break;
+                } else if (strcmp(method_name, "readLine") == 0) {
+                    /* File.readLine() returns String */
+                    char line_buf[256];
+                    uint16_t const_idx;
+                    size_t len;
+                    
+                    if (arg_count != 0) {
+                        printf("ERROR: File.readLine expects 0 arguments, got %u\n", arg_count);
+                        return -1;
+                    }
+                    
+                    /* Check if file is open */
+                    if (g_file_handle == NULL) {
+                        printf("ERROR: No file is open for reading\n");
+                        return -1;
+                    }
+                    
+                    /* Read line from file */
+                    if (fgets(line_buf, sizeof(line_buf), g_file_handle) == NULL) {
+                        /* EOF or error - return empty string */
+                        line_buf[0] = '\0';
+                    } else {
+                        /* Remove trailing newline characters */
+                        len = strlen(line_buf);
+                        if (len > 0 && line_buf[len-1] == '\n') {
+                            line_buf[len-1] = '\0';
+                            len--;
+                            if (len > 0 && line_buf[len-1] == '\r') {
+                                line_buf[len-1] = '\0';
+                            }
+                        }
+                    }
+                    
+                    /* Add string to constant pool */
+                    const_idx = ctx->djc_file->header.constant_pool_count;
+                    if (const_idx >= DJC_MAX_CONSTANTS) {
+                        printf("ERROR: Constant pool full during readLine\n");
+                        return -1;
+                    }
+                    
+                    len = strlen(line_buf);
+                    ctx->djc_file->constants[const_idx].tag = CONST_UTF8;
+                    ctx->djc_file->constants[const_idx].length = (uint16_t)len;
+                    ctx->djc_file->constants[const_idx].data.utf8_data = (char*)memory_alloc(len + 1);
+                    if (ctx->djc_file->constants[const_idx].data.utf8_data == NULL) {
+                        printf("ERROR: Out of memory during readLine\n");
+                        return -1;
+                    }
+                    strcpy(ctx->djc_file->constants[const_idx].data.utf8_data, line_buf);
+                    ctx->djc_file->header.constant_pool_count++;
+                    
+                    /* Push result to stack */
+                    if (stack_push_shared(ctx, const_idx) != 0) {
+                        printf("ERROR: Stack overflow\n");
+                        return -1;
+                    }
+                    break;
+                } else if (strcmp(method_name, "close") == 0) {
+                    /* File.close() */
+                    
+                    if (arg_count != 0) {
+                        printf("ERROR: File.close expects 0 arguments, got %u\n", arg_count);
+                        return -1;
+                    }
+                    
+                    /* Close file if open */
+                    if (g_file_handle != NULL) {
+                        fclose(g_file_handle);
+                        g_file_handle = NULL;
+                    }
+                    break;
+                }
+                
+                /* If we reach here, method_name was not recognized */
                 }
                 
                 printf("ERROR: Unsupported native method: %s\n",

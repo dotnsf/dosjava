@@ -22,5 +22,3 @@ echo.
 echo Compilation failed!
 
 :end
-
-@REM Made with Bob

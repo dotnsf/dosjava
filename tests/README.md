@@ -32,21 +32,23 @@ cd tests
 
 ## Test Files
 
-- `HELLO.JAV` - Basic hello/string output
+- `hello.jav` - Basic hello/string output
 - `var1.jav` - Single variable (prints 10)
 - `vartest.jav` - Multiple variables
 - `arith.jav` - Arithmetic
 - `calc.jav` - Arithmetic and expressions
+- `files.jav` - File related operations
 - `iftest.jav` - If / else
 - `loop.jav` - While loop
 - `for.jav` - For loop
-- `func.JAV` - Static method call / int parameter / int return
+- `func.jav` - Static method call / int parameter / int return
 - `array.jav` - Basic array operations
 - `arrays.jav` - Extended array operations
 - `arraysim.jav` - Array-oriented stress/simple simulation case
 - `str.jav` - String locals and `println(String)`
 - `strlen.jav` - `String.length()`
 - `strcat.jav` - `String + String` and chained concatenation
+- `strext.jav` - `String` related operations
 - `switch.jav` - Additional control-flow-oriented test asset
 
 ## Documentation

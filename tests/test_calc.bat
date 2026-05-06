@@ -18,4 +18,3 @@ echo Test failed!
 
 :end
 
-@REM Made with Bob

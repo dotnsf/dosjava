@@ -1641,6 +1641,19 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     } else if (object_idx != 0 && strcmp(method_name, "substr") == 0) {
         is_native = 1;
         is_string_substr = 1;
+    } else if (strcmp(method_name, "open") == 0 ||
+               strcmp(method_name, "readLine") == 0 ||
+               strcmp(method_name, "close") == 0) {
+        /* Check if this is File.method() call */
+        if (object_idx != 0) {
+            ASTNode* obj_node = codegen_get_node(codegen, object_idx);
+            if (obj_node && obj_node->type == NODE_IDENTIFIER) {
+                const char* obj_name = codegen_get_string(codegen, obj_node->data.identifier.name);
+                if (obj_name && strcmp(obj_name, "File") == 0) {
+                    is_native = 1;
+                }
+            }
+        }
     }
     
     arg_node_type = NODE_PROGRAM;
@@ -1767,6 +1780,12 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             }
         } else if (strcmp(method_name, "concat") == 0) {
             strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+        } else if (strcmp(method_name, "open") == 0) {
+            strcpy(descriptor, "(Ljava/lang/String;)V");
+        } else if (strcmp(method_name, "readLine") == 0) {
+            strcpy(descriptor, "()Ljava/lang/String;");
+        } else if (strcmp(method_name, "close") == 0) {
+            strcpy(descriptor, "()V");
         } else if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
             strcpy(descriptor, "(Ljava/lang/String;)V");
         } else {
@@ -1781,7 +1800,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     
     returns_value = 0;
     if (is_string_length || is_string_caseconv || is_string_compare || is_string_indexof ||
-        is_string_lastindexof || is_string_substr || strcmp(method_name, "concat") == 0) {
+        is_string_lastindexof || is_string_substr || strcmp(method_name, "concat") == 0 ||
+        strcmp(method_name, "readLine") == 0) {
         returns_value = 1;
     } else if (!is_native) {
         method_sym = NULL;

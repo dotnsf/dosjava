@@ -70,5 +70,3 @@ echo All array tests completed!
 echo ========================================
 
 :end
-
-@REM Made with Bob

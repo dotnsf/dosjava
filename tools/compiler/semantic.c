@@ -1667,6 +1667,53 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         return 0;
     }
     
+    /* Special-case File static methods */
+    if (method_name &&
+        (strcmp(method_name, "open") == 0 ||
+         strcmp(method_name, "readLine") == 0 ||
+         strcmp(method_name, "close") == 0)) {
+        
+        /* Check if this is File.method() call */
+        if (object_idx != 0) {
+            ASTNode* obj_node = semantic_get_node(analyzer, object_idx);
+            if (obj_node && obj_node->type == NODE_IDENTIFIER) {
+                const char* obj_name = semantic_get_string(analyzer, obj_node->data.identifier.name);
+                if (obj_name && strcmp(obj_name, "File") == 0) {
+                    /* This is a File.method() call */
+                    if (strcmp(method_name, "open") == 0) {
+                        /* File.open(String filename) */
+                        if (arg_count != 1) {
+                            semantic_error_node(analyzer, call_node, "File.open requires 1 argument");
+                            return -1;
+                        }
+                        /* Returns void */
+                        result_type->kind = TYPE_VOID;
+                        result_type->class_name = 0;
+                    } else if (strcmp(method_name, "readLine") == 0) {
+                        /* File.readLine() returns String */
+                        if (arg_count != 0) {
+                            semantic_error_node(analyzer, call_node, "File.readLine requires 0 arguments");
+                            return -1;
+                        }
+                        /* Returns String */
+                        result_type->kind = TYPE_CLASS;
+                        result_type->class_name = semantic_add_string(analyzer, "String");
+                    } else if (strcmp(method_name, "close") == 0) {
+                        /* File.close() */
+                        if (arg_count != 0) {
+                            semantic_error_node(analyzer, call_node, "File.close requires 0 arguments");
+                            return -1;
+                        }
+                        /* Returns void */
+                        result_type->kind = TYPE_VOID;
+                        result_type->class_name = 0;
+                    }
+                    return 0;
+                }
+            }
+        }
+    }
+    
     if (object_idx != 0) {
         semantic_error_node(analyzer, call_node, "Instance method calls are not supported");
         return -1;
