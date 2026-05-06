@@ -1071,6 +1071,56 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
     left_index = binop_node->data.binary_op.left;
     right_index = binop_node->data.binary_op.right;
     
+    /* Handle logical operators with short-circuit evaluation */
+    if (op == (uint16_t)BINOP_AND || op == (uint16_t)BINOP_OR) {
+        uint16_t skip_label;
+        uint16_t end_label;
+        
+        /* Generate left operand */
+        left_node = codegen_get_node(codegen, left_index);
+        if (left_node) {
+            generate_expression(codegen, left_node);
+        }
+        
+        /* Duplicate for the result */
+        emit_opcode(codegen, OP_DUP);
+        update_stack(codegen, 1);
+        
+        /* Create labels */
+        skip_label = codegen->context->code->size;
+        
+        if (op == (uint16_t)BINOP_AND) {
+            /* AND: if left is false, skip right evaluation */
+            emit_opcode(codegen, OP_IF_FALSE);
+            emit_u2(codegen, 0);  /* Placeholder for offset */
+        } else {
+            /* OR: if left is true, skip right evaluation */
+            emit_opcode(codegen, OP_IF_TRUE);
+            emit_u2(codegen, 0);  /* Placeholder for offset */
+        }
+        
+        /* Pop the duplicated value */
+        emit_opcode(codegen, OP_POP);
+        update_stack(codegen, -1);
+        
+        /* Generate right operand */
+        right_node = codegen_get_node(codegen, right_index);
+        if (right_node) {
+            generate_expression(codegen, right_node);
+        }
+        
+        /* Patch the jump offset */
+        end_label = codegen->context->code->size;
+        {
+            int16_t offset = (int16_t)(end_label - skip_label - 3);
+            codegen->context->code->data[skip_label + 1] = (uint8_t)(offset & 0xFF);
+            codegen->context->code->data[skip_label + 2] = (uint8_t)((offset >> 8) & 0xFF);
+        }
+        
+        update_stack(codegen, -1); /* Two operands consumed, one result produced */
+        return 0;
+    }
+    
     is_string_concat = 0;
     if (op == (uint16_t)BINOP_ADD) {
         ASTNode* test_left;
@@ -1213,8 +1263,8 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                 break;
             case (uint16_t)BINOP_AND:
             case (uint16_t)BINOP_OR:
-                /* Logical operations handled differently */
-                codegen_error(codegen, "Logical operations not yet implemented");
+                /* Logical operations handled above with short-circuit evaluation */
+                codegen_error(codegen, "Logical AND/OR should have been handled earlier");
                 return -1;
             default:
                 codegen_error(codegen, "Unknown binary operator");
@@ -1229,19 +1279,26 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
 /* Generate code for unary operation */
 int generate_unary_op(CodeGenerator* codegen, ASTNode* unop_node) {
     ASTNode* operand_node;
+    uint16_t op;
+    uint16_t operand_index;
     
     if (!codegen || !unop_node) {
         return -1;
     }
     
+    /* CRITICAL: Save operator and operand index BEFORE any recursive calls
+     * because generate_expression() may overwrite the unop_node memory */
+    op = unop_node->data.unary_op.op;
+    operand_index = unop_node->data.unary_op.operand;
+    
     /* Generate operand */
-    operand_node = codegen_get_node(codegen, unop_node->data.unary_op.operand);
+    operand_node = codegen_get_node(codegen, operand_index);
     if (operand_node) {
         generate_expression(codegen, operand_node);
     }
     
     /* Generate operation */
-    switch (unop_node->data.unary_op.op) {
+    switch (op) {
         case UNOP_NEG:
             emit_opcode(codegen, OP_NEG);
             break;

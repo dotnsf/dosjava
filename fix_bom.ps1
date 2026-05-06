@@ -2,7 +2,7 @@ Set-Location "c:\Users\KEIKIMURA\src"
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
-@(".\dosjava\src", ".\dosjava\tools") |
+@(".\dosjava\src", ".\dosjava\tools", ".\dosjava\examples") |
     ForEach-Object {
         Get-ChildItem $_ -Recurse -Include *.c, *.h |
             ForEach-Object {

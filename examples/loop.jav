@@ -16,17 +16,19 @@ class Loop {
             i = i + 1;
         }
         // sum = 45
+        System.out.println( sum );  // 45
         
         // ネストしたループ
         int x = 0;
         while (x < 3) {
             int y = 0;
             while (y < 3) {
-                int product = x * y;
+                sum = x * y;
                 y = y + 1;
             }
             x = x + 1;
         }
+        System.out.println( sum );  // 4
         
         return;
     }
