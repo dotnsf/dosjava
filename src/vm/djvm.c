@@ -15,6 +15,9 @@
 /* Program version */
 #define DJVM_VERSION "1.0"
 
+/* Global debug flag (used by interpreter.c) */
+int g_debug_mode = 0;
+
 /* Command-line options */
 typedef struct {
     const char* filename;       /* .djc file to execute */
@@ -135,6 +138,9 @@ int execute_method(DJCFile* djc_file, DJCMethod* method, VMOptions* options) {
         printf("  Max locals:  %u\n", method->max_locals);
         printf("\n");
     }
+    
+    /* Set global debug flag */
+    g_debug_mode = options->debug;
     
     /* Initialize execution context */
     result = interpreter_init_context(&ctx, djc_file, method);

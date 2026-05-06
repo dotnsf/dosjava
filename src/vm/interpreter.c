@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Global debug flag (set by djvm.c) */
+extern int g_debug_mode;
+
 static uint8_t descriptor_param_count(const char* descriptor) {
     uint8_t count = 0;
     const char* p;
@@ -761,8 +764,6 @@ int interpreter_step(ExecutionContext* ctx) {
             method_index = interpreter_read_u16(ctx);
             arg_count = interpreter_read_u8(ctx);
             
-            
-            
             /* Look up method */
             method = djc_find_method(ctx->djc_file, method_index);
             if (method == NULL) {
@@ -852,6 +853,78 @@ int interpreter_step(ExecutionContext* ctx) {
                         
                         len = (uint16_t)strlen(str);
                         if (stack_push_shared(ctx, len) != 0) {
+                            printf("ERROR: Stack overflow\n");
+                            return -1;
+                        }
+                        break;
+                    } else if (strcmp(method_name, "toUpperCase") == 0 ||
+                               strcmp(method_name, "toLowerCase") == 0) {
+                        uint16_t value;
+                        const char* src_str;
+                        char conv_buf[256];
+                        uint16_t len;
+                        uint16_t i;
+                        uint16_t const_idx;
+                        int to_upper;
+                        
+                        if (arg_count != 1) {
+                            printf("ERROR: %s expects 1 argument, got %u\n", method_name, arg_count);
+                            return -1;
+                        }
+                        
+                        value = stack_pop_shared(ctx);
+                        src_str = NULL;
+                        
+                        if (value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[value].tag == CONST_UTF8) {
+                                src_str = ctx->djc_file->constants[value].data.utf8_data;
+                            }
+                        }
+                        
+                        if (!src_str) {
+                            printf("ERROR: Invalid string constant index for %s: %d\n", method_name, value);
+                            return -1;
+                        }
+                        
+                        len = (uint16_t)strlen(src_str);
+                        if (len >= sizeof(conv_buf)) {
+                            printf("ERROR: String too long for %s\n", method_name);
+                            return -1;
+                        }
+                        
+                        to_upper = (strcmp(method_name, "toUpperCase") == 0);
+                        for (i = 0; i < len; i++) {
+                            char ch = src_str[i];
+                            if (to_upper) {
+                                if (ch >= 'a' && ch <= 'z') {
+                                    ch = (char)(ch - ('a' - 'A'));
+                                }
+                            } else {
+                                if (ch >= 'A' && ch <= 'Z') {
+                                    ch = (char)(ch + ('a' - 'A'));
+                                }
+                            }
+                            conv_buf[i] = ch;
+                        }
+                        conv_buf[len] = '\0';
+                        
+                        const_idx = ctx->djc_file->header.constant_pool_count;
+                        if (const_idx >= DJC_MAX_CONSTANTS) {
+                            printf("ERROR: Constant pool full during %s\n", method_name);
+                            return -1;
+                        }
+                        
+                        ctx->djc_file->constants[const_idx].tag = CONST_UTF8;
+                        ctx->djc_file->constants[const_idx].length = len;
+                        ctx->djc_file->constants[const_idx].data.utf8_data = (char*)memory_alloc(len + 1);
+                        if (ctx->djc_file->constants[const_idx].data.utf8_data == NULL) {
+                            printf("ERROR: Out of memory during %s\n", method_name);
+                            return -1;
+                        }
+                        strcpy(ctx->djc_file->constants[const_idx].data.utf8_data, conv_buf);
+                        ctx->djc_file->header.constant_pool_count++;
+                        
+                        if (stack_push_shared(ctx, const_idx) != 0) {
                             printf("ERROR: Stack overflow\n");
                             return -1;
                         }

@@ -1590,12 +1590,20 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         }
     }
     
-    /* Special-case Phase 1 String.length() */
-    if (object_idx != 0 && method_name && strcmp(method_name, "length") == 0) {
+    /* Special-case Phase 1 String native instance methods */
+    if (object_idx != 0 && method_name &&
+        (strcmp(method_name, "length") == 0 ||
+         strcmp(method_name, "toUpperCase") == 0 ||
+         strcmp(method_name, "toLowerCase") == 0)) {
         TypeInfo object_type;
+        uint16_t string_name_off;
         
         if (arg_count != 0) {
-            semantic_error_node(analyzer, call_node, "length() takes no arguments");
+            if (strcmp(method_name, "length") == 0) {
+                semantic_error_node(analyzer, call_node, "length() takes no arguments");
+            } else {
+                semantic_error_node(analyzer, call_node, "String case conversion takes no arguments");
+            }
             return -1;
         }
         
@@ -1605,20 +1613,23 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         }
         
         if (object_type.kind != TYPE_CLASS) {
-            semantic_error_node(analyzer, call_node, "length() requires String receiver");
+            semantic_error_node(analyzer, call_node, "String method requires String receiver");
             return -1;
         }
         
-        {
-            uint16_t string_name_off = semantic_add_string(analyzer, "String");
-            if (object_type.class_name != string_name_off) {
-                semantic_error_node(analyzer, call_node, "length() requires String receiver");
-                return -1;
-            }
+        string_name_off = semantic_add_string(analyzer, "String");
+        if (object_type.class_name != string_name_off) {
+            semantic_error_node(analyzer, call_node, "String method requires String receiver");
+            return -1;
         }
         
-        result_type->kind = TYPE_INT;
-        result_type->class_name = 0;
+        if (strcmp(method_name, "length") == 0) {
+            result_type->kind = TYPE_INT;
+            result_type->class_name = 0;
+        } else {
+            result_type->kind = TYPE_CLASS;
+            result_type->class_name = string_name_off;
+        }
         return 0;
     }
     

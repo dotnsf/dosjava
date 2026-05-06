@@ -53,7 +53,7 @@
 #define OP_IF_GE         0x38  /* Jump if greater or equal [offset:2] */
 
 /* Method Invocation (0x40-0x4F) */
-#define OP_INVOKE_STATIC 0x40  /* Static method call [method:2] */
+#define OP_INVOKE_STATIC 0x40  /* Static method call [method:2] [argc:1] */
 #define OP_INVOKE_VIRTUAL 0x41 /* Virtual method call [method:2] */
 #define OP_RETURN        0x42  /* Return void */
 #define OP_RETURN_VALUE  0x43  /* Return with value */

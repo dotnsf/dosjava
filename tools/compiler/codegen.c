@@ -469,11 +469,15 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
         uint16_t name_idx;
         int found = 0;
         
-        /* Search for existing placeholder entry */
+        /* Search for existing non-native placeholder entry.
+         * Native methods can share the same name (e.g. println(int) and
+         * println(String)), and user methods must never overwrite them.
+         */
         name_idx = find_or_add_utf8(codegen, method_name);
         for (method_idx = 0; method_idx < codegen->method_count; method_idx++) {
-            if (codegen->methods[method_idx].name_index == name_idx) {
-                /* Found existing entry - update it */
+            if ((codegen->methods[method_idx].flags & METHOD_NATIVE) == 0 &&
+                codegen->methods[method_idx].name_index == name_idx) {
+                /* Found existing user-method entry - update it */
                 codegen->methods[method_idx].descriptor_index =
                     build_method_descriptor(codegen, codegen->current_method);
                 codegen->methods[method_idx].code_offset = code_start;
@@ -1582,6 +1586,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     uint16_t i;
     int first_arg_is_string;
     int is_string_length;
+    int is_string_caseconv;
     uint16_t invoke_arg_count;
     
     if (!codegen || !call_node) {
@@ -1601,6 +1606,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     
     is_native = 0;
     is_string_length = 0;
+    is_string_caseconv = 0;
     if (strcmp(method_name, "println") == 0) {
         is_native = 1;
     } else if (strcmp(method_name, "concat") == 0 && object_idx == 0) {
@@ -1608,12 +1614,17 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     } else if (object_idx != 0 && strcmp(method_name, "length") == 0) {
         is_native = 1;
         is_string_length = 1;
+    } else if (object_idx != 0 &&
+               (strcmp(method_name, "toUpperCase") == 0 ||
+                strcmp(method_name, "toLowerCase") == 0)) {
+        is_native = 1;
+        is_string_caseconv = 1;
     }
     
     arg_node_type = NODE_PROGRAM;
     first_arg_name = NULL;
     first_arg_is_string = 0;
-    if (!is_string_length && saved_first_arg != 0) {
+    if (!is_string_length && !is_string_caseconv && saved_first_arg != 0) {
         arg_node = codegen_get_node(codegen, saved_first_arg);
         if (arg_node) {
             arg_node_type = arg_node->type;
@@ -1647,10 +1658,10 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     arg_count = 0;
-    if (is_string_length) {
+    if (is_string_length || is_string_caseconv) {
         ASTNode* recv_node = codegen_get_node(codegen, object_idx);
         if (!recv_node) {
-            codegen_error(codegen, "Invalid length receiver");
+            codegen_error(codegen, is_string_length ? "Invalid length receiver" : "Invalid String receiver");
             return -1;
         }
         if (generate_expression(codegen, recv_node) != 0) {
@@ -1687,10 +1698,12 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     
     if (is_native) {
         uint16_t desc_idx;
-        char descriptor[24];
+        char descriptor[80];  /* Increased buffer size to prevent overflow */
         
         if (is_string_length) {
             strcpy(descriptor, "(Ljava/lang/String;)I");
+        } else if (is_string_caseconv) {
+            strcpy(descriptor, "(Ljava/lang/String;)Ljava/lang/String;");
         } else if (strcmp(method_name, "concat") == 0) {
             strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
         } else if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
@@ -1706,7 +1719,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     returns_value = 0;
-    if (is_string_length || strcmp(method_name, "concat") == 0) {
+    if (is_string_length || is_string_caseconv || strcmp(method_name, "concat") == 0) {
         returns_value = 1;
     } else if (!is_native) {
         method_sym = NULL;
@@ -2047,11 +2060,11 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
     }
     
     for (i = 0; i < codegen->method_count; i++) {
-        name_idx = codegen->methods[i].name_index;
+        uint16_t existing_name_idx = codegen->methods[i].name_index;
         
-        if (name_idx < codegen->constants->count) {
-            if (codegen->constants->constants[name_idx].tag == CONST_UTF8) {
-                const char* existing_name = codegen->constants->constants[name_idx].data.utf8_data;
+        if (existing_name_idx < codegen->constants->count) {
+            if (codegen->constants->constants[existing_name_idx].tag == CONST_UTF8) {
+                const char* existing_name = codegen->constants->constants[existing_name_idx].data.utf8_data;
                 
                 if (strcmp(existing_name, method_name) == 0) {
                     int is_method_native = (codegen->methods[i].flags & METHOD_NATIVE) != 0;
@@ -2264,7 +2277,6 @@ int write_djc_file(CodeGenerator* codegen) {
     header.method_count = codegen->method_count;
     header.field_count = codegen->field_count;
     header.code_size = codegen->bytecode->size;
-    
     
     if (fwrite(&header, sizeof(DJCHeader), 1, codegen->output_file) != 1) {
         return -1;
