@@ -1,5 +1,7 @@
 # DOS Java Compiler
 
+![DOSJava](https://raw.githubusercontent.com/dotnsf/dosjava/refs/heads/main/dosjava.png)
+
 16-bit PC-DOS上で動作するJavaコンパイラとランタイム環境
 
 ## 概要
@@ -299,7 +301,7 @@ run_tests.bat
 - **制御**: if/else、while、for
 - **メソッド**: static 呼び出し、引数、int 戻り値
 - **文字列**: `println(String)`、`length()`、`String + String`
-- **配列**: `int[]`、`boolean[]`、`array.length`
+- **配列**: `int[]`、`array.length`
 - **複雑**: フィボナッチ、階乗
 
 ## ドキュメント
