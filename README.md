@@ -17,6 +17,7 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 
 ### データ型
 - `int` - 16-bit符号付き整数（-32768 ～ 32767）
+  - 配列のインデックスは `int` 型のみ
 - `boolean` - 真偽値（true/false）
 - `void` - 戻り値なし
 - `String` - Phase 1 の限定サポート
