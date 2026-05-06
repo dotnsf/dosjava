@@ -1589,6 +1589,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     int is_string_caseconv;
     int is_string_compare;
     int is_string_indexof;
+    int is_string_lastindexof;
     uint16_t invoke_arg_count;
     
     if (!codegen || !call_node) {
@@ -1611,6 +1612,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     is_string_caseconv = 0;
     is_string_compare = 0;
     is_string_indexof = 0;
+    is_string_lastindexof = 0;
     if (strcmp(method_name, "println") == 0) {
         is_native = 1;
     } else if (strcmp(method_name, "concat") == 0 && object_idx == 0) {
@@ -1631,6 +1633,9 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     } else if (object_idx != 0 && strcmp(method_name, "indexOf") == 0) {
         is_native = 1;
         is_string_indexof = 1;
+    } else if (object_idx != 0 && strcmp(method_name, "lastIndexOf") == 0) {
+        is_native = 1;
+        is_string_lastindexof = 1;
     }
     
     arg_node_type = NODE_PROGRAM;
@@ -1670,7 +1675,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     arg_count = 0;
-    if (is_string_length || is_string_caseconv || is_string_compare || is_string_indexof) {
+    if (is_string_length || is_string_caseconv || is_string_compare || is_string_indexof || is_string_lastindexof) {
         ASTNode* recv_node = codegen_get_node(codegen, object_idx);
         if (!recv_node) {
             codegen_error(codegen, "Invalid String receiver");
@@ -1682,7 +1687,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         arg_count = 1;
         
         /* For string comparison and indexOf methods, also push the argument(s) */
-        if (is_string_compare || is_string_indexof) {
+        if (is_string_compare || is_string_indexof || is_string_lastindexof) {
             arg_idx = saved_first_arg;
             while (arg_idx != 0 && arg_count < total_arg_count + 1) {
                 uint16_t next_arg_idx;
@@ -1739,8 +1744,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             strcpy(descriptor, "(Ljava/lang/String;)Ljava/lang/String;");
         } else if (is_string_compare) {
             strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)I");
-        } else if (is_string_indexof) {
-            /* indexOf can have 1 or 2 arguments (not counting receiver) */
+        } else if (is_string_indexof || is_string_lastindexof) {
+            /* indexOf/lastIndexOf can have 1 or 2 arguments (not counting receiver) */
             /* arg_count includes receiver, so: 1-arg version has arg_count=2, 2-arg version has arg_count=3 */
             if (arg_count == 2) {
                 strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)I");
@@ -1763,7 +1768,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     
     returns_value = 0;
     if (is_string_length || is_string_caseconv || is_string_compare || is_string_indexof ||
-        strcmp(method_name, "concat") == 0) {
+        is_string_lastindexof || strcmp(method_name, "concat") == 0) {
         returns_value = 1;
     } else if (!is_native) {
         method_sym = NULL;

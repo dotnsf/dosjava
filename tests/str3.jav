@@ -9,9 +9,9 @@ class str3 {
         int n4 = str.indexOf( "World!" );
         int n5 = str.indexOf( "WORLD!" );
         int n6 = str.indexOf( "world!" );
-        int n7 = str.indexOf( "World!", 3 );
-        int n8 = str.indexOf( "WORLD!", 3 );
-        int n9 = str.indexOf( "world!", 3 );
+        int n7 = str.indexOf( "W", 3 );
+        int n8 = str.indexOf( "!", 3 );
+        int n9 = str.indexOf( "o", 3 );
 
         System.out.println(n1);  // 0
         System.out.println(n2);  // -1 
@@ -22,7 +22,7 @@ class str3 {
         System.out.println(n6);  // -1
 
         System.out.println(n7);  // 6
-        System.out.println(n8);  // -1
-        System.out.println(n9);  // -1
+        System.out.println(n8);  // 11
+        System.out.println(n9);  // 4
     }
 }

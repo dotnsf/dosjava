@@ -1147,6 +1147,94 @@ int interpreter_step(ExecutionContext* ctx) {
                             return -1;
                         }
                         break;
+                    } else if (strcmp(method_name, "lastIndexOf") == 0) {
+                        uint16_t search_value;
+                        uint16_t str_value;
+                        uint16_t from_index;
+                        const char* str;
+                        const char* search_str;
+                        const char* found_pos;
+                        const char* last_found;
+                        uint16_t str_len;
+                        uint16_t search_len;
+                        int result;
+                        int has_from_index;
+                        const char* search_start;
+                        
+                        has_from_index = (arg_count == 3);
+                        
+                        if (arg_count != 2 && arg_count != 3) {
+                            printf("ERROR: lastIndexOf expects 2 or 3 arguments, got %u\n", arg_count);
+                            return -1;
+                        }
+                        
+                        /* Pop arguments from stack */
+                        if (has_from_index) {
+                            from_index = stack_pop_shared(ctx);
+                        } else {
+                            from_index = 0;
+                        }
+                        search_value = stack_pop_shared(ctx);
+                        str_value = stack_pop_shared(ctx);
+                        
+                        str = NULL;
+                        search_str = NULL;
+                        
+                        /* Get target string from constant pool */
+                        if (str_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+                                str = ctx->djc_file->constants[str_value].data.utf8_data;
+                            }
+                        }
+                        
+                        /* Get search string from constant pool */
+                        if (search_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[search_value].tag == CONST_UTF8) {
+                                search_str = ctx->djc_file->constants[search_value].data.utf8_data;
+                            }
+                        }
+                        
+                        if (!str || !search_str) {
+                            printf("ERROR: Invalid string constant index for lastIndexOf: %d, %d\n",
+                                   str_value, search_value);
+                            return -1;
+                        }
+                        
+                        str_len = (uint16_t)strlen(str);
+                        search_len = (uint16_t)strlen(search_str);
+                        
+                        /* Determine search start position */
+                        if (has_from_index) {
+                            /* Search from fromIndex onwards */
+                            if (from_index > str_len) {
+                                from_index = str_len;
+                            }
+                            search_start = str + from_index;
+                        } else {
+                            /* Search entire string */
+                            search_start = str;
+                        }
+                        
+                        /* Find last occurrence by iterating through all occurrences */
+                        result = -1;
+                        last_found = NULL;
+                        found_pos = search_start;
+                        
+                        while ((found_pos = strstr(found_pos, search_str)) != NULL) {
+                            last_found = found_pos;
+                            found_pos++; /* Move past this occurrence to find next */
+                        }
+                        
+                        if (last_found != NULL) {
+                            result = (int)(last_found - str);
+                        }
+                        
+                        /* Push result to stack */
+                        if (stack_push_shared(ctx, (uint16_t)result) != 0) {
+                            printf("ERROR: Stack overflow\n");
+                            return -1;
+                        }
+                        break;
                     }
                 }
                 

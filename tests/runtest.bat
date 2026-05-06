@@ -488,7 +488,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "ABC\nHello ABC\nABCABCABC" 
 echo.
 
-goto :completed
+goto :test13
 
 :test12_fail
 echo FAILED: Compilation error
@@ -505,6 +505,46 @@ goto :end
 :test12_badout
 echo FAILED: Output mismatch for Test 12
 echo Expected: "ABC\nHello ABC\nABCABCABC"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test13
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 13: String extend features
+echo ------------------------------
+..\build\bin\djc.exe strext.jav
+if errorlevel 1 goto :test13_fail
+if not exist STREXT.DJC goto :test13_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe STREXT.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test13_runfail
+find "1\n0\n1\n0\n6\n11\n4\n6\n11\n7" RT_OUT.TXT > nul
+if errorlevel 1 goto :test13_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "1\n0\n1\n0\n6\n11\n4\n6\n11\n7" 
+echo.
+
+goto :completed
+
+:test13_fail
+echo FAILED: Compilation error
+goto :end
+
+:test13_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test13_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test13_badout
+echo FAILED: Output mismatch for Test 13
+echo Expected: "1\n0\n1\n0\n6\n11\n4\n6\n11\n7"
 echo Actual:
 type RT_OUT.TXT
 goto :end

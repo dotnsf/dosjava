@@ -1597,7 +1597,8 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
          strcmp(method_name, "toLowerCase") == 0 ||
          strcmp(method_name, "startsWith") == 0 ||
          strcmp(method_name, "endsWith") == 0 ||
-         strcmp(method_name, "indexOf") == 0)) {
+         strcmp(method_name, "indexOf") == 0 ||
+         strcmp(method_name, "lastIndexOf") == 0)) {
         TypeInfo object_type;
         uint16_t string_name_off;
         int is_comparison_method;
@@ -1605,7 +1606,8 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         
         is_comparison_method = (strcmp(method_name, "startsWith") == 0 ||
                                 strcmp(method_name, "endsWith") == 0);
-        is_index_method = (strcmp(method_name, "indexOf") == 0);
+        is_index_method = (strcmp(method_name, "indexOf") == 0 ||
+                           strcmp(method_name, "lastIndexOf") == 0);
         
         if (strcmp(method_name, "length") == 0 ||
             strcmp(method_name, "toUpperCase") == 0 ||
