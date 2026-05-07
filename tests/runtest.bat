@@ -566,10 +566,10 @@ find "ABC\n123\nHello World!" RT_OUT.TXT > nul
 if errorlevel 1 goto :test14_badout
 echo Output:
 type RT_OUT.TXT
-echo SUCCESS: Output matched expected value "ABC\n123\nHello World!" 
+echo SUCCESS: Output matched expected value "ABC\n123\nHello World!"
 echo.
 
-goto :completed
+goto :test15
 
 :test14_fail
 echo FAILED: Compilation error
@@ -586,6 +586,48 @@ goto :end
 :test14_badout
 echo FAILED: Output mismatch for Test 14
 echo Expected: "ABC\n123\nHello World!"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test15
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 15: String.equals()
+echo ------------------------------
+..\build\bin\djc.exe str6.jav
+if errorlevel 1 goto :test15_fail
+if not exist STR6.DJC goto :test15_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe STR6.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test15_runfail
+find "true" RT_OUT.TXT > nul
+if errorlevel 1 goto :test15_badout
+find "false" RT_OUT.TXT > nul
+if errorlevel 1 goto :test15_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "true\nfalse"
+echo.
+
+goto :completed
+
+:test15_fail
+echo FAILED: Compilation error
+goto :end
+
+:test15_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test15_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test15_badout
+echo FAILED: Output mismatch for Test 15
+echo Expected: "true\nfalse"
 echo Actual:
 type RT_OUT.TXT
 goto :end
