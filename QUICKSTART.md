@@ -239,7 +239,7 @@ djc --version
 - 配列
 - 文字列リテラル（`String`型変数）
 - (String).length() などの一部文字列関数
-  - .length(), .toUpperCase(), .toLowerCase(), .startsWith(), .endsWith(), .indexOf(), lastIndexOf(), .substr()
+  - .length(), .toUpperCase(), .toLowerCase(), .startsWith(), .endsWith(), .indexOf(), lastIndexOf(), .substr(), equals(), compareTo()
 - File.open() などの一部ファイル関数
   - .open(), .readLine(), .writeLine(), .close()
 
