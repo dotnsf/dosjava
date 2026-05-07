@@ -1598,6 +1598,7 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
          strcmp(method_name, "startsWith") == 0 ||
          strcmp(method_name, "endsWith") == 0 ||
          strcmp(method_name, "equals") == 0 ||
+         strcmp(method_name, "compareTo") == 0 ||
          strcmp(method_name, "indexOf") == 0 ||
          strcmp(method_name, "lastIndexOf") == 0 ||
          strcmp(method_name, "substr") == 0)) {
@@ -1605,12 +1606,14 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         uint16_t string_name_off;
         int is_comparison_method;
         int is_equals_method;
+        int is_compareto_method;
         int is_index_method;
         int is_substr_method;
         
         is_comparison_method = (strcmp(method_name, "startsWith") == 0 ||
                                 strcmp(method_name, "endsWith") == 0);
         is_equals_method = (strcmp(method_name, "equals") == 0);
+        is_compareto_method = (strcmp(method_name, "compareTo") == 0);
         is_index_method = (strcmp(method_name, "indexOf") == 0 ||
                            strcmp(method_name, "lastIndexOf") == 0);
         is_substr_method = (strcmp(method_name, "substr") == 0);
@@ -1626,10 +1629,12 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                 }
                 return -1;
             }
-        } else if (is_comparison_method || is_equals_method) {
+        } else if (is_comparison_method || is_equals_method || is_compareto_method) {
             if (arg_count != 1) {
                 if (is_equals_method) {
                     semantic_error_node(analyzer, call_node, "equals() requires 1 argument");
+                } else if (is_compareto_method) {
+                    semantic_error_node(analyzer, call_node, "compareTo() requires 1 argument");
                 } else {
                     semantic_error_node(analyzer, call_node, "startsWith/endsWith requires 1 argument");
                 }
@@ -1663,7 +1668,7 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
             return -1;
         }
         
-        if (strcmp(method_name, "length") == 0 || is_comparison_method || is_equals_method || is_index_method) {
+        if (strcmp(method_name, "length") == 0 || is_comparison_method || is_equals_method || is_compareto_method || is_index_method) {
             result_type->kind = TYPE_INT;
             result_type->class_name = 0;
         } else {

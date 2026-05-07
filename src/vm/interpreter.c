@@ -1128,6 +1128,54 @@ int interpreter_step(ExecutionContext* ctx) {
                             return -1;
                         }
                         break;
+                    } else if (strcmp(method_name, "compareTo") == 0) {
+                        uint16_t arg_value;
+                        uint16_t str_value;
+                        const char* str;
+                        const char* arg_str;
+                        int result;
+                        
+                        if (arg_count != 2) {
+                            printf("ERROR: compareTo expects 2 arguments, got %u\n", arg_count);
+                            return -1;
+                        }
+                        
+                        /* Pop argument and receiver from stack */
+                        arg_value = stack_pop_shared(ctx);
+                        str_value = stack_pop_shared(ctx);
+                        
+                        str = NULL;
+                        arg_str = NULL;
+                        
+                        /* Get receiver string from constant pool */
+                        if (str_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+                                str = ctx->djc_file->constants[str_value].data.utf8_data;
+                            }
+                        }
+                        
+                        /* Get argument string from constant pool */
+                        if (arg_value < ctx->djc_file->header.constant_pool_count) {
+                            if (ctx->djc_file->constants[arg_value].tag == CONST_UTF8) {
+                                arg_str = ctx->djc_file->constants[arg_value].data.utf8_data;
+                            }
+                        }
+                        
+                        if (!str || !arg_str) {
+                            printf("ERROR: Invalid string constant for compareTo: %d, %d\n",
+                                   str_value, arg_value);
+                            return -1;
+                        }
+                        
+                        /* Compare strings lexicographically (case-sensitive) */
+                        result = strcmp(str, arg_str);
+                        
+                        /* Push result to stack */
+                        if (stack_push_shared(ctx, (uint16_t)result) != 0) {
+                            printf("ERROR: Stack overflow\n");
+                            return -1;
+                        }
+                        break;
                     } else if (strcmp(method_name, "indexOf") == 0) {
                         uint16_t search_value;
                         uint16_t str_value;

@@ -1646,6 +1646,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     int is_string_caseconv;
     int is_string_compare;
     int is_string_equals;
+    int is_string_compareto;
     int is_string_indexof;
     int is_string_lastindexof;
     int is_string_substr;
@@ -1671,6 +1672,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     is_string_caseconv = 0;
     is_string_compare = 0;
     is_string_equals = 0;
+    is_string_compareto = 0;
     is_string_indexof = 0;
     is_string_lastindexof = 0;
     is_string_substr = 0;
@@ -1694,6 +1696,9 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     } else if (object_idx != 0 && strcmp(method_name, "equals") == 0) {
         is_native = 1;
         is_string_equals = 1;
+    } else if (object_idx != 0 && strcmp(method_name, "compareTo") == 0) {
+        is_native = 1;
+        is_string_compareto = 1;
     } else if (object_idx != 0 && strcmp(method_name, "indexOf") == 0) {
         is_native = 1;
         is_string_indexof = 1;
@@ -1756,7 +1761,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     arg_count = 0;
-    if (is_string_length || is_string_caseconv || is_string_compare || is_string_equals || is_string_indexof || is_string_lastindexof || is_string_substr) {
+    if (is_string_length || is_string_caseconv || is_string_compare || is_string_equals || is_string_compareto || is_string_indexof || is_string_lastindexof || is_string_substr) {
         ASTNode* recv_node = codegen_get_node(codegen, object_idx);
         if (!recv_node) {
             codegen_error(codegen, "Invalid String receiver");
@@ -1767,8 +1772,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         }
         arg_count = 1;
         
-        /* For string comparison, equals, indexOf, and substr methods, also push the argument(s) */
-        if (is_string_compare || is_string_equals || is_string_indexof || is_string_lastindexof || is_string_substr) {
+        /* For string comparison, equals, compareTo, indexOf, and substr methods, also push the argument(s) */
+        if (is_string_compare || is_string_equals || is_string_compareto || is_string_indexof || is_string_lastindexof || is_string_substr) {
             arg_idx = saved_first_arg;
             while (arg_idx != 0 && arg_count < total_arg_count + 1) {
                 uint16_t next_arg_idx;
@@ -1823,7 +1828,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             strcpy(descriptor, "(Ljava/lang/String;)I");
         } else if (is_string_caseconv) {
             strcpy(descriptor, "(Ljava/lang/String;)Ljava/lang/String;");
-        } else if (is_string_compare || is_string_equals) {
+        } else if (is_string_compare || is_string_equals || is_string_compareto) {
             strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)I");
         } else if (is_string_indexof || is_string_lastindexof) {
             /* indexOf/lastIndexOf can have 1 or 2 arguments (not counting receiver) */
