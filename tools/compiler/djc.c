@@ -125,9 +125,28 @@ void print_usage(const char* program_name) {
 }
 
 void print_version(void) {
-    printf("DOS Java Compiler v1.0\n");
-    printf("16-bit PC-DOS Java Compiler\n");
-    printf("Built with Open Watcom v2\n");
+    /* Extract year from __DATE__ macro (format: "Mmm dd yyyy") */
+    const char* date_str = __DATE__;
+    int year = 0;
+    int i;
+    
+    /* Find the year (last 4 characters of __DATE__) */
+    for (i = 0; date_str[i] != '\0'; i++) {
+        if (date_str[i] >= '0' && date_str[i] <= '9' &&
+            date_str[i+1] >= '0' && date_str[i+1] <= '9' &&
+            date_str[i+2] >= '0' && date_str[i+2] <= '9' &&
+            date_str[i+3] >= '0' && date_str[i+3] <= '9') {
+            year = (date_str[i] - '0') * 1000 +
+                   (date_str[i+1] - '0') * 100 +
+                   (date_str[i+2] - '0') * 10 +
+                   (date_str[i+3] - '0');
+            break;
+        }
+    }
+    
+    /* Print version information */
+    printf("djc(DOS Java Compiler) by K.Kimura(dotnsf@gmail.com) (C)opyright 2026-%d\n", year);
+    printf("Version: %s\n", __DATE__);
 }
 
 void print_statistics(const CompilerContext* ctx) {
@@ -516,8 +535,6 @@ int main(int argc, char* argv[]) {
     
     /* Cleanup */
     compiler_cleanup(&ctx);
-    
     return result;
 }
-
 
