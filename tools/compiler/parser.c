@@ -1742,6 +1742,18 @@ uint16_t parse_primary(Parser* parser) {
         }
     }
     
+    /* this keyword */
+    if (parser_match(parser, TOK_THIS)) {
+        node = parser_alloc_node(parser, NODE_THIS);
+        if (node == 0) {
+            return 0;
+        }
+        
+        parser_next_token(parser);
+        
+        return node;
+    }
+    
     /* Identifier */
     if (parser_match(parser, TOK_IDENTIFIER)) {
         node = parser_alloc_node(parser, NODE_IDENTIFIER);

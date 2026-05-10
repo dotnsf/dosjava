@@ -1809,10 +1809,11 @@ int interpreter_step(ExecutionContext* ctx) {
             }
             
             /* For Phase 1, allocate a simple object handle
-             * Object handle is just a unique ID (using class_name_idx as base)
+             * Object handle is just a unique ID
+             * Use class_name_idx + 1 to avoid handle=0 (which looks like null)
              * In a full implementation, this would allocate actual object memory
              */
-            object_handle = class_name_idx;  /* Simple handle for now */
+            object_handle = class_name_idx + 1;  /* +1 to avoid 0 (null-like value) */
             
             /* Push object handle onto stack */
             if (stack_push_shared(ctx, object_handle) != 0) {
@@ -1833,6 +1834,7 @@ int interpreter_step(ExecutionContext* ctx) {
             uint16_t object_handle;
             const char* field_name;
             uint16_t field_value;
+            uint16_t storage_index;
             
             /* Read field name index */
             field_name_idx = interpreter_read_u16(ctx);
@@ -1851,18 +1853,16 @@ int interpreter_step(ExecutionContext* ctx) {
              * Store fields in shared_locals using object_handle and field_name_idx
              * This is a simplified implementation for testing
              */
-            {
-                uint16_t storage_index;
-                /* Combine object_handle and field_name_idx to create unique storage location */
-                storage_index = (object_handle * 10 + field_name_idx) % (SHARED_LOCALS_SIZE - 100);
-                
-                if (storage_index >= SHARED_LOCALS_SIZE) {
-                    printf("ERROR: Invalid storage index for field access: %u\n", storage_index);
-                    return -1;
-                }
-                
-                field_value = ctx->shared_locals[storage_index];
+            /* Combine object_handle and field_name_idx to create unique storage location */
+            storage_index = (object_handle * 10 + field_name_idx) % (SHARED_LOCALS_SIZE - 100);
+            
+            if (storage_index >= SHARED_LOCALS_SIZE) {
+                printf("ERROR: Invalid storage index for field access: %u\n", storage_index);
+                return -1;
             }
+            
+            field_value = ctx->shared_locals[storage_index];
+            
             
             /* Push field value onto stack */
             if (stack_push_shared(ctx, field_value) != 0) {
@@ -1883,16 +1883,21 @@ int interpreter_step(ExecutionContext* ctx) {
             uint16_t field_value;
             uint16_t object_handle;
             const char* field_name;
+            uint16_t storage_index;
             
             /* Read field name index */
             field_name_idx = interpreter_read_u16(ctx);
             
+            
             /* Pop value and object reference from stack
-             * Stack order: ... object_ref value (top)
-             * So pop value first, then object_ref
+             * Codegen generates: object_ref, OP_DUP, value
+             * Stack order: ... object_ref object_ref value (top)
+             * We pop value, then one object_ref, leaving one object_ref as result
              */
             field_value = stack_pop_shared(ctx);
             object_handle = stack_pop_shared(ctx);
+            
+            /* Note: One object_ref remains on stack as assignment result */
             
             /* Get field name from constant pool */
             field_name = djc_get_utf8(ctx->djc_file, field_name_idx);
@@ -1902,18 +1907,16 @@ int interpreter_step(ExecutionContext* ctx) {
             }
             
             /* For Phase 1, use simple field storage */
-            {
-                uint16_t storage_index;
-                /* Combine object_handle and field_name_idx to create unique storage location */
-                storage_index = (object_handle * 10 + field_name_idx) % (SHARED_LOCALS_SIZE - 100);
-                
-                if (storage_index >= SHARED_LOCALS_SIZE) {
-                    printf("ERROR: Invalid storage index for field access: %u\n", storage_index);
-                    return -1;
-                }
-                
-                ctx->shared_locals[storage_index] = field_value;
+            /* Combine object_handle and field_name_idx to create unique storage location */
+            storage_index = (object_handle * 10 + field_name_idx) % (SHARED_LOCALS_SIZE - 100);
+            
+            if (storage_index >= SHARED_LOCALS_SIZE) {
+                printf("ERROR: Invalid storage index for field access: %u\n", storage_index);
+                return -1;
             }
+            
+            ctx->shared_locals[storage_index] = field_value;
+            
             
             if (g_debug_mode) {
                 printf("DEBUG: OP_PUT_FIELD '%s' to object %u = %u\n",
@@ -2025,7 +2028,8 @@ int interpreter_step(ExecutionContext* ctx) {
                 /* Pop arguments in reverse order (last arg first) */
                 for (arg_index = 0; arg_index < total_args; arg_index++) {
                     uint16_t arg_value = stack_pop_shared(ctx);
-                    ctx->shared_locals[frame->local_base + total_args - arg_index - 1] = arg_value;
+                    uint8_t local_idx = total_args - arg_index - 1;
+                    ctx->shared_locals[frame->local_base + local_idx] = arg_value;
                 }
             }
             

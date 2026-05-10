@@ -1193,6 +1193,24 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             result_type->class_name = semantic_add_string(analyzer, "String");
             return 0;
         
+        case NODE_THIS: {
+            /* 'this' keyword - only valid in instance methods (explicit this support) */
+            if (!analyzer->current_method || analyzer->current_method->data.method_data.is_static) {
+                semantic_error_node(analyzer, expr_node, "'this' cannot be used in static context");
+                return -1;
+            }
+            
+            /* Return the type of the current class */
+            if (!analyzer->current_class) {
+                semantic_error_node(analyzer, expr_node, "'this' used outside of class context");
+                return -1;
+            }
+            
+            result_type->kind = TYPE_CLASS;
+            result_type->class_name = analyzer->current_class->name_offset;
+            return 0;
+        }
+        
         case NODE_IDENTIFIER:
             return check_identifier(analyzer, expr_node, result_type);
         

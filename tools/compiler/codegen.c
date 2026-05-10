@@ -483,11 +483,14 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
                 codegen->methods[method_idx].code_offset = code_start;
                 codegen->methods[method_idx].code_length = code_length;
                 codegen->methods[method_idx].max_stack = codegen->context->max_stack;
-                codegen->methods[method_idx].max_locals =
-                    (uint8_t)((codegen->current_method->data.method_data.param_count >
-                               codegen->context->max_locals)
-                                  ? codegen->current_method->data.method_data.param_count
-                                  : codegen->context->max_locals);
+                {
+                    uint8_t base_locals = (uint8_t)((codegen->current_method->data.method_data.param_count >
+                                                     codegen->context->max_locals)
+                                                        ? codegen->current_method->data.method_data.param_count
+                                                        : codegen->context->max_locals);
+                    /* For instance methods, add 1 for 'this' parameter */
+                    codegen->methods[method_idx].max_locals = is_static ? base_locals : (base_locals + 1);
+                }
                 codegen->methods[method_idx].flags =
                     (is_static ? METHOD_STATIC : 0) |
                     (is_public ? METHOD_PUBLIC : 0);
@@ -505,11 +508,14 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
             codegen->methods[codegen->method_count].code_offset = code_start;
             codegen->methods[codegen->method_count].code_length = code_length;
             codegen->methods[codegen->method_count].max_stack = codegen->context->max_stack;
-            codegen->methods[codegen->method_count].max_locals =
-                (uint8_t)((codegen->current_method->data.method_data.param_count >
-                           codegen->context->max_locals)
-                              ? codegen->current_method->data.method_data.param_count
-                              : codegen->context->max_locals);
+            {
+                uint8_t base_locals = (uint8_t)((codegen->current_method->data.method_data.param_count >
+                                                 codegen->context->max_locals)
+                                                    ? codegen->current_method->data.method_data.param_count
+                                                    : codegen->context->max_locals);
+                /* For instance methods, add 1 for 'this' parameter */
+                codegen->methods[codegen->method_count].max_locals = is_static ? base_locals : (base_locals + 1);
+            }
             codegen->methods[codegen->method_count].flags =
                 (is_static ? METHOD_STATIC : 0) |
                 (is_public ? METHOD_PUBLIC : 0);
@@ -960,6 +966,12 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             update_stack(codegen, 1);
             return 0;
         }
+        
+        case NODE_THIS:
+            /* 'this' keyword - load local variable 0 (this reference) */
+            emit_opcode(codegen, OP_LOAD_0);  /* Optimized: load local[0] */
+            update_stack(codegen, 1);
+            return 0;
         
         case NODE_IDENTIFIER:
             return generate_identifier(codegen, expr_node);
@@ -2665,6 +2677,10 @@ uint16_t get_local_index(CodeGenerator* codegen, const char* name) {
     /* Get index based on symbol kind */
     if (best_sym->kind == SYM_PARAM) {
         result = best_sym->data.param_data.index;
+        /* For instance methods, add 1 for 'this' parameter at local[0] */
+        if (codegen->current_method && !codegen->current_method->data.method_data.is_static) {
+            result++;
+        }
         return result;
     } else if (best_sym->kind == SYM_LOCAL) {
         /* Local variables come after parameters */
