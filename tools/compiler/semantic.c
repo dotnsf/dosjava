@@ -1212,20 +1212,54 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             return check_call(analyzer, expr_node, result_type);
         
         case NODE_NEW: {
-            ASTNode* size_node;
-            TypeInfo size_type;
+            uint16_t class_name_value;
+            const char* class_name;
+            Symbol* class_sym;
             
-            size_node = semantic_get_node(analyzer, next_sibling_idx);
-            if (!size_node || check_expression(analyzer, size_node, &size_type) != 0) {
+            /* Save class_name value before any semantic_get_node calls */
+            class_name_value = expr_node->data.new_expr.class_name;
+            
+            /* Initialize to avoid warnings */
+            class_name = NULL;
+            class_sym = NULL;
+            
+            /* Check if it's an array (class_name is TYPE_INT or TYPE_BOOLEAN) */
+            if (class_name_value == TYPE_INT || class_name_value == TYPE_BOOLEAN) {
+                /* Array creation: new int[size] or new boolean[size] */
+                ASTNode* size_node;
+                TypeInfo size_type;
+                
+                size_node = semantic_get_node(analyzer, next_sibling_idx);
+                if (!size_node || check_expression(analyzer, size_node, &size_type) != 0) {
+                    return -1;
+                }
+                if (!is_numeric_type(size_type)) {
+                    semantic_error_node(analyzer, expr_node, "Array size must be integer");
+                    return -1;
+                }
+                
+                result_type->kind = TYPE_ARRAY;
+                result_type->class_name = 0;
+                return 0;
+            }
+            
+            /* Object creation: new ClassName() */
+            class_name = semantic_get_string(analyzer, class_name_value);
+            if (!class_name) {
+                semantic_error_node(analyzer, expr_node, "Invalid class name in new expression");
                 return -1;
             }
-            if (!is_numeric_type(size_type)) {
-                semantic_error_node(analyzer, expr_node, "Array size must be integer");
+            
+            /* Lookup class symbol */
+            class_sym = symtable_lookup(analyzer->symtable, class_name);
+            if (!class_sym || class_sym->kind != SYM_CLASS) {
+                semantic_error_node(analyzer, expr_node, "Undefined class in new expression");
                 return -1;
             }
             
-            result_type->kind = TYPE_ARRAY;
-            result_type->class_name = 0;
+            /* Return class type */
+            result_type->kind = TYPE_CLASS;
+            result_type->class_name = class_name_value;
             return 0;
         }
         
@@ -1267,8 +1301,12 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             ASTNode* object_node;
             TypeInfo object_type;
             const char* field_name;
+            const char* class_name;
+            Symbol* class_sym;
+            Symbol* field_sym;
             uint16_t object_idx;
             uint16_t field_name_off;
+            uint16_t i;
             
             object_idx = expr_node->data.field_access.object;
             field_name_off = expr_node->data.field_access.field_name;
@@ -1279,13 +1317,63 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             }
             
             field_name = semantic_get_string(analyzer, field_name_off);
-            if (object_type.kind == TYPE_ARRAY && field_name && strcmp(field_name, "length") == 0) {
+            if (!field_name) {
+                semantic_error_node(analyzer, expr_node, "Invalid field name");
+                return -1;
+            }
+            
+            /* Array.length special case */
+            if (object_type.kind == TYPE_ARRAY && strcmp(field_name, "length") == 0) {
                 result_type->kind = TYPE_INT;
                 result_type->class_name = 0;
                 return 0;
             }
             
-            semantic_error_node(analyzer, expr_node, "Unsupported field access");
+            /* Object field access */
+            if (object_type.kind == TYPE_CLASS) {
+                class_name = semantic_get_string(analyzer, object_type.class_name);
+                if (!class_name) {
+                    class_name = symtable_get_string(analyzer->symtable, object_type.class_name);
+                }
+                if (!class_name) {
+                    semantic_error_node(analyzer, expr_node, "Invalid class name in field access");
+                    return -1;
+                }
+                
+                /* Lookup class symbol */
+                class_sym = symtable_lookup(analyzer->symtable, class_name);
+                if (!class_sym || class_sym->kind != SYM_CLASS) {
+                    semantic_error_node(analyzer, expr_node, "Undefined class in field access");
+                    return -1;
+                }
+                
+                /* Find field in class scope */
+                field_sym = NULL;
+                for (i = 0; i < analyzer->symtable->symbol_count; i++) {
+                    Symbol* sym = &analyzer->symtable->symbols[i];
+                    const char* sym_name;
+                    
+                    if (sym->kind != SYM_FIELD) {
+                        continue;
+                    }
+                    
+                    sym_name = symtable_get_string(analyzer->symtable, sym->name_offset);
+                    if (sym_name && strcmp(sym_name, field_name) == 0) {
+                        field_sym = sym;
+                        break;
+                    }
+                }
+                
+                if (!field_sym) {
+                    semantic_error_node(analyzer, expr_node, "Undefined field");
+                    return -1;
+                }
+                
+                *result_type = field_sym->type;
+                return 0;
+            }
+            
+            semantic_error_node(analyzer, expr_node, "Field access requires object or array");
             return -1;
         }
         
@@ -1736,11 +1824,128 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         }
     }
     
+    /* General instance method call: object.method(...) */
     if (object_idx != 0) {
-        semantic_error_node(analyzer, call_node, "Instance method calls are not supported");
-        return -1;
+        TypeInfo object_type;
+        const char* class_name;
+        Symbol* class_sym;
+        Symbol* method_sym = NULL;
+        uint16_t checked_args;
+        uint16_t current_arg_idx;
+        uint16_t param_index;
+        uint16_t i;
+        int method_symbol_index = -1;
+        
+        /* Check object expression */
+        object_node = semantic_get_node(analyzer, object_idx);
+        if (!object_node || check_expression(analyzer, object_node, &object_type) != 0) {
+            return -1;
+        }
+        
+        /* Object must be of class type */
+        if (object_type.kind != TYPE_CLASS) {
+            semantic_error_node(analyzer, call_node, "Method call requires object");
+            return -1;
+        }
+        
+        /* Get class name */
+        class_name = semantic_get_string(analyzer, object_type.class_name);
+        if (!class_name) {
+            class_name = symtable_get_string(analyzer->symtable, object_type.class_name);
+        }
+        if (!class_name) {
+            semantic_error_node(analyzer, call_node, "Invalid class name in method call");
+            return -1;
+        }
+        
+        /* Lookup class symbol */
+        class_sym = symtable_lookup(analyzer->symtable, class_name);
+        if (!class_sym || class_sym->kind != SYM_CLASS) {
+            semantic_error_node(analyzer, call_node, "Undefined class in method call");
+            return -1;
+        }
+        
+        /* Find method in class scope */
+        for (i = 0; i < analyzer->symtable->symbol_count; i++) {
+            Symbol* sym = &analyzer->symtable->symbols[i];
+            const char* sym_name;
+            
+            if (sym->kind != SYM_METHOD) {
+                continue;
+            }
+            
+            sym_name = symtable_get_string(analyzer->symtable, sym->name_offset);
+            if (sym_name && strcmp(sym_name, method_name) == 0) {
+                method_sym = sym;
+                method_symbol_index = (int)i;
+                break;
+            }
+        }
+        
+        if (!method_sym) {
+            semantic_error_node(analyzer, call_node, "Undefined method");
+            return -1;
+        }
+        
+        /* Check argument count */
+        if (method_sym->data.method_data.param_count != arg_count) {
+            semantic_error_node(analyzer, call_node, "Argument count mismatch in method call");
+            return -1;
+        }
+        
+        /* Check argument types */
+        checked_args = 0;
+        current_arg_idx = first_arg_idx;
+        param_index = 0;
+        
+        while (current_arg_idx != 0 && checked_args < arg_count) {
+            TypeInfo arg_type;
+            Symbol* param_sym = NULL;
+            uint16_t next_arg_idx;
+            
+            arg_node = semantic_get_node(analyzer, current_arg_idx);
+            if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
+                return -1;
+            }
+            
+            /* Find parameter symbol */
+            if (method_symbol_index >= 0) {
+                for (i = (uint16_t)(method_symbol_index + 1); i < analyzer->symtable->symbol_count; i++) {
+                    Symbol* sym = &analyzer->symtable->symbols[i];
+                    if (sym->kind == SYM_METHOD) {
+                        break;
+                    }
+                    if (sym->kind != SYM_PARAM) {
+                        continue;
+                    }
+                    if (sym->data.param_data.index == param_index) {
+                        param_sym = sym;
+                        break;
+                    }
+                }
+            }
+            
+            if (!param_sym) {
+                semantic_error_node(analyzer, call_node, "Internal error: method parameter metadata not found");
+                return -1;
+            }
+            
+            if (!types_compatible(param_sym->type, arg_type)) {
+                semantic_error_node(analyzer, call_node, "Argument type mismatch in method call");
+                return -1;
+            }
+            
+            next_arg_idx = arg_node->next_sibling;
+            current_arg_idx = next_arg_idx;
+            checked_args++;
+            param_index++;
+        }
+        
+        *result_type = method_sym->type;
+        return 0;
     }
     
+    /* Static method call: ClassName.method(...) or method(...) */
     {
         Symbol* method_sym = NULL;
         uint16_t checked_args;

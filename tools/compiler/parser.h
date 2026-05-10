@@ -301,6 +301,14 @@ int parser_next_token(Parser* parser);
 int parser_match(Parser* parser, TokenType type);
 
 /**
+ * Check if lookahead token matches expected type
+ * @param parser Parser state
+ * @param type Expected token type
+ * @return 1 if matches, 0 otherwise
+ */
+int parser_match_lookahead(Parser* parser, TokenType type);
+
+/**
  * Consume current token if it matches expected type
  * @param parser Parser state
  * @param type Expected token type

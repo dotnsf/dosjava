@@ -11,6 +11,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/* Global debug flag (used by interpreter.c) */
+int g_debug_mode = 0;
+
 void test_djc_file(const char* filename) {
     DJCFile* djc_file;
     DJCMethod* main_method;

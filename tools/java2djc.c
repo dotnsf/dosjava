@@ -11,6 +11,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Global debug flag (used by interpreter.c) */
+int g_debug_mode = 0;
+
 /* Java bytecode opcodes (subset we support) */
 #define JAVA_NOP            0x00
 #define JAVA_ICONST_M1      0x02

@@ -20,6 +20,8 @@ static uint16_t parse_if_stmt(Parser* parser);
 static uint16_t parse_while_stmt(Parser* parser);
 static uint16_t parse_return_stmt(Parser* parser);
 static int parser_link_sibling(Parser* parser, uint16_t current_node, uint16_t next_node);
+static uint16_t parse_field_decl(Parser* parser, int is_public, int is_static, TypeInfo field_type, uint16_t name_offset);
+static uint16_t parse_method_body(Parser* parser, int is_public, int is_static, TypeInfo return_type, uint16_t name_offset);
 
 /**
  * Initialize parser
@@ -124,6 +126,13 @@ int parser_match(Parser* parser, TokenType type) {
 }
 
 /**
+ * Check if lookahead token matches type
+ */
+int parser_match_lookahead(Parser* parser, TokenType type) {
+    return ((uint8_t)parser->lookahead.type) == ((uint8_t)type);
+}
+
+/**
  * Consume token if it matches
  */
 int parser_consume(Parser* parser, TokenType type) {
@@ -139,7 +148,7 @@ int parser_consume(Parser* parser, TokenType type) {
  */
 int parser_expect(Parser* parser, TokenType type) {
     if (((uint8_t)parser->current.type) != ((uint8_t)type)) {
-        fprintf(stderr, "Error: Expected %s but got %s at line %d\n",
+        printf("Error: Expected %s but got %s at line %d\n",
                 token_type_name((TokenType)((uint8_t)type)),
                 token_type_name((TokenType)((uint8_t)parser->current.type)),
                 parser->current.line);
@@ -218,7 +227,7 @@ int parser_flush_nodes(Parser* parser) {
     
     written = fwrite(parser->nodes, sizeof(ASTNode), parser->node_count, parser->ast_file);
     if (written != parser->node_count) {
-        fprintf(stderr, "Error: Failed to write AST nodes\n");
+        printf("Error: Failed to write AST nodes\n");
         return -1;
     }
     
@@ -269,7 +278,7 @@ uint16_t parser_parse(Parser* parser) {
     /* Create temporary file for nodes */
     temp_file = tmpfile();
     if (!temp_file) {
-        fprintf(stderr, "Error: Cannot create temporary file\n");
+        printf("Error: Cannot create temporary file\n");
         return 0;
     }
     
@@ -313,7 +322,7 @@ uint16_t parser_parse(Parser* parser) {
     nodes_size = parser->total_nodes * sizeof(ASTNode);
     nodes_buffer = (uint8_t*)malloc(nodes_size);
     if (!nodes_buffer) {
-        fprintf(stderr, "Error: Out of memory\n");
+        printf("Error: Out of memory\n");
         fclose(temp_file);
         parser->ast_file = original_ast_file;
         return 0;
@@ -321,7 +330,7 @@ uint16_t parser_parse(Parser* parser) {
     
     fseek(temp_file, 0, SEEK_SET);
     if (fread(nodes_buffer, 1, nodes_size, temp_file) != nodes_size) {
-        fprintf(stderr, "Error: Failed to read nodes from temp file\n");
+        printf("Error: Failed to read nodes from temp file\n");
         free(nodes_buffer);
         fclose(temp_file);
         parser->ast_file = original_ast_file;
@@ -425,20 +434,21 @@ uint16_t parse_class(Parser* parser) {
 }
 
 /**
- * Parse member declaration (method only for MVP)
- * MemberDecl -> 'public' 'static' 'void' ID '(' ')' Block
+ * Parse member declaration (method or field)
+ * MemberDecl -> Modifiers Type ID ('(' ... ')' Block | ';')
  */
 uint16_t parse_member(Parser* parser) {
     int is_public;
     int is_static;
-    TypeInfo return_type;
+    TypeInfo member_type;
+    uint16_t name_offset;
     
     is_public = 0;
     is_static = 0;
     
-    /* Initialize return_type to void by default */
-    return_type.kind = TYPE_VOID;
-    return_type.class_name = 0;
+    /* Initialize member_type to void by default */
+    member_type.kind = TYPE_VOID;
+    member_type.class_name = 0;
     
     /* Check for 'public' */
     if (parser_consume(parser, TOK_PUBLIC)) {
@@ -450,49 +460,76 @@ uint16_t parse_member(Parser* parser) {
         is_static = 1;
     }
     
-    /* Parse return type (optional - defaults to void)
+    /* Parse type (required for fields, optional for methods)
      * Also accept identifier-based reference types such as String.
-     * Without this, "public static String func2(...)" leaves "String"
-     * unconsumed and parse_method() mistakenly treats it as the method name,
-     * then fails expecting '(' when it sees the real name token.
      */
     if (parser_match(parser, TOK_VOID) || parser_match(parser, TOK_INT) ||
         parser_match(parser, TOK_BOOLEAN) || parser_match(parser, TOK_IDENTIFIER)) {
-        if (parse_type(parser, &return_type) < 0) {
+        if (parse_type(parser, &member_type) < 0) {
             return 0;
         }
     }
     
-    
-    
-    /* For MVP, only support methods */
-    return parse_method(parser, is_public, is_static, return_type);
-}
-
-/**
- * Parse method declaration
- * MethodDecl -> ID '(' ')' Block
- */
-uint16_t parse_method(Parser* parser, int is_public, int is_static, TypeInfo return_type) {
-    uint16_t method_node;
-    uint16_t name_offset;
-    uint16_t body_node;
-    uint16_t first_param;
-    uint16_t param_count;
-    
-    /* Expect method name */
+    /* Expect member name */
     if (!parser_match(parser, TOK_IDENTIFIER)) {
-        parser_error(parser, "Expected method name");
+        parser_error(parser, "Expected member name");
         return 0;
     }
     
     name_offset = parser->current.value.str_offset;
     parser_next_token(parser);
     
-    /* Expect '(' */
-    if (parser_expect(parser, TOK_LPAREN) < 0) {
+    /* Distinguish between field and method by next token */
+    if (parser_match(parser, TOK_LPAREN)) {
+        /* Method: has '(' after name */
+        return parse_method_body(parser, is_public, is_static, member_type, name_offset);
+    }
+    else if (parser_match(parser, TOK_SEMICOLON)) {
+        /* Field: has ';' after name */
+        parser_next_token(parser);  /* consume ';' */
+        return parse_field_decl(parser, is_public, is_static, member_type, name_offset);
+    }
+    else {
+        parser_error(parser, "Expected '(' or ';' after member name");
         return 0;
     }
+}
+
+/**
+ * Parse field declaration
+ * FieldDecl -> Type ID ';'
+ * (Type and ID already consumed by parse_member)
+ */
+uint16_t parse_field_decl(Parser* parser, int is_public, int is_static, TypeInfo field_type, uint16_t name_offset) {
+    uint16_t field_node;
+    
+    /* Allocate field node */
+    field_node = parser_alloc_node(parser, NODE_FIELD);
+    if (field_node == 0) {
+        return 0;
+    }
+    
+    /* Fill field node */
+    parser->nodes[field_node - parser->total_nodes - 1].data.field.name = name_offset;
+    parser->nodes[field_node - parser->total_nodes - 1].data.field.type = field_type;
+    parser->nodes[field_node - parser->total_nodes - 1].data.field.is_static = is_static;
+    parser->nodes[field_node - parser->total_nodes - 1].data.field.is_public = is_public;
+    
+    return field_node;
+}
+
+/**
+ * Parse method body (name and '(' already consumed by parse_member)
+ * MethodBody -> ParamList ')' Block
+ */
+uint16_t parse_method_body(Parser* parser, int is_public, int is_static, TypeInfo return_type, uint16_t name_offset) {
+    uint16_t method_node;
+    uint16_t body_node;
+    uint16_t first_param;
+    uint16_t param_count;
+    
+    /* '(' already consumed by parse_member, parse parameters */
+    parser_next_token(parser);  /* consume '(' */
     
     first_param = parse_param_list(parser, &param_count);
     if (parser->has_error) {
@@ -622,7 +659,6 @@ uint16_t parse_arg_list(Parser* parser, uint16_t* arg_count) {
  */
 int parse_type(Parser* parser, TypeInfo* type) {
     uint16_t base_kind = 0;
-    const char* ident_name;
     
     if (parser_consume(parser, TOK_VOID)) {
         type->kind = TYPE_VOID;
@@ -637,15 +673,10 @@ int parse_type(Parser* parser, TypeInfo* type) {
         base_kind = TYPE_BOOLEAN;
         type->class_name = 0;
     } else if (parser_match(parser, TOK_IDENTIFIER)) {
-        ident_name = parser_get_string(parser, parser->current.value.str_offset);
-        if (ident_name && strcmp(ident_name, "String") == 0) {
-            base_kind = TYPE_CLASS;
-            type->class_name = parser->current.value.str_offset;
-            parser_next_token(parser);
-        } else {
-            parser_error(parser, "Expected type");
-            return -1;
-        }
+        /* Accept any identifier as a class type (String, TestObj1, etc.) */
+        base_kind = TYPE_CLASS;
+        type->class_name = parser->current.value.str_offset;
+        parser_next_token(parser);
     } else {
         parser_error(parser, "Expected type");
         return -1;
@@ -742,15 +773,14 @@ uint16_t parse_statement(Parser* parser) {
     }
     
     /* Variable declaration
-     * Only treat identifier-led statements as declarations when the
-     * identifier is a known type name pattern for Phase 1 (currently String).
-     * This avoids misparsing expression statements like:
-     *   System.out.println(str);
+     * Check if this looks like a type declaration by looking ahead.
+     * If identifier is followed by another identifier, it's likely a variable declaration.
      */
-    if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN) ||
-        (parser_match(parser, TOK_IDENTIFIER) &&
-         parser_get_string(parser, parser->current.value.str_offset) &&
-         strcmp(parser_get_string(parser, parser->current.value.str_offset), "String") == 0)) {
+    if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN)) {
+        return parse_var_decl(parser);
+    }
+    
+    if (parser_match(parser, TOK_IDENTIFIER) && parser_match_lookahead(parser, TOK_IDENTIFIER)) {
         return parse_var_decl(parser);
     }
     
@@ -1643,42 +1673,73 @@ uint16_t parse_primary(Parser* parser) {
         return node;
     }
     
-    /* Array creation */
+    /* Object/Array creation: new ClassName() or new Type[size] */
     if (parser_consume(parser, TOK_NEW)) {
-        uint16_t base_kind;
-        uint16_t size_expr;
-        
-        if (parser_consume(parser, TOK_INT)) {
-            base_kind = TYPE_INT;
-        } else if (parser_consume(parser, TOK_BOOLEAN)) {
-            base_kind = TYPE_BOOLEAN;
-        } else {
-            parser_error(parser, "Expected array element type after new");
+        /* Check if it's an array creation (int[] or boolean[]) */
+        if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN)) {
+            uint16_t base_kind;
+            uint16_t size_expr;
+            
+            if (parser_consume(parser, TOK_INT)) {
+                base_kind = TYPE_INT;
+            } else {
+                base_kind = TYPE_BOOLEAN;
+                parser_next_token(parser);
+            }
+            
+            if (parser_expect(parser, TOK_LBRACKET) < 0) {
+                return 0;
+            }
+            
+            size_expr = parse_expression(parser);
+            if (size_expr == 0) {
+                return 0;
+            }
+            
+            if (parser_expect(parser, TOK_RBRACKET) < 0) {
+                return 0;
+            }
+            
+            node = parser_alloc_node(parser, NODE_NEW);
+            if (node == 0) {
+                return 0;
+            }
+            
+            parser->nodes[node - parser->total_nodes - 1].data.new_expr.class_name = base_kind;
+            parser->nodes[node - parser->total_nodes - 1].next_sibling = size_expr;
+            
+            return node;
+        }
+        /* Object creation: new ClassName() */
+        else if (parser_match(parser, TOK_IDENTIFIER)) {
+            uint16_t class_name_offset;
+            
+            class_name_offset = parser->current.value.str_offset;
+            parser_next_token(parser);
+            
+            /* Expect '()' for now (no constructor arguments yet) */
+            if (parser_expect(parser, TOK_LPAREN) < 0) {
+                return 0;
+            }
+            
+            if (parser_expect(parser, TOK_RPAREN) < 0) {
+                return 0;
+            }
+            
+            node = parser_alloc_node(parser, NODE_NEW);
+            if (node == 0) {
+                return 0;
+            }
+            
+            parser->nodes[node - parser->total_nodes - 1].data.new_expr.class_name = class_name_offset;
+            parser->nodes[node - parser->total_nodes - 1].next_sibling = 0;  /* No size expr for objects */
+            
+            return node;
+        }
+        else {
+            parser_error(parser, "Expected class name or array type after 'new'");
             return 0;
         }
-        
-        if (parser_expect(parser, TOK_LBRACKET) < 0) {
-            return 0;
-        }
-        
-        size_expr = parse_expression(parser);
-        if (size_expr == 0) {
-            return 0;
-        }
-        
-        if (parser_expect(parser, TOK_RBRACKET) < 0) {
-            return 0;
-        }
-        
-        node = parser_alloc_node(parser, NODE_NEW);
-        if (node == 0) {
-            return 0;
-        }
-        
-        parser->nodes[node - parser->total_nodes - 1].data.new_expr.class_name = base_kind;
-        parser->nodes[node - parser->total_nodes - 1].next_sibling = size_expr;
-        
-        return node;
     }
     
     /* Identifier */
@@ -1716,7 +1777,7 @@ uint16_t parse_primary(Parser* parser) {
  * Report parse error
  */
 void parser_error(Parser* parser, const char* message) {
-    fprintf(stderr, "Parse error at line %d, column %d: %s\n",
+    printf("Parse error at line %d, column %d: %s\n",
             parser->current.line, parser->current.column, message);
     parser->has_error = 1;
     parser->error_count++;

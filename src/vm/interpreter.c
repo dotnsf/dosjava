@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Global debug flag (set by djvm.c) */
+/* Global debug flag (set by djvm.c or default to 0) */
+/* Declared in djvm.c */
 extern int g_debug_mode;
 
 /* Global file handle for File I/O operations */
@@ -291,6 +292,12 @@ int interpreter_step(ExecutionContext* ctx) {
     
     /* Fetch opcode */
     opcode = interpreter_read_u8(ctx);
+    
+    /* Debug output for opcode execution */
+    if (g_debug_mode) {
+        printf("DEBUG VM: Executing opcode 0x%02X at PC offset %u\n",
+               opcode, (unsigned)(ctx->pc - ctx->code_start - 1));
+    }
     
     /* Decode and execute */
     switch (opcode) {
@@ -1782,6 +1789,254 @@ int interpreter_step(ExecutionContext* ctx) {
             ctx->code_start = frame->return_code_start;
             ctx->code_length = frame->return_code_length;
             
+            break;
+        }
+        
+        case OP_NEW: {
+            /* Create new object [class_name_idx:2] */
+            uint16_t class_name_idx;
+            uint16_t object_handle;
+            const char* class_name;
+            
+            /* Read class name index from constant pool */
+            class_name_idx = interpreter_read_u16(ctx);
+            
+            /* Get class name from constant pool */
+            class_name = djc_get_utf8(ctx->djc_file, class_name_idx);
+            if (class_name == NULL) {
+                printf("ERROR: Invalid class name index: %u\n", class_name_idx);
+                return -1;
+            }
+            
+            /* For Phase 1, allocate a simple object handle
+             * Object handle is just a unique ID (using class_name_idx as base)
+             * In a full implementation, this would allocate actual object memory
+             */
+            object_handle = class_name_idx;  /* Simple handle for now */
+            
+            /* Push object handle onto stack */
+            if (stack_push_shared(ctx, object_handle) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            
+            if (g_debug_mode) {
+                printf("DEBUG: OP_NEW created object of class '%s' (handle=%u)\n",
+                       class_name, object_handle);
+            }
+            break;
+        }
+        
+        case OP_GET_FIELD: {
+            /* Read instance field [field_name_idx:2] */
+            uint16_t field_name_idx;
+            uint16_t object_handle;
+            const char* field_name;
+            uint16_t field_value;
+            
+            /* Read field name index */
+            field_name_idx = interpreter_read_u16(ctx);
+            
+            /* Pop object reference from stack */
+            object_handle = stack_pop_shared(ctx);
+            
+            /* Get field name from constant pool */
+            field_name = djc_get_utf8(ctx->djc_file, field_name_idx);
+            if (field_name == NULL) {
+                printf("ERROR: Invalid field name index: %u\n", field_name_idx);
+                return -1;
+            }
+            
+            /* For Phase 1, use a simple field storage mechanism
+             * Store fields in shared_locals using object_handle and field_name_idx
+             * This is a simplified implementation for testing
+             */
+            {
+                uint16_t storage_index;
+                /* Combine object_handle and field_name_idx to create unique storage location */
+                storage_index = (object_handle * 10 + field_name_idx) % (SHARED_LOCALS_SIZE - 100);
+                
+                if (storage_index >= SHARED_LOCALS_SIZE) {
+                    printf("ERROR: Invalid storage index for field access: %u\n", storage_index);
+                    return -1;
+                }
+                
+                field_value = ctx->shared_locals[storage_index];
+            }
+            
+            /* Push field value onto stack */
+            if (stack_push_shared(ctx, field_value) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            
+            if (g_debug_mode) {
+                printf("DEBUG: OP_GET_FIELD '%s' from object %u = %u\n",
+                       field_name, object_handle, field_value);
+            }
+            break;
+        }
+        
+        case OP_PUT_FIELD: {
+            /* Write instance field [field_name_idx:2] */
+            uint16_t field_name_idx;
+            uint16_t field_value;
+            uint16_t object_handle;
+            const char* field_name;
+            
+            /* Read field name index */
+            field_name_idx = interpreter_read_u16(ctx);
+            
+            /* Pop value and object reference from stack
+             * Stack order: ... object_ref value (top)
+             * So pop value first, then object_ref
+             */
+            field_value = stack_pop_shared(ctx);
+            object_handle = stack_pop_shared(ctx);
+            
+            /* Get field name from constant pool */
+            field_name = djc_get_utf8(ctx->djc_file, field_name_idx);
+            if (field_name == NULL) {
+                printf("ERROR: Invalid field name index: %u\n", field_name_idx);
+                return -1;
+            }
+            
+            /* For Phase 1, use simple field storage */
+            {
+                uint16_t storage_index;
+                /* Combine object_handle and field_name_idx to create unique storage location */
+                storage_index = (object_handle * 10 + field_name_idx) % (SHARED_LOCALS_SIZE - 100);
+                
+                if (storage_index >= SHARED_LOCALS_SIZE) {
+                    printf("ERROR: Invalid storage index for field access: %u\n", storage_index);
+                    return -1;
+                }
+                
+                ctx->shared_locals[storage_index] = field_value;
+            }
+            
+            if (g_debug_mode) {
+                printf("DEBUG: OP_PUT_FIELD '%s' to object %u = %u\n",
+                       field_name, object_handle, field_value);
+            }
+            break;
+        }
+        
+        case OP_INVOKE_VIRTUAL: {
+            /* Virtual method call [method_name_idx:2] */
+            uint16_t method_name_idx;
+            const char* method_name;
+            DJCMethod* method;
+            uint8_t* method_code;
+            CallFrame* frame;
+            uint8_t arg_count;
+            
+            /* Read method name index */
+            method_name_idx = interpreter_read_u16(ctx);
+            
+            /* Get method name from constant pool */
+            method_name = djc_get_utf8(ctx->djc_file, method_name_idx);
+            if (method_name == NULL) {
+                printf("ERROR: Invalid method name index: %u\n", method_name_idx);
+                return -1;
+            }
+            
+            /* Find method by name */
+            method = djc_find_method_by_name(ctx->djc_file, method_name);
+            if (method == NULL) {
+                printf("ERROR: Method not found: %s\n", method_name);
+                return -1;
+            }
+            
+            /* Get parameter count from method descriptor */
+            {
+                const char* descriptor_str;
+                descriptor_str = djc_get_utf8(ctx->djc_file, method->descriptor_index);
+                if (descriptor_str == NULL) {
+                    printf("ERROR: Invalid descriptor index\n");
+                    return -1;
+                }
+                arg_count = descriptor_param_count(descriptor_str);
+                if (arg_count == 0xFF) {
+                    printf("ERROR: Invalid method descriptor: %s\n", descriptor_str);
+                    return -1;
+                }
+            }
+            
+            /* Check call depth */
+            if (ctx->call_depth >= MAX_CALL_DEPTH) {
+                printf("ERROR: Call stack overflow (max depth: %d)\n", MAX_CALL_DEPTH);
+                return -1;
+            }
+            
+            /* Get method code */
+            method_code = djc_get_method_code(ctx->djc_file, method);
+            if (method_code == NULL) {
+                printf("ERROR: Failed to get method code\n");
+                return -1;
+            }
+            
+            /* Check if we have enough space for locals */
+            if (ctx->local_pointer + method->max_locals > SHARED_LOCALS_SIZE) {
+                printf("ERROR: Not enough space for local variables\n");
+                return -1;
+            }
+            
+            /* Save current state to call frame */
+            frame = &ctx->call_frames[ctx->call_depth];
+            frame->return_pc = ctx->pc;
+            frame->return_code_start = ctx->code_start;
+            frame->return_code_length = ctx->code_length;
+            frame->frame_pointer = ctx->stack_pointer;
+            frame->local_base = ctx->local_pointer;
+            frame->local_count = method->max_locals;
+            
+            /* Increment call depth */
+            ctx->call_depth++;
+            
+            /* Set up new frame */
+            ctx->call_frames[ctx->call_depth - 1].local_base = frame->local_base;
+            ctx->call_frames[ctx->call_depth - 1].local_count = frame->local_count;
+            
+            /* Initialize new locals to 0 */
+            if (method->max_locals > 0) {
+                memset(&ctx->shared_locals[frame->local_base], 0,
+                       method->max_locals * sizeof(uint16_t));
+            }
+            
+            /* Allocate space for new method's locals */
+            ctx->local_pointer += method->max_locals;
+            
+            /* Move arguments and object reference from operand stack into callee locals
+             * Stack layout before call: [object, arg1, arg2, ...]
+             * Local layout after call: [this=object, arg1, arg2, ...]
+             */
+            {
+                uint8_t arg_index;
+                uint8_t total_args = arg_count + 1;  /* +1 for 'this' */
+                
+                if (total_args > method->max_locals) {
+                    total_args = method->max_locals;
+                }
+                if (total_args > ctx->stack_pointer) {
+                    total_args = (uint8_t)ctx->stack_pointer;
+                }
+                
+                /* Pop arguments in reverse order (last arg first) */
+                for (arg_index = 0; arg_index < total_args; arg_index++) {
+                    uint16_t arg_value = stack_pop_shared(ctx);
+                    ctx->shared_locals[frame->local_base + total_args - arg_index - 1] = arg_value;
+                }
+            }
+            
+            /* Set PC to method code */
+            ctx->pc = method_code;
+            ctx->code_start = method_code;
+            ctx->code_length = method->code_length;
+            
+            if (g_debug_mode) {
+                printf("DEBUG: OP_INVOKE_VIRTUAL '%s' (args=%u)\n", method_name, arg_count);
+            }
             break;
         }
         

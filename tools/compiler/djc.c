@@ -160,10 +160,10 @@ void print_statistics(const CompilerContext* ctx) {
 }
 
 void report_error(const CompilerContext* ctx) {
-    fprintf(stderr, "\n");
-    fprintf(stderr, "Compilation failed\n");
+    printf("\n");
+    printf("Compilation failed\n");
     if (ctx->error_message[0] != '\0') {
-        fprintf(stderr, "Error: %s\n", ctx->error_message);
+        printf("Error: %s\n", ctx->error_message);
     }
 }
 
@@ -188,7 +188,7 @@ int parse_arguments(int argc, char* argv[], CompilerContext* ctx) {
             if (strcmp(argv[i], "-o") == 0) {
                 /* Output file */
                 if (i + 1 >= argc) {
-                    fprintf(stderr, "Error: -o requires an argument\n");
+                    printf("Error: -o requires an argument\n");
                     return EXIT_ERROR;
                 }
                 strncpy(ctx->output_file, argv[++i], MAX_PATH_LEN - 1);
@@ -211,14 +211,14 @@ int parse_arguments(int argc, char* argv[], CompilerContext* ctx) {
                 return EXIT_USAGE;
             }
             else {
-                fprintf(stderr, "Error: Unknown option: %s\n", argv[i]);
+                printf("Error: Unknown option: %s\n", argv[i]);
                 return EXIT_ERROR;
             }
         }
         else {
             /* Input file */
             if (has_input) {
-                fprintf(stderr, "Error: Multiple input files not supported\n");
+                printf("Error: Multiple input files not supported\n");
                 return EXIT_ERROR;
             }
             strncpy(ctx->source_file, argv[i], MAX_PATH_LEN - 1);
@@ -229,14 +229,14 @@ int parse_arguments(int argc, char* argv[], CompilerContext* ctx) {
     
     /* Check if input file was provided */
     if (!has_input) {
-        fprintf(stderr, "Error: No input file specified\n");
+        printf("Error: No input file specified\n");
         print_usage(argv[0]);
         return EXIT_USAGE;
     }
     
     /* Check if input file exists */
     if (!check_file_exists(ctx->source_file)) {
-        fprintf(stderr, "Error: Input file not found: %s\n", ctx->source_file);
+        printf("Error: Input file not found: %s\n", ctx->source_file);
         return EXIT_ERROR;
     }
     

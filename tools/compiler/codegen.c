@@ -103,6 +103,8 @@ void codegen_cleanup(CodeGenerator* codegen) {
     }
     
     if (codegen->output_file) {
+        /* Ensure all data is flushed before closing */
+        fflush(codegen->output_file);
         fclose(codegen->output_file);
     }
     
@@ -300,9 +302,7 @@ int generate_class(CodeGenerator* codegen, ASTNode* class_node) {
     
     
     /* Add class name to constant pool */
-    {
-        uint16_t class_idx = add_utf8_constant(codegen, class_name);
-    }
+    add_utf8_constant(codegen, class_name);
     
     /* Get class symbol */
     codegen->current_class = symtable_lookup(codegen->symtable, class_name);
@@ -980,19 +980,54 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             return generate_method_call(codegen, expr_node);
         
         case NODE_NEW: {
-            ASTNode* size_node;
-            uint16_t size_idx = expr_node->next_sibling;
-            uint8_t elem_type = (uint8_t)expr_node->data.new_expr.class_name;
+            uint16_t class_name_value;
+            uint16_t size_idx;
             
-            size_node = codegen_get_node(codegen, size_idx);
-            if (!size_node) {
-                codegen_error(codegen, "Invalid array size expression");
-                return -1;
+            /* Save class_name value before any codegen_get_node calls */
+            class_name_value = expr_node->data.new_expr.class_name;
+            size_idx = expr_node->next_sibling;
+            
+            /* Check if it's an array (class_name is TYPE_INT or TYPE_BOOLEAN) */
+            if (class_name_value == TYPE_INT || class_name_value == TYPE_BOOLEAN) {
+                /* Array creation: new int[size] or new boolean[size] */
+                ASTNode* size_node;
+                uint8_t elem_type = (uint8_t)class_name_value;
+                
+                size_node = codegen_get_node(codegen, size_idx);
+                if (!size_node) {
+                    codegen_error(codegen, "Invalid array size expression");
+                    return -1;
+                }
+                generate_expression(codegen, size_node);
+                emit_opcode(codegen, OP_NEW_ARRAY);
+                emit_u1(codegen, elem_type);
+                return 0;
             }
-            generate_expression(codegen, size_node);
-            emit_opcode(codegen, OP_NEW_ARRAY);
-            emit_u1(codegen, elem_type);
-            return 0;
+            
+            /* Object creation: new ClassName() */
+            {
+                const char* class_name;
+                uint16_t class_idx;
+                
+                class_name = codegen_get_string(codegen, class_name_value);
+                if (!class_name) {
+                    codegen_error(codegen, "Invalid class name in new expression");
+                    return -1;
+                }
+                
+                /* Add class name to constant pool */
+                class_idx = find_or_add_utf8(codegen, class_name);
+                if (class_idx == 0xFFFF) {
+                    codegen_error(codegen, "Failed to add class constant");
+                    return -1;
+                }
+                
+                /* Emit OP_NEW with class index */
+                emit_opcode(codegen, OP_NEW);
+                emit_u2(codegen, class_idx);
+                update_stack(codegen, 1);
+                return 0;
+            }
         }
         
         case NODE_ARRAY_ACCESS: {
@@ -1024,6 +1059,9 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             ASTNode* object_node;
             uint16_t field_name_off = expr_node->data.field_access.field_name;
             uint16_t object_idx = expr_node->data.field_access.object;
+            uint16_t field_idx;
+            Symbol* field_sym;
+            uint16_t i;
             
             field_name = codegen_get_string(codegen, field_name_off);
             if (!field_name) {
@@ -1037,13 +1075,51 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
                 return -1;
             }
             
+            /* Array.length special case */
             if (strcmp(field_name, "length") == 0) {
                 generate_expression(codegen, object_node);
                 emit_opcode(codegen, OP_ARRAY_LENGTH);
                 return 0;
             }
-            codegen_error(codegen, "Unsupported field access");
-            return -1;
+            
+            /* Object field access */
+            /* Generate object reference */
+            generate_expression(codegen, object_node);
+            
+            /* Find field symbol */
+            field_sym = NULL;
+            for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                Symbol* sym = &codegen->symtable->symbols[i];
+                const char* sym_name;
+                
+                if (sym->kind != SYM_FIELD) {
+                    continue;
+                }
+                
+                sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                if (sym_name && strcmp(sym_name, field_name) == 0) {
+                    field_sym = sym;
+                    break;
+                }
+            }
+            
+            if (!field_sym) {
+                codegen_error(codegen, "Undefined field in code generation");
+                return -1;
+            }
+            
+            /* Add field name to constant pool */
+            field_idx = find_or_add_utf8(codegen, field_name);
+            if (field_idx == 0xFFFF) {
+                codegen_error(codegen, "Failed to add field constant");
+                return -1;
+            }
+            
+            /* Emit OP_GET_FIELD */
+            emit_opcode(codegen, OP_GET_FIELD);
+            emit_u2(codegen, field_idx);
+            /* Stack: object -> value (no change in depth) */
+            return 0;
         }
         
         default:
@@ -1433,6 +1509,65 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     } else if (target_type == NODE_ARRAY_ACCESS) {
         array_idx = target_node->data.array_access.array;
         index_idx = target_node->data.array_access.index;
+    } else if (target_type == NODE_FIELD_ACCESS) {
+        /* Save field access info */
+        uint16_t field_name_off = target_node->data.field_access.field_name;
+        uint16_t object_idx = target_node->data.field_access.object;
+        
+        /* Handle field assignment: object.field = value */
+        if (assign_op == 0) {
+            /* Simple assignment */
+            ASTNode* object_node;
+            const char* field_name;
+            uint16_t field_idx;
+            
+            /* Generate object reference */
+            object_node = codegen_get_node(codegen, object_idx);
+            if (!object_node) {
+                codegen_error(codegen, "Invalid field assignment target");
+                return -1;
+            }
+            generate_expression(codegen, object_node);
+            
+            /* Duplicate object reference for OP_PUT_FIELD */
+            emit_opcode(codegen, OP_DUP);
+            update_stack(codegen, 1);
+            
+            /* Generate value */
+            value_node = codegen_get_node(codegen, value_index);
+            if (!value_node) {
+                codegen_error(codegen, "Invalid field assignment value");
+                return -1;
+            }
+            generate_expression(codegen, value_node);
+            
+            /* Get field name */
+            field_name = codegen_get_string(codegen, field_name_off);
+            if (!field_name) {
+                codegen_error(codegen, "Invalid field name");
+                return -1;
+            }
+            
+            /* Add field name to constant pool */
+            field_idx = find_or_add_utf8(codegen, field_name);
+            if (field_idx == 0xFFFF) {
+                codegen_error(codegen, "Failed to add field constant");
+                return -1;
+            }
+            
+            /* Stack: [object_ref, object_ref, value]
+             * OP_PUT_FIELD pops value and object_ref
+             * Leaves one object_ref on stack as assignment result
+             */
+            emit_opcode(codegen, OP_PUT_FIELD);
+            emit_u2(codegen, field_idx);
+            update_stack(codegen, -2); /* object and value consumed */
+            
+            return 0;
+        } else {
+            codegen_error(codegen, "Compound assignment to fields not yet supported");
+            return -1;
+        }
     }
     
     value_node = codegen_get_node(codegen, value_index);
@@ -1500,6 +1635,67 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     }
     
     local_idx = get_local_index(codegen, var_name);
+    
+    /* If not a local variable, check if it's a field */
+    if (local_idx == 0xFFFF) {
+        Symbol* field_sym = NULL;
+        uint16_t j;
+        
+        for (j = 0; j < codegen->symtable->symbol_count; j++) {
+            Symbol* sym = &codegen->symtable->symbols[j];
+            if (sym->kind == SYM_FIELD) {
+                const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                if (sym_name && strcmp(sym_name, var_name) == 0) {
+                    field_sym = sym;
+                    break;
+                }
+            }
+        }
+        
+        if (field_sym) {
+            /* It's a field - generate implicit 'this.field = value' */
+            if (assign_op == 0) {
+                uint16_t field_idx;
+                
+                /* Load 'this' (always at local index 0 in instance methods) */
+                emit_opcode(codegen, OP_LOAD_0);
+                update_stack(codegen, 1);
+                
+                /* Duplicate 'this' for OP_PUT_FIELD */
+                emit_opcode(codegen, OP_DUP);
+                update_stack(codegen, 1);
+                
+                /* Generate value */
+                if (generate_expression(codegen, &value_expr_copy) != 0) {
+                    return -1;
+                }
+                
+                /* Add field name to constant pool */
+                field_idx = find_or_add_utf8(codegen, var_name);
+                if (field_idx == 0xFFFF) {
+                    codegen_error(codegen, "Failed to add field constant");
+                    return -1;
+                }
+                
+                /* Stack: [this, this, value]
+                 * OP_PUT_FIELD pops value and this
+                 * Leaves one this on stack as assignment result
+                 */
+                emit_opcode(codegen, OP_PUT_FIELD);
+                emit_u2(codegen, field_idx);
+                update_stack(codegen, -2);
+                
+                return 0;
+            } else {
+                codegen_error(codegen, "Compound assignment to fields not yet supported");
+                return -1;
+            }
+        }
+        
+        /* Neither local nor field */
+        codegen_error(codegen, "Undefined variable");
+        return -1;
+    }
     
     if (assign_op == 0) {
         if (generate_expression(codegen, &value_expr_copy) != 0) {
@@ -1761,6 +1957,19 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     arg_count = 0;
+    
+    /* For instance method calls (non-native), push object reference first */
+    if (object_idx != 0 && !is_native) {
+        ASTNode* obj_node = codegen_get_node(codegen, object_idx);
+        if (!obj_node) {
+            codegen_error(codegen, "Invalid object in method call");
+            return -1;
+        }
+        if (generate_expression(codegen, obj_node) != 0) {
+            return -1;
+        }
+    }
+    
     if (is_string_length || is_string_caseconv || is_string_compare || is_string_equals || is_string_compareto || is_string_indexof || is_string_lastindexof || is_string_substr) {
         ASTNode* recv_node = codegen_get_node(codegen, object_idx);
         if (!recv_node) {
@@ -1813,12 +2022,12 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     invoke_arg_count = arg_count;
-    
     method_idx = find_method_index(codegen, method_name, is_native);
     if (method_idx == 0xFFFF) {
         codegen_error(codegen, "Failed to add method reference");
         return -1;
     }
+    
     
     if (is_native) {
         uint16_t desc_idx;
@@ -1893,13 +2102,30 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         }
     }
     
-    emit_opcode(codegen, OP_INVOKE_STATIC);
-    emit_u2(codegen, method_idx);
-    emit_u1(codegen, (uint8_t)invoke_arg_count);
-    
-    update_stack(codegen, -(int16_t)invoke_arg_count);
-    if (returns_value) {
-        update_stack(codegen, 1);
+    /* Check if this is an instance method call (non-native, non-special) */
+    if (object_idx != 0 && !is_native) {
+        /* Instance method call: object.method(...) */
+        /* Object reference was already pushed before arguments */
+        
+        /* Emit OP_INVOKE_VIRTUAL with method name index (not method table index) */
+        emit_opcode(codegen, OP_INVOKE_VIRTUAL);
+        emit_u2(codegen, codegen->methods[method_idx].name_index);
+        
+        /* Stack: object + args consumed, result pushed if non-void */
+        update_stack(codegen, -(int16_t)(invoke_arg_count + 1));
+        if (returns_value) {
+            update_stack(codegen, 1);
+        }
+    } else {
+        /* Static method call or native method */
+        emit_opcode(codegen, OP_INVOKE_STATIC);
+        emit_u2(codegen, method_idx);
+        emit_u1(codegen, (uint8_t)invoke_arg_count);
+        
+        update_stack(codegen, -(int16_t)invoke_arg_count);
+        if (returns_value) {
+            update_stack(codegen, 1);
+        }
     }
     
     return 0;
@@ -1909,6 +2135,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
 int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
     const char* var_name;
     uint16_t local_idx;
+    Symbol* field_sym;
+    uint16_t i;
     
     if (!codegen || !id_node) {
         return -1;
@@ -1920,19 +2148,59 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
         return -1;
     }
     
-    /* Get local index */
+    /* Try to get local variable index */
     local_idx = get_local_index(codegen, var_name);
     
-    /* Load from local variable */
-    if (local_idx <= 2) {
-        emit_opcode(codegen, OP_LOAD_0 + local_idx);
-    } else {
-        emit_opcode(codegen, OP_LOAD_LOCAL);
-        emit_u1(codegen, (uint8_t)local_idx);
+    /* If found as local variable, load it */
+    if (local_idx != 0xFFFF) {
+        if (local_idx <= 2) {
+            emit_opcode(codegen, OP_LOAD_0 + local_idx);
+        } else {
+            emit_opcode(codegen, OP_LOAD_LOCAL);
+            emit_u1(codegen, (uint8_t)local_idx);
+        }
+        update_stack(codegen, 1);
+        return 0;
     }
-    update_stack(codegen, 1);
     
-    return 0;
+    /* Not a local variable - check if it's a field in current class */
+    field_sym = NULL;
+    for (i = 0; i < codegen->symtable->symbol_count; i++) {
+        Symbol* sym = &codegen->symtable->symbols[i];
+        if (sym->kind == SYM_FIELD) {
+            const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+            if (sym_name && strcmp(sym_name, var_name) == 0) {
+                field_sym = sym;
+                break;
+            }
+        }
+    }
+    
+    if (field_sym) {
+        /* It's a field - generate implicit 'this.field' access */
+        uint16_t field_idx;
+        
+        /* Load 'this' (always at local index 0 in instance methods) */
+        emit_opcode(codegen, OP_LOAD_0);
+        update_stack(codegen, 1);
+        
+        /* Add field name to constant pool */
+        field_idx = find_or_add_utf8(codegen, var_name);
+        if (field_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add field constant");
+            return -1;
+        }
+        
+        /* Emit OP_GET_FIELD */
+        emit_opcode(codegen, OP_GET_FIELD);
+        emit_u2(codegen, field_idx);
+        /* Stack: this -> value (no change in depth) */
+        return 0;
+    }
+    
+    /* Neither local nor field - error */
+    codegen_error(codegen, "Undefined variable");
+    return -1;
 }
 
 /* Emit opcode */
@@ -1944,6 +2212,10 @@ int emit_opcode(CodeGenerator* codegen, uint8_t opcode) {
     if (codegen->context->code->size >= codegen->context->code->capacity) {
         codegen_error(codegen, "Code size exceeds maximum");
         return -1;
+    }
+    
+    /* Debug: print opcode being emitted */
+    if (opcode == 0x51 || opcode == 0x41) {
     }
     
     codegen->context->code->data[codegen->context->code->size++] = opcode;
@@ -2468,6 +2740,11 @@ int write_djc_file(CodeGenerator* codegen) {
     /* Write method table */
     for (i = 0; i < codegen->method_count; i++) {
         DJCMethod* m = &codegen->methods[i];
+        const char* method_name = NULL;
+        
+        if (m->name_index < codegen->constants->count) {
+            method_name = codegen->constants->constants[m->name_index].data.utf8_data;
+        }
         
         /* Write each field individually to avoid padding issues */
         if (fwrite(&m->name_index, sizeof(uint16_t), 1, codegen->output_file) != 1) return -1;
@@ -2494,6 +2771,11 @@ int write_djc_file(CodeGenerator* codegen) {
         if (fwrite(codegen->bytecode->data, 1, codegen->bytecode->size, codegen->output_file) != codegen->bytecode->size) {
             return -1;
         }
+    }
+    
+    /* Flush output to ensure all data is written */
+    if (fflush(codegen->output_file) != 0) {
+        return -1;
     }
     
     return 0;

@@ -9,6 +9,9 @@
 #include "runtime/string.h"
 #include <stdio.h>
 
+/* Global debug flag (used by interpreter.c) */
+int g_debug_mode = 0;
+
 void test_basic_allocation(void) {
     void* p1;
     void* p2;
