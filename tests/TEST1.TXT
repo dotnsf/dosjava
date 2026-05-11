@@ -1,4 +1,0 @@
-ABC
-123
-DEF
-Hello World!

@@ -1,0 +1,3 @@
+Hello, DOS World!
+This is a test file for FileInputStream.
+Line 3 of the test file.
