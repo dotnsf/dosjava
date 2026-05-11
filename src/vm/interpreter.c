@@ -959,6 +959,12 @@ int interpreter_step(ExecutionContext* ctx) {
                         
                         right_value = stack_pop_shared(ctx);
                         left_value = stack_pop_shared(ctx);
+                        
+                        if (g_debug_mode) {
+                            printf("[DEBUG] concat: left_value=%u, right_value=%u\n", left_value, right_value);
+                            printf("[DEBUG] concat: constant_pool_count=%u\n", ctx->djc_file->header.constant_pool_count);
+                        }
+                        
                         left_str = NULL;
                         right_str = NULL;
                         
@@ -973,9 +979,21 @@ int interpreter_step(ExecutionContext* ctx) {
                             }
                         }
                         
+                        if (g_debug_mode) {
+                            printf("[DEBUG] concat: left_str=%s, right_str=%s\n",
+                                   left_str ? left_str : "NULL",
+                                   right_str ? right_str : "NULL");
+                        }
+                        
                         if (!left_str || !right_str) {
                             printf("ERROR: Invalid string constant index for concat: %d, %d\n",
                                    left_value, right_value);
+                            if (left_value < ctx->djc_file->header.constant_pool_count) {
+                                printf("  left constant tag: %d\n", ctx->djc_file->constants[left_value].tag);
+                            }
+                            if (right_value < ctx->djc_file->header.constant_pool_count) {
+                                printf("  right constant tag: %d\n", ctx->djc_file->constants[right_value].tag);
+                            }
                             return -1;
                         }
                         
@@ -1611,6 +1629,55 @@ int interpreter_step(ExecutionContext* ctx) {
                     if (g_file_handle != NULL) {
                         fclose(g_file_handle);
                         g_file_handle = NULL;
+                    }
+                    break;
+                } else if (strcmp(method_name, "Integer.toString") == 0) {
+                    /* Integer.toString(int) returns String */
+                    int16_t int_value;
+                    char int_buf[8];  /* Enough for 16-bit int (-32768 to 32767) */
+                    uint16_t const_idx;
+                    
+                    if (arg_count != 1) {
+                        printf("ERROR: Integer.toString expects 1 argument, got %u\n", arg_count);
+                        return -1;
+                    }
+                    
+                    /* Pop int value from stack */
+                    int_value = (int16_t)stack_pop_shared(ctx);
+                    
+                    if (g_debug_mode) {
+                        printf("[DEBUG] Integer.toString: converting %d to String\n", int_value);
+                    }
+                    
+                    /* Convert int to string */
+                    sprintf(int_buf, "%d", int_value);
+                    
+                    /* Add to constant pool */
+                    const_idx = ctx->djc_file->header.constant_pool_count;
+                    if (const_idx >= DJC_MAX_CONSTANTS) {
+                        printf("ERROR: Constant pool full during Integer.toString\n");
+                        return -1;
+                    }
+                    
+                    ctx->djc_file->constants[const_idx].tag = CONST_UTF8;
+                    ctx->djc_file->constants[const_idx].length = (uint16_t)strlen(int_buf);
+                    ctx->djc_file->constants[const_idx].data.utf8_data = (char*)memory_alloc(strlen(int_buf) + 1);
+                    if (ctx->djc_file->constants[const_idx].data.utf8_data == NULL) {
+                        printf("ERROR: Out of memory during Integer.toString\n");
+                        return -1;
+                    }
+                    strcpy(ctx->djc_file->constants[const_idx].data.utf8_data, int_buf);
+                    ctx->djc_file->header.constant_pool_count++;
+                    
+                    if (g_debug_mode) {
+                        printf("[DEBUG] Integer.toString: created constant at index %u: \"%s\"\n",
+                               const_idx, int_buf);
+                    }
+                    
+                    /* Push string constant index to stack */
+                    if (stack_push_shared(ctx, const_idx) != 0) {
+                        printf("ERROR: Stack overflow\n");
+                        return -1;
                     }
                     break;
                 }

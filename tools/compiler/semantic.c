@@ -1435,10 +1435,28 @@ int check_binary_op(SemanticAnalyzer* analyzer, ASTNode* binop_node, TypeInfo* r
         return -1;
     }
     
-    if (op == BINOP_ADD && is_string_type(analyzer, left_type) && is_string_type(analyzer, right_type)) {
-        result_type->kind = TYPE_CLASS;
-        result_type->class_name = left_type.class_name;
-        return 0;
+    /* String concatenation: String + String, String + int, int + String */
+    if (op == BINOP_ADD) {
+        /* String + String */
+        if (is_string_type(analyzer, left_type) && is_string_type(analyzer, right_type)) {
+            result_type->kind = TYPE_CLASS;
+            result_type->class_name = left_type.class_name;
+            return 0;
+        }
+        
+        /* String + int */
+        if (is_string_type(analyzer, left_type) && is_numeric_type(right_type)) {
+            result_type->kind = TYPE_CLASS;
+            result_type->class_name = left_type.class_name;
+            return 0;
+        }
+        
+        /* int + String */
+        if (is_numeric_type(left_type) && is_string_type(analyzer, right_type)) {
+            result_type->kind = TYPE_CLASS;
+            result_type->class_name = right_type.class_name;
+            return 0;
+        }
     }
     
     /* Get result type */

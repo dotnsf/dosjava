@@ -1148,6 +1148,10 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
     uint16_t left_index;
     uint16_t right_index;
     int is_string_concat;
+    int left_is_string;
+    int right_is_string;
+    int left_is_int;
+    int right_is_int;
     
     if (!codegen || !binop_node) {
         return -1;
@@ -1210,69 +1214,211 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
     }
     
     is_string_concat = 0;
+    left_is_string = 0;
+    right_is_string = 0;
+    left_is_int = 0;
+    right_is_int = 0;
+    
     if (op == (uint16_t)BINOP_ADD) {
-        ASTNode* test_left;
-        ASTNode* test_right;
+        ASTNode* test_node;
         uint16_t left_type;
         uint16_t right_type;
         
-        test_left = codegen_get_node(codegen, left_index);
-        test_right = codegen_get_node(codegen, right_index);
-        left_type = test_left ? test_left->type : 0xFFFF;
-        right_type = test_right ? test_right->type : 0xFFFF;
+        /* Get left operand type (must save before getting right operand) */
+        test_node = codegen_get_node(codegen, left_index);
+        left_type = test_node ? test_node->type : 0xFFFF;
         
-        if (left_type == NODE_LITERAL_STRING || right_type == NODE_LITERAL_STRING) {
+        /* Get right operand type */
+        test_node = codegen_get_node(codegen, right_index);
+        right_type = test_node ? test_node->type : 0xFFFF;
+        
+        /* Check if left operand is String */
+        if (left_type == NODE_LITERAL_STRING) {
+            left_is_string = 1;
+        } else if (left_type == NODE_BINARY_OP) {
+            /* If left is a binary operation with ADD operator, check if it's String concatenation */
+            test_node = codegen_get_node(codegen, left_index);
+            if (test_node && test_node->data.binary_op.op == BINOP_ADD) {
+                /* Recursively check if this binary op produces a String result */
+                uint16_t left_left_idx = test_node->data.binary_op.left;
+                uint16_t left_right_idx = test_node->data.binary_op.right;
+                ASTNode* left_left_node = codegen_get_node(codegen, left_left_idx);
+                NodeType left_left_type = left_left_node ? left_left_node->type : NODE_PROGRAM;
+                uint16_t left_left_name_idx = (left_left_node && left_left_node->type == NODE_IDENTIFIER) ?
+                                               left_left_node->data.identifier.name : 0;
+                ASTNode* left_right_node = codegen_get_node(codegen, left_right_idx);
+                NodeType left_right_type = left_right_node ? left_right_node->type : NODE_PROGRAM;
+                uint16_t left_right_name_idx = (left_right_node && left_right_node->type == NODE_IDENTIFIER) ?
+                                                left_right_node->data.identifier.name : 0;
+                
+                /* If either operand of the nested binary op is a String literal, result is String */
+                if (left_left_type == NODE_LITERAL_STRING || left_right_type == NODE_LITERAL_STRING) {
+                    left_is_string = 1;
+                }
+                /* Check if either operand is a String variable */
+                else if (left_left_type == NODE_IDENTIFIER || left_right_type == NODE_IDENTIFIER) {
+                    uint16_t i;
+                    if (left_left_type == NODE_IDENTIFIER) {
+                        const char* var_name = codegen_get_string(codegen, left_left_name_idx);
+                        if (var_name) {
+                            for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                                Symbol* sym = &codegen->symtable->symbols[i];
+                                const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                                if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                                    sym_name && strcmp(sym_name, var_name) == 0) {
+                                    if (sym->type.kind == TYPE_CLASS) {
+                                        left_is_string = 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (!left_is_string && left_right_type == NODE_IDENTIFIER) {
+                        const char* var_name = codegen_get_string(codegen, left_right_name_idx);
+                        if (var_name) {
+                            for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                                Symbol* sym = &codegen->symtable->symbols[i];
+                                const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                                if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                                    sym_name && strcmp(sym_name, var_name) == 0) {
+                                    if (sym->type.kind == TYPE_CLASS) {
+                                        left_is_string = 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (left_type == NODE_IDENTIFIER) {
+            /* Get left node again to access identifier data */
+            test_node = codegen_get_node(codegen, left_index);
+            if (test_node) {
+                const char* left_name = codegen_get_string(codegen, test_node->data.identifier.name);
+                if (left_name) {
+                    Symbol* left_sym = NULL;
+                    uint16_t best_scope = 0;
+                    uint16_t i;
+                    for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                        Symbol* sym = &codegen->symtable->symbols[i];
+                        const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                            sym_name && strcmp(sym_name, left_name) == 0) {
+                            if (!left_sym || sym->scope_level >= best_scope) {
+                                left_sym = sym;
+                                best_scope = sym->scope_level;
+                            }
+                        }
+                    }
+                    if (left_sym && left_sym->type.kind == TYPE_CLASS) {
+                        left_is_string = 1;
+                    } else if (left_sym && left_sym->type.kind == TYPE_INT) {
+                        left_is_int = 1;
+                    }
+                }
+            }
+        } else if (left_type == NODE_LITERAL_INT) {
+            left_is_int = 1;
+        }
+        
+        /* Check if right operand is String */
+        if (right_type == NODE_LITERAL_STRING) {
+            right_is_string = 1;
+        } else if (right_type == NODE_BINARY_OP) {
+            /* If right is a binary operation with ADD operator, check if it's String concatenation */
+            test_node = codegen_get_node(codegen, right_index);
+            if (test_node && test_node->data.binary_op.op == BINOP_ADD) {
+                /* Recursively check if this binary op produces a String result */
+                uint16_t right_left_idx = test_node->data.binary_op.left;
+                uint16_t right_right_idx = test_node->data.binary_op.right;
+                ASTNode* right_left_node = codegen_get_node(codegen, right_left_idx);
+                NodeType right_left_type = right_left_node ? right_left_node->type : NODE_PROGRAM;
+                uint16_t right_left_name_idx = (right_left_node && right_left_node->type == NODE_IDENTIFIER) ?
+                                                right_left_node->data.identifier.name : 0;
+                ASTNode* right_right_node = codegen_get_node(codegen, right_right_idx);
+                NodeType right_right_type = right_right_node ? right_right_node->type : NODE_PROGRAM;
+                uint16_t right_right_name_idx = (right_right_node && right_right_node->type == NODE_IDENTIFIER) ?
+                                                 right_right_node->data.identifier.name : 0;
+                
+                /* If either operand of the nested binary op is a String literal, result is String */
+                if (right_left_type == NODE_LITERAL_STRING || right_right_type == NODE_LITERAL_STRING) {
+                    right_is_string = 1;
+                }
+                /* Check if either operand is a String variable */
+                else if (right_left_type == NODE_IDENTIFIER || right_right_type == NODE_IDENTIFIER) {
+                    uint16_t i;
+                    if (right_left_type == NODE_IDENTIFIER) {
+                        const char* var_name = codegen_get_string(codegen, right_left_name_idx);
+                        if (var_name) {
+                            for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                                Symbol* sym = &codegen->symtable->symbols[i];
+                                const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                                if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                                    sym_name && strcmp(sym_name, var_name) == 0) {
+                                    if (sym->type.kind == TYPE_CLASS) {
+                                        right_is_string = 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (!right_is_string && right_right_type == NODE_IDENTIFIER) {
+                        const char* var_name = codegen_get_string(codegen, right_right_name_idx);
+                        if (var_name) {
+                            for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                                Symbol* sym = &codegen->symtable->symbols[i];
+                                const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                                if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                                    sym_name && strcmp(sym_name, var_name) == 0) {
+                                    if (sym->type.kind == TYPE_CLASS) {
+                                        right_is_string = 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (right_type == NODE_IDENTIFIER) {
+            /* Get right node again to access identifier data */
+            test_node = codegen_get_node(codegen, right_index);
+            if (test_node) {
+                const char* right_name = codegen_get_string(codegen, test_node->data.identifier.name);
+                if (right_name) {
+                    Symbol* right_sym = NULL;
+                    uint16_t best_scope = 0;
+                    uint16_t i;
+                    for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                        Symbol* sym = &codegen->symtable->symbols[i];
+                        const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                            sym_name && strcmp(sym_name, right_name) == 0) {
+                            if (!right_sym || sym->scope_level >= best_scope) {
+                                right_sym = sym;
+                                best_scope = sym->scope_level;
+                            }
+                        }
+                    }
+                    if (right_sym && right_sym->type.kind == TYPE_CLASS) {
+                        right_is_string = 1;
+                    } else if (right_sym && right_sym->type.kind == TYPE_INT) {
+                        right_is_int = 1;
+                    }
+                }
+            }
+        } else if (right_type == NODE_LITERAL_INT) {
+            right_is_int = 1;
+        }
+        
+        /* String concatenation: String + String, String + int, int + String */
+        if ((left_is_string && right_is_string) ||
+            (left_is_string && right_is_int) ||
+            (left_is_int && right_is_string)) {
             is_string_concat = 1;
-        } else {
-            const char* left_name = NULL;
-            const char* right_name = NULL;
-            Symbol* left_sym = NULL;
-            Symbol* right_sym = NULL;
-            uint16_t best_scope;
-            uint16_t i;
-            
-            if (test_left && left_type == NODE_IDENTIFIER) {
-                left_name = codegen_get_string(codegen, test_left->data.identifier.name);
-            }
-            if (test_right && right_type == NODE_IDENTIFIER) {
-                right_name = codegen_get_string(codegen, test_right->data.identifier.name);
-            }
-            
-            if (left_name) {
-                best_scope = 0;
-                for (i = 0; i < codegen->symtable->symbol_count; i++) {
-                    Symbol* sym = &codegen->symtable->symbols[i];
-                    const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
-                    if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
-                        sym_name && strcmp(sym_name, left_name) == 0) {
-                        if (!left_sym || sym->scope_level >= best_scope) {
-                            left_sym = sym;
-                            best_scope = sym->scope_level;
-                        }
-                    }
-                }
-            }
-            
-            if (right_name) {
-                best_scope = 0;
-                for (i = 0; i < codegen->symtable->symbol_count; i++) {
-                    Symbol* sym = &codegen->symtable->symbols[i];
-                    const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
-                    if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
-                        sym_name && strcmp(sym_name, right_name) == 0) {
-                        if (!right_sym || sym->scope_level >= best_scope) {
-                            right_sym = sym;
-                            best_scope = sym->scope_level;
-                        }
-                    }
-                }
-            }
-            
-            if (left_sym && right_sym &&
-                left_sym->type.kind == TYPE_CLASS &&
-                right_sym->type.kind == TYPE_CLASS) {
-                is_string_concat = 1;
-            }
         }
     }
     
@@ -1282,15 +1428,66 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
         generate_expression(codegen, left_node);
     }
     
+    /* Convert left int to String if needed */
+    if (is_string_concat && left_is_int) {
+        uint16_t tostring_idx;
+        uint16_t tostring_desc_idx;
+        
+        
+        tostring_idx = find_method_index(codegen, "Integer.toString", 1);
+        if (tostring_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Integer.toString method reference");
+            return -1;
+        }
+        
+        tostring_desc_idx = find_or_add_utf8(codegen, "(I)Ljava/lang/String;");
+        if (tostring_desc_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Integer.toString descriptor");
+            return -1;
+        }
+        codegen->methods[tostring_idx].descriptor_index = tostring_desc_idx;
+        
+        emit_opcode(codegen, OP_INVOKE_STATIC);
+        emit_u2(codegen, tostring_idx);
+        emit_u1(codegen, 1);
+        /* Stack: int -> String (no change in stack depth) */
+    }
+    
     /* Generate right operand */
     right_node = codegen_get_node(codegen, right_index);
     if (right_node) {
         generate_expression(codegen, right_node);
     }
     
+    /* Convert right int to String if needed */
+    if (is_string_concat && right_is_int) {
+        uint16_t tostring_idx;
+        uint16_t tostring_desc_idx;
+        
+        
+        tostring_idx = find_method_index(codegen, "Integer.toString", 1);
+        if (tostring_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Integer.toString method reference");
+            return -1;
+        }
+        
+        tostring_desc_idx = find_or_add_utf8(codegen, "(I)Ljava/lang/String;");
+        if (tostring_desc_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Integer.toString descriptor");
+            return -1;
+        }
+        codegen->methods[tostring_idx].descriptor_index = tostring_desc_idx;
+        
+        emit_opcode(codegen, OP_INVOKE_STATIC);
+        emit_u2(codegen, tostring_idx);
+        emit_u1(codegen, 1);
+        /* Stack: int -> String (no change in stack depth) */
+    }
+    
     if (is_string_concat) {
         uint16_t method_idx;
         uint16_t desc_idx;
+        
         
         method_idx = find_method_index(codegen, "concat", 1);
         if (method_idx == 0xFFFF) {
@@ -1304,6 +1501,7 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
             return -1;
         }
         codegen->methods[method_idx].descriptor_index = desc_idx;
+        
         
         emit_opcode(codegen, OP_INVOKE_STATIC);
         emit_u2(codegen, method_idx);
@@ -1939,10 +2137,95 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         arg_node = codegen_get_node(codegen, saved_first_arg);
         if (arg_node) {
             arg_node_type = arg_node->type;
+            
+            /* If arg is an expression statement, get the actual expression */
+            if (arg_node_type == NODE_EXPR_STMT) {
+                uint16_t expr_idx = arg_node->data.expr_stmt.expr;
+                arg_node = codegen_get_node(codegen, expr_idx);
+                if (arg_node) {
+                    arg_node_type = arg_node->type;
+                }
+            }
+            
             if (arg_node_type == NODE_LITERAL_STRING) {
                 first_arg_is_string = 1;
             }
-            if (arg_node_type == NODE_IDENTIFIER) {
+            /* Check if method call returns String (e.g., concat result) */
+            else if (arg_node_type == NODE_CALL) {  /* NODE_CALL */
+                const char* call_method_name = codegen_get_string(codegen, arg_node->data.call.method_name);
+                if (call_method_name) {
+                    /* Check if this is a String-returning method */
+                    if (strcmp(call_method_name, "concat") == 0 ||
+                        strcmp(call_method_name, "toUpperCase") == 0 ||
+                        strcmp(call_method_name, "toLowerCase") == 0 ||
+                        strcmp(call_method_name, "substr") == 0 ||
+                        strcmp(call_method_name, "readLine") == 0) {
+                        first_arg_is_string = 1;
+                    }
+                }
+            }
+            /* Check if binary operation result is String (e.g., String + int) */
+            else if (arg_node_type == NODE_BINARY_OP) {
+                /* For binary operations, check if it's a String concatenation:
+                 * - If either operand is a String literal, result is String
+                 * - If operator is ADD (+), check operand types
+                 */
+                /* Save values before calling codegen_get_node (which reuses buffer) */
+                uint16_t left_idx = arg_node->data.binary_op.left;
+                uint16_t right_idx = arg_node->data.binary_op.right;
+                BinaryOp op = arg_node->data.binary_op.op;
+                
+                ASTNode* left_node = codegen_get_node(codegen, left_idx);
+                NodeType left_type = left_node ? left_node->type : NODE_PROGRAM;
+                uint16_t left_name_idx = (left_node && left_node->type == NODE_IDENTIFIER) ?
+                                         left_node->data.identifier.name : 0;
+                
+                ASTNode* right_node = codegen_get_node(codegen, right_idx);
+                NodeType right_type = right_node ? right_node->type : NODE_PROGRAM;
+                uint16_t right_name_idx = (right_node && right_node->type == NODE_IDENTIFIER) ?
+                                          right_node->data.identifier.name : 0;
+
+                if (op == BINOP_ADD) {
+                    /* Check if either operand is a String literal */
+                    if (left_type == NODE_LITERAL_STRING || right_type == NODE_LITERAL_STRING) {
+                        first_arg_is_string = 1;
+                    }
+                    /* Check if either operand is a String variable */
+                    if (left_type == NODE_IDENTIFIER) {
+                        const char* left_name = codegen_get_string(codegen, left_name_idx);
+                        if (left_name) {
+                            for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                                Symbol* sym = &codegen->symtable->symbols[i];
+                                const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                                if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                                    sym_name && strcmp(sym_name, left_name) == 0) {
+                                    if (sym->type.kind == TYPE_CLASS) {
+                                        first_arg_is_string = 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (right_type == NODE_IDENTIFIER && !first_arg_is_string) {
+                        const char* right_name = codegen_get_string(codegen, right_name_idx);
+                        if (right_name) {
+                            for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                                Symbol* sym = &codegen->symtable->symbols[i];
+                                const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                                if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                                    sym_name && strcmp(sym_name, right_name) == 0) {
+                                    if (sym->type.kind == TYPE_CLASS) {
+                                        first_arg_is_string = 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else if (arg_node_type == NODE_IDENTIFIER) {
                 Symbol* best_sym = NULL;
                 uint16_t best_scope = 0;
                 
@@ -1965,6 +2248,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
                     }
                 }
             }
+            
         }
     }
     
