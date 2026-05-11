@@ -647,10 +647,10 @@ if exist RT_OUT.TXT del RT_OUT.TXT
 echo Test 16: String + Integer
 echo ------------------------------
 ..\build\bin\djc.exe strint1.jav
-if errorlevel 1 goto :test15_fail
+if errorlevel 1 goto :test16_fail
 if not exist STRINT1.DJC goto :test16_nofile
 echo SUCCESS: Compilation passed
-..\build\bin\djvm.exe STR6.DJC > RT_OUT.TXT
+..\build\bin\djvm.exe STRINT1.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test16_runfail
 find "Count: 42" RT_OUT.TXT > nul
 if errorlevel 1 goto :test16_badout
@@ -661,7 +661,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "Count: 42\n42 items\nTotal: 42 items"
 echo.
 
-goto :completed
+goto :test17
 
 :test16_fail
 echo FAILED: Compilation error
@@ -681,6 +681,48 @@ echo Expected: "Count: 42\n42 items\nTotal: 42 items"
 echo Actual:
 type RT_OUT.TXT
 goto :end
+
+
+:test17
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 17: new Object
+echo ------------------------------
+..\build\bin\djc.exe obj3.jav
+if errorlevel 1 goto :test17_fail
+if not exist OBJ3.DJC goto :test17_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe OBJ3.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test17_runfail
+find "42" RT_OUT.TXT > nul
+if errorlevel 1 goto :test17_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "42"
+echo.
+
+goto :completed
+
+:test17_fail
+echo FAILED: Compilation error
+goto :end
+
+:test17_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test17_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test17_badout
+echo FAILED: Output mismatch for Test 17
+echo Expected: "42"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
 :completed
 
 echo ========================================
