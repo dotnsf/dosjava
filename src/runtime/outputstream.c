@@ -18,6 +18,12 @@ int outputstream_init(OutputStream* stream) {
     stream->is_open = 1;
     stream->position = 0;
     
+    /* Initialize virtual function pointers to default implementations */
+    stream->write = (void (*)(void*, int))outputstream_write;
+    stream->write_bytes = (void (*)(void*, const unsigned char*, int))outputstream_write_bytes;
+    stream->flush = (void (*)(void*))outputstream_flush;
+    stream->close = (void (*)(void*))outputstream_close;
+    
     return 0;
 }
 

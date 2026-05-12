@@ -18,6 +18,12 @@ typedef struct OutputStream {
     Object base;              /* Base object */
     uint8_t is_open;          /* Open state flag */
     uint16_t position;        /* Current position in stream */
+    
+    /* Virtual function pointers for polymorphism */
+    void (*write)(void* stream, int byte);
+    void (*write_bytes)(void* stream, const unsigned char* data, int len);
+    void (*flush)(void* stream);
+    void (*close)(void* stream);
 } OutputStream;
 
 /**

@@ -28,20 +28,20 @@ BIN_DIR = $(BUILD_DIR)/bin
 # Source files
 VM_SRCS = $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/interpreter.c
 FORMAT_SRCS = $(SRC_DIR)/format/djc.c $(SRC_DIR)/format/opcodes.c
-RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c
+RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedwriter.c
 TEST_SRCS = $(SRC_DIR)/test_memory.c
 
 # Object files
 VM_OBJS = $(OBJ_DIR)/memory.obj $(OBJ_DIR)/stack.obj $(OBJ_DIR)/interpreter.obj
 FORMAT_OBJS = $(OBJ_DIR)/djc.obj $(OBJ_DIR)/opcodes.obj
-RUNTIME_OBJS = $(OBJ_DIR)/object.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/system.obj $(OBJ_DIR)/integer.obj $(OBJ_DIR)/inputstream.obj $(OBJ_DIR)/outputstream.obj $(OBJ_DIR)/fileinputstream.obj
+RUNTIME_OBJS = $(OBJ_DIR)/object.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/system.obj $(OBJ_DIR)/integer.obj $(OBJ_DIR)/inputstream.obj $(OBJ_DIR)/outputstream.obj $(OBJ_DIR)/fileinputstream.obj $(OBJ_DIR)/fileoutputstream.obj $(OBJ_DIR)/bufferedreader.obj $(OBJ_DIR)/bufferedwriter.obj
 TEST_OBJS = $(OBJ_DIR)/test_memory.obj
 
 # Compiler object files
 COMPILER_OBJS = $(OBJ_DIR)/lexer.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/codegen.obj
 
 # Targets
-all: test_memory test_interpreter mkdjc java2djc test_lexer test_parser test_semantic test_codegen djc djvm test_stream test_fileinputstream
+all: test_memory test_interpreter mkdjc java2djc test_lexer test_parser test_semantic test_codegen djc djvm test_stream test_fileinputstream test_fileoutputstream test_buffered
 
 # Test memory program
 test_memory: $(BIN_DIR)/test_mem.exe
@@ -54,6 +54,12 @@ test_stream: $(BIN_DIR)/tstrm.exe
 
 # Test file input stream program
 test_fileinputstream: $(BIN_DIR)/tfis.exe
+
+# Test file output stream program
+test_fileoutputstream: $(BIN_DIR)/tfos.exe
+
+# Test buffered reader/writer program
+test_buffered: $(BIN_DIR)/tbuf.exe
 
 # .djc file generator tool
 mkdjc: $(BIN_DIR)/mkdjc.exe
@@ -85,6 +91,14 @@ $(BIN_DIR)/tstrm.exe: $(OBJ_DIR)/test_stream.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memo
 $(BIN_DIR)/tfis.exe: $(OBJ_DIR)/test_fileinputstream.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memory.obj
 	@echo Linking tfis.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_fileinputstream.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memory.obj }
+
+$(BIN_DIR)/tfos.exe: $(OBJ_DIR)/test_fileoutputstream.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memory.obj
+	@echo Linking tfos.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_fileoutputstream.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memory.obj }
+
+$(BIN_DIR)/tbuf.exe: $(OBJ_DIR)/test_buffered.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memory.obj
+	@echo Linking tbuf.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_buffered.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memory.obj }
 
 $(BIN_DIR)/mkdjc.exe: $(OBJ_DIR)/mkdjc.obj
 	@echo Linking mkdjc.exe...
@@ -153,6 +167,18 @@ $(OBJ_DIR)/fileinputstream.obj: $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/
 	@echo Compiling fileinputstream.c...
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/runtime/fileinputstream.c
 
+$(OBJ_DIR)/fileoutputstream.obj: $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/fileoutputstream.h $(SRC_DIR)/runtime/outputstream.h
+	@echo Compiling fileoutputstream.c...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/runtime/fileoutputstream.c
+
+$(OBJ_DIR)/bufferedreader.obj: $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedreader.h $(SRC_DIR)/runtime/fileinputstream.h
+	@echo Compiling bufferedreader.c...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/runtime/bufferedreader.c
+
+$(OBJ_DIR)/bufferedwriter.obj: $(SRC_DIR)/runtime/bufferedwriter.c $(SRC_DIR)/runtime/bufferedwriter.h $(SRC_DIR)/runtime/fileoutputstream.h
+	@echo Compiling bufferedwriter.c...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/runtime/bufferedwriter.c
+
 # Compile rules - Tests
 $(OBJ_DIR)/test_memory.obj: $(SRC_DIR)/test_memory.c
 	@echo Compiling test_memory.c...
@@ -169,6 +195,14 @@ $(OBJ_DIR)/test_stream.obj: tests/io/test_stream.c $(SRC_DIR)/runtime/inputstrea
 $(OBJ_DIR)/test_fileinputstream.obj: tests/io/test_fileinputstream.c $(SRC_DIR)/runtime/fileinputstream.h
 	@echo Compiling test_fileinputstream.c...
 	$(CC) $(CFLAGS) -fo=$@ tests/io/test_fileinputstream.c
+
+$(OBJ_DIR)/test_fileoutputstream.obj: tests/io/test_fileoutputstream.c $(SRC_DIR)/runtime/fileoutputstream.h
+	@echo Compiling test_fileoutputstream.c...
+	$(CC) $(CFLAGS) -fo=$@ tests/io/test_fileoutputstream.c
+
+$(OBJ_DIR)/test_buffered.obj: tests/io/test_buffered.c $(SRC_DIR)/runtime/bufferedreader.h $(SRC_DIR)/runtime/bufferedwriter.h
+	@echo Compiling test_buffered.c...
+	$(CC) $(CFLAGS) -fo=$@ tests/io/test_buffered.c
 
 # Compile rules - Tools
 $(OBJ_DIR)/mkdjc.obj: tools/mkdjc.c
@@ -287,6 +321,8 @@ test_memory: .SYMBOLIC
 test_interpreter: .SYMBOLIC
 test_stream: .SYMBOLIC
 test_fileinputstream: .SYMBOLIC
+test_fileoutputstream: .SYMBOLIC
+test_buffered: .SYMBOLIC
 mkdjc: .SYMBOLIC
 java2djc: .SYMBOLIC
 test_lexer: .SYMBOLIC
