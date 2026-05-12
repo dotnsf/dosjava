@@ -741,7 +741,7 @@ type RT_OUT.TXT
 REM echo SUCCESS: Output matched expected value "42"
 echo.
 
-goto :completed
+goto :test19
 
 :test18_fail
 echo FAILED: Compilation error
@@ -758,6 +758,86 @@ goto :end
 :test18_badout
 echo FAILED: Output mismatch for Test 18
 echo Expected: "42"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test19
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 19: E2E Write
+echo ------------------------------
+..\build\bin\djc.exe e2ewrit.jav
+if errorlevel 1 goto :test19_fail
+if not exist e2ewrit.DJC goto :test19_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe e2ewrit.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test19_runfail
+find "Write test completed" RT_OUT.TXT > nul
+if errorlevel 1 goto :test19_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "Write test completed"
+echo.
+
+goto :test20
+
+:test19_fail
+echo FAILED: Compilation error
+goto :end
+
+:test19_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test19_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test19_badout
+echo FAILED: Output mismatch for Test 19
+echo Expected: "Write test completed"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test20
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 20: E2E Read
+echo ------------------------------
+..\build\bin\djc.exe e2eread.jav
+if errorlevel 1 goto :test20_fail
+if not exist e2eread.DJC goto :test20_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe e2eread.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test20_runfail
+find "Read test completed" RT_OUT.TXT > nul
+if errorlevel 1 goto :test20_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "Read test completed"
+echo.
+
+goto :completed
+
+:test20_fail
+echo FAILED: Compilation error
+goto :end
+
+:test20_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test20_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test20_badout
+echo FAILED: Output mismatch for Test 20
+echo Expected: "Read test completed"
 echo Actual:
 type RT_OUT.TXT
 goto :end
