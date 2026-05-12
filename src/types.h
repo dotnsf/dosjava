@@ -17,12 +17,15 @@ typedef signed long        int32_t;
 typedef unsigned long      uint32_t;
 
 /* Pointer-sized integer types */
+#ifndef _INTPTR_T_DEFINED
+#define _INTPTR_T_DEFINED
 #if defined(__SMALL__) || defined(__MEDIUM__)
     typedef unsigned short uintptr_t;
     typedef signed short   intptr_t;
 #else
     typedef unsigned long  uintptr_t;
     typedef signed long    intptr_t;
+#endif
 #endif
 
 #endif /* TYPES_H */

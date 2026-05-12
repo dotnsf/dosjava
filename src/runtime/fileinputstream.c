@@ -1,3 +1,5 @@
+#include <fcntl.h>
+#include <io.h>
 #include "fileinputstream.h"
 #include "../vm/memory.h"
 #include <string.h>
@@ -167,6 +169,22 @@ int fileinputstream_open(FileInputStream* stream, const char* filename) {
     
     /* AX contains file handle */
     stream->handle = regs.w.ax;
+    
+    /* Set binary mode using DOS IOCTL to prevent CR-LF translation */
+    /* INT 21h, AH=44h (IOCTL), AL=00h (Get Device Information) */
+    regs.h.ah = 0x44;
+    regs.h.al = 0x00;
+    regs.w.bx = stream->handle;
+    int86(0x21, &regs, &regs);
+    
+    /* Set bit 5 (binary mode) in device information word */
+    /* INT 21h, AH=44h (IOCTL), AL=01h (Set Device Information) */
+    regs.h.ah = 0x44;
+    regs.h.al = 0x01;
+    regs.w.bx = stream->handle;
+    regs.w.dx |= 0x0020;  /* Set bit 5 for binary mode */
+    int86(0x21, &regs, &regs);
+    
     stream->base.is_open = 1;
     stream->base.position = 0;
     stream->file_pos = 0;

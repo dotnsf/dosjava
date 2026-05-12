@@ -1,3 +1,5 @@
+#include <fcntl.h>
+#include <io.h>
 #include "fileoutputstream.h"
 #include "../vm/memory.h"
 #include <string.h>
@@ -121,6 +123,7 @@ int fileoutputstream_open(FileOutputStream* stream, const char* filename) {
     stream->filename[len] = '\0';
     
     /* Create/truncate file using INT 21h, AH=3Ch */
+    /* The file is opened for writing automatically */
     regs.h.ah = 0x3C;
     regs.w.cx = 0;  /* Normal file attribute */
     regs.w.dx = FP_OFF(stream->filename);
@@ -134,8 +137,24 @@ int fileoutputstream_open(FileOutputStream* stream, const char* filename) {
         return -1;
     }
     
-    /* AX contains file handle */
+    /* AX contains file handle - file is already open for writing */
     stream->handle = regs.w.ax;
+    
+    /* Set binary mode using DOS IOCTL to prevent CR-LF translation */
+    /* INT 21h, AH=44h (IOCTL), AL=00h (Get Device Information) */
+    regs.h.ah = 0x44;
+    regs.h.al = 0x00;
+    regs.w.bx = stream->handle;
+    int86(0x21, &regs, &regs);
+    
+    /* Set bit 5 (binary mode) in device information word */
+    /* INT 21h, AH=44h (IOCTL), AL=01h (Set Device Information) */
+    regs.h.ah = 0x44;
+    regs.h.al = 0x01;
+    regs.w.bx = stream->handle;
+    regs.w.dx |= 0x0020;  /* Set bit 5 for binary mode */
+    int86(0x21, &regs, &regs);
+    
     stream->base.is_open = 1;
     stream->file_pos = 0;
     stream->buffer_pos = 0;

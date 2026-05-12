@@ -701,7 +701,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "42"
 echo.
 
-goto :completed
+goto :test18
 
 :test17_fail
 echo FAILED: Compilation error
@@ -717,6 +717,46 @@ goto :end
 
 :test17_badout
 echo FAILED: Output mismatch for Test 17
+echo Expected: "42"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test18
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 18: BuffereedReader/BufferedWriter
+echo ------------------------------
+..\build\bin\djc.exe bufrw.jav
+if errorlevel 1 goto :test18_fail
+if not exist bufrw.DJC goto :test18_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe bufrw.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test18_runfail
+REM find "" RT_OUT.TXT > nul
+REM if errorlevel 1 goto :test18_badout
+echo Output:
+type RT_OUT.TXT
+REM echo SUCCESS: Output matched expected value "42"
+echo.
+
+goto :completed
+
+:test18_fail
+echo FAILED: Compilation error
+goto :end
+
+:test18_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test18_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test18_badout
+echo FAILED: Output mismatch for Test 18
 echo Expected: "42"
 echo Actual:
 type RT_OUT.TXT

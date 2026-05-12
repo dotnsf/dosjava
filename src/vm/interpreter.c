@@ -2,7 +2,9 @@
 #include "memory.h"
 #include "../format/opcodes.h"
 #include "../runtime/system.h"
+#include "../runtime/fileinputstream.h"
 #include "../runtime/fileoutputstream.h"
+#include "../runtime/bufferedreader.h"
 #include "../runtime/bufferedwriter.h"
 #include <stdio.h>
 #include <string.h>
@@ -801,13 +803,15 @@ int interpreter_step(ExecutionContext* ctx) {
                 /* Handle native methods - don't increment call depth */
                 
                 if (method_name) {
-                    /* Check for System.out.println */
-                    if (strcmp(method_name, "println") == 0) {
+                    /* Check for System.out.println and System.out.print */
+                    if (strcmp(method_name, "println") == 0 || strcmp(method_name, "print") == 0) {
                         /* Pop value from stack */
                         uint16_t value;
                         const char* str;
                         const char* descriptor;
+                        int is_println;
                         
+                        is_println = (strcmp(method_name, "println") == 0);
                         value = stack_pop_shared(ctx);
                         
                         /* Get method descriptor to determine parameter type */
@@ -826,14 +830,22 @@ int interpreter_step(ExecutionContext* ctx) {
                                 }
                             }
                             if (str) {
-                                system_println_cstr(str);
+                                if (is_println) {
+                                    system_println_cstr(str);
+                                } else {
+                                    printf("%s", str);
+                                }
                             } else {
                                 printf("ERROR: Invalid string constant index: %d\n", value);
                                 return -1;
                             }
                         } else {
-                            /* Native println(int) and any non-string fallback */
-                            system_println_int((int16_t)value);
+                            /* Native print/println(int) and any non-string fallback */
+                            if (is_println) {
+                                system_println_int((int16_t)value);
+                            } else {
+                                printf("%d", (int16_t)value);
+                            }
                         }
                         break;
                     } else if (strcmp(method_name, "length") == 0) {
@@ -1927,6 +1939,39 @@ int interpreter_step(ExecutionContext* ctx) {
                 /* In Small memory model, pointer is already 16-bit offset */
                 object_handle = (uint16_t)(uintptr_t)bw;
             }
+            else if (strcmp(class_name, "FileInputStream") == 0 && arg_count == 1) {
+                /* FileInputStream(String filename) */
+                const char* filename = djc_get_utf8(ctx->djc_file, args[0]);
+                FileInputStream* fis;
+                
+                if (filename == NULL) {
+                    printf("ERROR: Invalid filename for FileInputStream\n");
+                    return -1;
+                }
+                
+                fis = fileinputstream_new(filename);
+                if (fis == NULL) {
+                    printf("ERROR: Failed to create FileInputStream\n");
+                    return -1;
+                }
+                
+                /* In Small memory model, pointer is already 16-bit offset */
+                object_handle = (uint16_t)(uintptr_t)fis;
+            }
+            else if (strcmp(class_name, "BufferedReader") == 0 && arg_count == 1) {
+                /* BufferedReader(InputStream is) */
+                FileInputStream* fis = (FileInputStream*)(uintptr_t)args[0];
+                BufferedReader* br;
+                
+                br = bufferedreader_new(fis, 256);
+                if (br == NULL) {
+                    printf("ERROR: Failed to create BufferedReader\n");
+                    return -1;
+                }
+                
+                /* In Small memory model, pointer is already 16-bit offset */
+                object_handle = (uint16_t)(uintptr_t)br;
+            }
             else {
                 /* Generic object creation (no constructor logic yet) */
                 object_handle = class_name_idx + 1;
@@ -2068,7 +2113,96 @@ int interpreter_step(ExecutionContext* ctx) {
             if (ctx->stack_pointer > 0) {
                 /* For now, check method name to determine if it's a native method */
                 if (strcmp(method_name, "write") == 0) {
-                    /* BufferedWriter.write(String) */
+                    /* Check if it's BufferedWriter.write(String) or FileOutputStream.write(int) */
+                    uint16_t arg_value;
+                    
+                    /* Pop argument */
+                    arg_value = stack_pop_shared(ctx);
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Try to determine object type by checking if arg is a string index */
+                    if (arg_value < ctx->djc_file->header.constant_pool_count &&
+                        ctx->djc_file->constants[arg_value].tag == CONST_UTF8) {
+                        /* BufferedWriter.write(String) */
+                        const char* str_value;
+                        BufferedWriter* bw;
+                        
+                        str_value = ctx->djc_file->constants[arg_value].data.utf8_data;
+                        if (str_value == NULL) {
+                            printf("ERROR: Invalid string for write()\n");
+                            return -1;
+                        }
+                        
+                        bw = (BufferedWriter*)(uintptr_t)object_handle;
+                        bufferedwriter_write_string(bw, str_value);
+                    } else {
+                        /* FileOutputStream.write(int) */
+                        FileOutputStream* fos;
+                        
+                        fos = (FileOutputStream*)(uintptr_t)object_handle;
+                        fileoutputstream_write(fos, (uint8_t)arg_value);
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "read") == 0) {
+                    /* FileInputStream.read() - returns int */
+                    FileInputStream* fis;
+                    int byte_value;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    fis = (FileInputStream*)(uintptr_t)object_handle;
+                    byte_value = fileinputstream_read(fis);
+                    
+                    /* Push result (-1 for EOF, or 0-255 for byte value) */
+                    if (byte_value == -1) {
+                        stack_push_shared(ctx, (uint16_t)-1);  /* -1 as uint16_t is 0xFFFF */
+                    } else {
+                        stack_push_shared(ctx, (uint16_t)byte_value);
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "newLine") == 0) {
+                    /* BufferedWriter.newLine() */
+                    BufferedWriter* bw;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    bw = (BufferedWriter*)(uintptr_t)object_handle;
+                    bufferedwriter_new_line(bw);
+                    break;
+                }
+                else if (strcmp(method_name, "readLine") == 0) {
+                    /* BufferedReader.readLine() - returns String */
+                    BufferedReader* br;
+                    char* line;
+                    uint16_t str_idx;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    br = (BufferedReader*)(uintptr_t)object_handle;
+                    line = bufferedreader_read_line(br);
+                    
+                    if (line == NULL) {
+                        /* Return null (represented as 0) */
+                        stack_push_shared(ctx, 0);
+                    } else {
+                        /* Add string to constant pool and return index */
+                        str_idx = djc_add_string(ctx->djc_file, line);
+                        stack_push_shared(ctx, str_idx);
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "writeLine") == 0) {
+                    /* BufferedWriter.writeLine(String) */
                     uint16_t str_idx;
                     const char* str_value;
                     BufferedWriter* bw;
@@ -2082,25 +2216,45 @@ int interpreter_step(ExecutionContext* ctx) {
                     /* Get string value */
                     str_value = djc_get_utf8(ctx->djc_file, str_idx);
                     if (str_value == NULL) {
-                        printf("ERROR: Invalid string for write()\n");
+                        printf("ERROR: Invalid string for writeLine()\n");
                         return -1;
                     }
                     
                     /* Call native method */
                     bw = (BufferedWriter*)(uintptr_t)object_handle;
-                    bufferedwriter_write_string(bw, str_value);
+                    bufferedwriter_write_line(bw, str_value);
                     break;
                 }
                 else if (strcmp(method_name, "close") == 0) {
-                    /* BufferedWriter.close() or FileOutputStream.close() */
-                    BufferedWriter* bw;
+                    /* close() for various stream types */
+                    void* stream_obj;
                     
                     /* Pop object reference */
                     object_handle = stack_pop_shared(ctx);
+                    stream_obj = (void*)(uintptr_t)object_handle;
                     
-                    /* Call close (works for both BufferedWriter and FileOutputStream) */
-                    bw = (BufferedWriter*)(uintptr_t)object_handle;
-                    bufferedwriter_close(bw);
+                    /* Call appropriate close function
+                     * Note: All stream types have close() as their last virtual function,
+                     * so we can safely cast to any stream type and call close().
+                     * The actual implementation will be called via the vtable.
+                     */
+                    if (stream_obj) {
+                        /* Try FileOutputStream first */
+                        FileOutputStream* fos = (FileOutputStream*)stream_obj;
+                        if (fos->base.is_open) {
+                            fileoutputstream_close(fos);
+                        } else {
+                            /* Try FileInputStream */
+                            FileInputStream* fis = (FileInputStream*)stream_obj;
+                            if (fis->base.is_open) {
+                                fileinputstream_close(fis);
+                            } else {
+                                /* Try BufferedWriter/BufferedReader */
+                                BufferedWriter* bw = (BufferedWriter*)stream_obj;
+                                bufferedwriter_close(bw);
+                            }
+                        }
+                    }
                     break;
                 }
             }

@@ -2104,7 +2104,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     is_string_indexof = 0;
     is_string_lastindexof = 0;
     is_string_substr = 0;
-    if (strcmp(method_name, "println") == 0) {
+    if (strcmp(method_name, "println") == 0 || strcmp(method_name, "print") == 0) {
         is_native = 1;
     } else if (strcmp(method_name, "concat") == 0 && object_idx == 0) {
         is_native = 1;

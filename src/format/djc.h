@@ -135,6 +135,14 @@ DJCMethod* djc_find_method(DJCFile* file, uint16_t method_index);
 DJCMethod* djc_find_method_by_name(DJCFile* file, const char* method_name);
 
 /**
+ * Add a UTF8 string to the constant pool at runtime
+ * @param file DJC file
+ * @param str String to add
+ * @return Index of the added string, or 0 if failed
+ */
+uint16_t djc_add_string(DJCFile* file, const char* str);
+
+/**
  * Get a UTF8 string from the constant pool
  * @param file DJC file
  * @param index Constant index

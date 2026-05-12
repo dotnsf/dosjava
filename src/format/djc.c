@@ -364,6 +364,50 @@ const char* djc_get_utf8(DJCFile* file, uint16_t index) {
 }
 
 /**
+ * Add a UTF8 string to the constant pool at runtime
+ * @param file DJC file
+ * @param str String to add
+ * @return Index of the added string, or 0 if failed
+ */
+uint16_t djc_add_string(DJCFile* file, const char* str) {
+    DJCConstant* constant;
+    uint16_t index;
+    size_t len;
+    
+    if (file == NULL || str == NULL) {
+        return 0;
+    }
+    
+    /* Check if we have space in the constant pool */
+    if (file->header.constant_pool_count >= DJC_MAX_CONSTANTS) {
+        return 0;
+    }
+    
+    /* Get the next available index */
+    index = file->header.constant_pool_count;
+    constant = &file->constants[index];
+    
+    /* Calculate string length */
+    len = strlen(str);
+    
+    /* Allocate and copy string data */
+    constant->data.utf8_data = (char*)memory_alloc(len + 1);
+    if (constant->data.utf8_data == NULL) {
+        return 0;
+    }
+    strcpy(constant->data.utf8_data, str);
+    
+    /* Set constant properties */
+    constant->tag = CONST_UTF8;
+    constant->length = (uint16_t)len;
+    
+    /* Increment constant pool count */
+    file->header.constant_pool_count++;
+    
+    return index;
+}
+
+/**
  * Get bytecode for a method
  */
 uint8_t* djc_get_method_code(DJCFile* file, DJCMethod* method) {
