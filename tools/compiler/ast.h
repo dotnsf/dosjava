@@ -221,7 +221,9 @@ typedef struct ASTNode {
         
         /* New expression */
         struct {
-            uint16_t class_name;    /* Offset in string pool */
+            uint16_t class_name;    /* Offset in string pool or TypeKind for arrays */
+            uint16_t arg_count;     /* Number of constructor arguments (0 for arrays) */
+            uint16_t first_arg;     /* Index of first argument (0 if none) */
         } new_expr;
         
         /* Field access */

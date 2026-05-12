@@ -1706,22 +1706,33 @@ uint16_t parse_primary(Parser* parser) {
             }
             
             parser->nodes[node - parser->total_nodes - 1].data.new_expr.class_name = base_kind;
+            parser->nodes[node - parser->total_nodes - 1].data.new_expr.arg_count = 0;
+            parser->nodes[node - parser->total_nodes - 1].data.new_expr.first_arg = 0;
             parser->nodes[node - parser->total_nodes - 1].next_sibling = size_expr;
             
             return node;
         }
-        /* Object creation: new ClassName() */
+        /* Object creation: new ClassName(args...) */
         else if (parser_match(parser, TOK_IDENTIFIER)) {
             uint16_t class_name_offset;
+            uint16_t arg_count;
+            uint16_t first_arg;
             
             class_name_offset = parser->current.value.str_offset;
             parser_next_token(parser);
             
-            /* Expect '()' for now (no constructor arguments yet) */
+            /* Expect '(' */
             if (parser_expect(parser, TOK_LPAREN) < 0) {
                 return 0;
             }
             
+            /* Parse constructor arguments */
+            first_arg = parse_arg_list(parser, &arg_count);
+            if (parser->has_error) {
+                return 0;
+            }
+            
+            /* Expect ')' */
             if (parser_expect(parser, TOK_RPAREN) < 0) {
                 return 0;
             }
@@ -1732,6 +1743,8 @@ uint16_t parse_primary(Parser* parser) {
             }
             
             parser->nodes[node - parser->total_nodes - 1].data.new_expr.class_name = class_name_offset;
+            parser->nodes[node - parser->total_nodes - 1].data.new_expr.arg_count = arg_count;
+            parser->nodes[node - parser->total_nodes - 1].data.new_expr.first_arg = first_arg;
             parser->nodes[node - parser->total_nodes - 1].next_sibling = 0;  /* No size expr for objects */
             
             return node;

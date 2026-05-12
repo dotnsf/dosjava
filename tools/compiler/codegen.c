@@ -1016,10 +1016,13 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
                 return 0;
             }
             
-            /* Object creation: new ClassName() */
+            /* Object creation: new ClassName(args...) */
             {
                 const char* class_name;
                 uint16_t class_idx;
+                uint16_t arg_count;
+                uint16_t arg_idx;
+                ASTNode* arg_node;
                 
                 class_name = codegen_get_string(codegen, class_name_value);
                 if (!class_name) {
@@ -1034,10 +1037,29 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
                     return -1;
                 }
                 
-                /* Emit OP_NEW with class index */
+                /* Generate code for constructor arguments */
+                arg_count = expr_node->data.new_expr.arg_count;
+                arg_idx = expr_node->data.new_expr.first_arg;
+                
+                while (arg_idx != 0) {
+                    arg_node = codegen_get_node(codegen, arg_idx);
+                    if (!arg_node) {
+                        codegen_error(codegen, "Invalid constructor argument");
+                        return -1;
+                    }
+                    
+                    if (generate_expression(codegen, arg_node) != 0) {
+                        return -1;
+                    }
+                    
+                    arg_idx = arg_node->next_sibling;
+                }
+                
+                /* Emit OP_NEW with class index and argument count */
                 emit_opcode(codegen, OP_NEW);
                 emit_u2(codegen, class_idx);
-                update_stack(codegen, 1);
+                emit_u1(codegen, (uint8_t)arg_count);
+                update_stack(codegen, 1 - arg_count);  /* Args consumed, object pushed */
                 return 0;
             }
         }

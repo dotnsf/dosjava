@@ -1,6 +1,7 @@
 #include "bufferedwriter.h"
 #include "../vm/memory.h"
 #include <string.h>
+#include <stdio.h>
 
 /* Default buffer size for line writing */
 #define DEFAULT_BUFFER_SIZE 256
@@ -123,9 +124,12 @@ void bufferedwriter_flush(BufferedWriter* writer) {
     }
     
     /* Write buffer to underlying stream */
-    fileoutputstream_write_bytes(writer->output_stream, 
-                                  (const unsigned char*)writer->buffer, 
+    fileoutputstream_write_bytes(writer->output_stream,
+                                  (const unsigned char*)writer->buffer,
                                   writer->buffer_pos);
+    
+    /* Flush the underlying FileOutputStream to disk */
+    fileoutputstream_flush(writer->output_stream);
     
     /* Reset buffer position */
     writer->buffer_pos = 0;

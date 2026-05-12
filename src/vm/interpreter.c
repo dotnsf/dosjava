@@ -2,6 +2,8 @@
 #include "memory.h"
 #include "../format/opcodes.h"
 #include "../runtime/system.h"
+#include "../runtime/fileoutputstream.h"
+#include "../runtime/bufferedwriter.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -1860,13 +1862,19 @@ int interpreter_step(ExecutionContext* ctx) {
         }
         
         case OP_NEW: {
-            /* Create new object [class_name_idx:2] */
+            /* Create new object [class_name_idx:2] [arg_count:1] */
             uint16_t class_name_idx;
+            uint8_t arg_count;
             uint16_t object_handle;
             const char* class_name;
+            uint16_t args[8];  /* Support up to 8 constructor arguments */
+            uint8_t i;
             
             /* Read class name index from constant pool */
             class_name_idx = interpreter_read_u16(ctx);
+            
+            /* Read argument count */
+            arg_count = interpreter_read_u8(ctx);
             
             /* Get class name from constant pool */
             class_name = djc_get_utf8(ctx->djc_file, class_name_idx);
@@ -1875,12 +1883,59 @@ int interpreter_step(ExecutionContext* ctx) {
                 return -1;
             }
             
-            /* For Phase 1, allocate a simple object handle
-             * Object handle is just a unique ID
-             * Use class_name_idx + 1 to avoid handle=0 (which looks like null)
-             * In a full implementation, this would allocate actual object memory
-             */
-            object_handle = class_name_idx + 1;  /* +1 to avoid 0 (null-like value) */
+            /* Pop constructor arguments from stack (in reverse order) */
+            if (arg_count > 8) {
+                printf("ERROR: Too many constructor arguments: %u\n", arg_count);
+                return -1;
+            }
+            
+            for (i = 0; i < arg_count; i++) {
+                args[arg_count - 1 - i] = stack_pop_shared(ctx);
+            }
+            
+            /* Handle special I/O classes with runtime support */
+            if (strcmp(class_name, "FileOutputStream") == 0 && arg_count == 1) {
+                /* FileOutputStream(String filename) */
+                const char* filename = djc_get_utf8(ctx->djc_file, args[0]);
+                FileOutputStream* fos;
+                
+                if (filename == NULL) {
+                    printf("ERROR: Invalid filename for FileOutputStream\n");
+                    return -1;
+                }
+                
+                fos = fileoutputstream_new(filename);
+                if (fos == NULL) {
+                    printf("ERROR: Failed to create FileOutputStream\n");
+                    return -1;
+                }
+                
+                /* In Small memory model, pointer is already 16-bit offset */
+                object_handle = (uint16_t)(uintptr_t)fos;
+            }
+            else if (strcmp(class_name, "BufferedWriter") == 0 && arg_count == 1) {
+                /* BufferedWriter(OutputStream os) */
+                FileOutputStream* fos = (FileOutputStream*)(uintptr_t)args[0];
+                BufferedWriter* bw;
+                
+                bw = bufferedwriter_new(fos, 256);
+                if (bw == NULL) {
+                    printf("ERROR: Failed to create BufferedWriter\n");
+                    return -1;
+                }
+                
+                /* In Small memory model, pointer is already 16-bit offset */
+                object_handle = (uint16_t)(uintptr_t)bw;
+            }
+            else {
+                /* Generic object creation (no constructor logic yet) */
+                object_handle = class_name_idx + 1;
+                
+                if (g_debug_mode) {
+                    printf("DEBUG: OP_NEW created object of class '%s' (handle=%u, args=%u)\n",
+                           class_name, object_handle, arg_count);
+                }
+            }
             
             /* Push object handle onto stack */
             if (stack_push_shared(ctx, object_handle) != 0) {
@@ -1888,10 +1943,6 @@ int interpreter_step(ExecutionContext* ctx) {
                 return -1;
             }
             
-            if (g_debug_mode) {
-                printf("DEBUG: OP_NEW created object of class '%s' (handle=%u)\n",
-                       class_name, object_handle);
-            }
             break;
         }
         
@@ -2000,6 +2051,7 @@ int interpreter_step(ExecutionContext* ctx) {
             uint8_t* method_code;
             CallFrame* frame;
             uint8_t arg_count;
+            uint16_t object_handle;
             
             /* Read method name index */
             method_name_idx = interpreter_read_u16(ctx);
@@ -2009,6 +2061,48 @@ int interpreter_step(ExecutionContext* ctx) {
             if (method_name == NULL) {
                 printf("ERROR: Invalid method name index: %u\n", method_name_idx);
                 return -1;
+            }
+            
+            /* Check for native I/O methods before looking up in DJC file */
+            /* Peek at object handle (it's at stack top - arg_count - 1) */
+            if (ctx->stack_pointer > 0) {
+                /* For now, check method name to determine if it's a native method */
+                if (strcmp(method_name, "write") == 0) {
+                    /* BufferedWriter.write(String) */
+                    uint16_t str_idx;
+                    const char* str_value;
+                    BufferedWriter* bw;
+                    
+                    /* Pop string argument */
+                    str_idx = stack_pop_shared(ctx);
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Get string value */
+                    str_value = djc_get_utf8(ctx->djc_file, str_idx);
+                    if (str_value == NULL) {
+                        printf("ERROR: Invalid string for write()\n");
+                        return -1;
+                    }
+                    
+                    /* Call native method */
+                    bw = (BufferedWriter*)(uintptr_t)object_handle;
+                    bufferedwriter_write_string(bw, str_value);
+                    break;
+                }
+                else if (strcmp(method_name, "close") == 0) {
+                    /* BufferedWriter.close() or FileOutputStream.close() */
+                    BufferedWriter* bw;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call close (works for both BufferedWriter and FileOutputStream) */
+                    bw = (BufferedWriter*)(uintptr_t)object_handle;
+                    bufferedwriter_close(bw);
+                    break;
+                }
             }
             
             /* Find method by name */

@@ -16,6 +16,8 @@ static int read_ast_header(SemanticAnalyzer* analyzer);
 static int load_string_pool(SemanticAnalyzer* analyzer);
 static int current_scope_has_local_name(SemanticAnalyzer* analyzer, const char* name, SymbolKind kind);
 static int is_string_type(SemanticAnalyzer* analyzer, TypeInfo type);
+static int register_builtin_classes(SemanticAnalyzer* analyzer);
+static uint16_t semantic_add_string(SemanticAnalyzer* analyzer, const char* str);
 
 /* Initialize semantic analyzer */
 int semantic_init(SemanticAnalyzer* analyzer, const char* ast_file, const char* symbol_file) {
@@ -62,6 +64,177 @@ int semantic_init(SemanticAnalyzer* analyzer, const char* ast_file, const char* 
     /* Copy string pool to symbol table */
     memcpy(analyzer->symtable->string_pool, analyzer->string_pool, analyzer->pool_size);
     analyzer->symtable->pool_size = analyzer->pool_size;
+    
+    /* Register built-in classes */
+    if (register_builtin_classes(analyzer) != 0) {
+        symtable_cleanup(analyzer->symtable);
+        free(analyzer->symtable);
+        fclose(analyzer->ast_file);
+        return -1;
+    }
+    
+    return 0;
+}
+
+/* Register built-in classes */
+static int register_builtin_classes(SemanticAnalyzer* analyzer) {
+    Symbol class_sym, method_sym;
+    uint16_t name_offset, method_offset;
+    const char* builtin_classes[] = {
+        "FileOutputStream",
+        "FileInputStream",
+        "BufferedWriter",
+        "BufferedReader",
+        "OutputStream",
+        "InputStream",
+        NULL
+    };
+    int i;
+    
+    for (i = 0; builtin_classes[i] != NULL; i++) {
+        /* Add class name to string pool */
+        name_offset = semantic_add_string(analyzer, builtin_classes[i]);
+        if (name_offset == 0xFFFF) {
+            return -1;
+        }
+        
+        /* Create class symbol */
+        memset(&class_sym, 0, sizeof(Symbol));
+        class_sym.kind = SYM_CLASS;
+        class_sym.name_offset = name_offset;
+        class_sym.type.kind = TYPE_CLASS;
+        class_sym.type.class_name = name_offset;
+        class_sym.data.class_data.member_count = 0;
+        
+        /* Add to symbol table */
+        if (symtable_add_symbol(analyzer->symtable, &class_sym) == 0xFFFF) {
+            return -1;
+        }
+        
+        /* Add common methods for I/O classes */
+        if (strcmp(builtin_classes[i], "BufferedWriter") == 0 ||
+            strcmp(builtin_classes[i], "FileOutputStream") == 0) {
+            /* Add write(String) method */
+            uint16_t string_class_offset, param_offset;
+            Symbol param_sym;
+            
+            method_offset = semantic_add_string(analyzer, "write");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_VOID;
+            method_sym.data.method_data.param_count = 1;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 0;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameter symbol for write(String str) */
+            param_offset = semantic_add_string(analyzer, "str");
+            if (param_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            string_class_offset = semantic_add_string(analyzer, "String");
+            if (string_class_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&param_sym, 0, sizeof(Symbol));
+            param_sym.kind = SYM_PARAM;
+            param_sym.name_offset = param_offset;
+            param_sym.type.kind = TYPE_CLASS;
+            param_sym.type.class_name = string_class_offset;
+            param_sym.data.param_data.index = 0;
+            
+            if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                return -1;
+            }
+        }
+        
+        if (strcmp(builtin_classes[i], "BufferedWriter") == 0 ||
+            strcmp(builtin_classes[i], "BufferedReader") == 0 ||
+            strcmp(builtin_classes[i], "FileOutputStream") == 0 ||
+            strcmp(builtin_classes[i], "FileInputStream") == 0) {
+            /* Add close() method */
+            method_offset = semantic_add_string(analyzer, "close");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_VOID;
+            method_sym.data.method_data.param_count = 0;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 0;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+        }
+        
+        if (strcmp(builtin_classes[i], "BufferedReader") == 0 ||
+            strcmp(builtin_classes[i], "FileInputStream") == 0) {
+            /* Add read() method */
+            method_offset = semantic_add_string(analyzer, "read");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_INT;
+            method_sym.data.method_data.param_count = 0;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 0;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add readLine() method for BufferedReader */
+            if (strcmp(builtin_classes[i], "BufferedReader") == 0) {
+                uint16_t string_class_offset;
+                
+                method_offset = semantic_add_string(analyzer, "readLine");
+                if (method_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* Get String class name offset */
+                string_class_offset = semantic_add_string(analyzer, "String");
+                if (string_class_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&method_sym, 0, sizeof(Symbol));
+                method_sym.kind = SYM_METHOD;
+                method_sym.name_offset = method_offset;
+                method_sym.type.kind = TYPE_CLASS;
+                method_sym.type.class_name = string_class_offset;
+                method_sym.data.method_data.param_count = 0;
+                method_sym.data.method_data.local_count = 0;
+                method_sym.data.method_data.is_static = 0;
+                method_sym.data.method_data.is_public = 1;
+                
+                if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+        }
+    }
     
     return 0;
 }
