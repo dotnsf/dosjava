@@ -1,4 +1,4 @@
-class Counter {
+﻿class Counter {
     int count;
     
     void increment() {
@@ -21,5 +21,3 @@ class Counter {
         System.out.println(c.getCount());
     }
 }
-
-// Made with Bob

@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <string.h>
 #include "../../src/runtime/fileoutputstream.h"
 #include "../../src/vm/memory.h"
@@ -317,5 +317,3 @@ int main(void) {
         return 1;
     }
 }
-
-// Made with Bob

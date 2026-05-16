@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DOS Time API Wrapper Implementation
  */
 
@@ -169,5 +169,3 @@ uint32_t dos_get_timestamp(void) {
     
     return dos_datetime_to_timestamp(&dt);
 }
-
-// Made with Bob

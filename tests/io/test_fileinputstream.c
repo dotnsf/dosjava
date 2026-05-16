@@ -1,4 +1,4 @@
-#include "../../src/runtime/fileinputstream.h"
+﻿#include "../../src/runtime/fileinputstream.h"
 #include "../../src/vm/memory.h"
 #include <stdio.h>
 #include <string.h>
@@ -338,5 +338,3 @@ int main(void) {
     
     return result;
 }
-
-// Made with Bob

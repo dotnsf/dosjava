@@ -1,4 +1,4 @@
-class Point {
+﻿class Point {
     int x;
     int y;
     
@@ -26,5 +26,3 @@ class Point {
         System.out.println(p.getY());
     }
 }
-
-// Made with Bob

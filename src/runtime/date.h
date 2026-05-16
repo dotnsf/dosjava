@@ -1,4 +1,4 @@
-#ifndef DATE_H
+﻿#ifndef DATE_H
 #define DATE_H
 
 #include "../types.h"
@@ -107,5 +107,3 @@ uint8_t date_get_seconds(Date* date);
 char* date_to_string(Date* date);
 
 #endif /* DATE_H */
-
-// Made with Bob

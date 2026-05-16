@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Wattcp Initialization Test (Simplified)
  *
  * This program tests basic Wattcp functionality:
@@ -167,5 +167,3 @@ int main(void) {
     
     return 0;
 }
-
-// Made with Bob

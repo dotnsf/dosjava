@@ -34,8 +34,7 @@ Test 2b: Display configuration file contents
   22: 
   23: # Debug mode (0=off, 1=minimal, 2=verbose)
   24: debug.mode = 2
-  25: 
-  26: # Made with Bob
+  25:
   --- End of file ---
 
 Test 3: Check for packet driver

@@ -1,4 +1,4 @@
-# Build djvm.exe using Open Watcom
+﻿# Build djvm.exe using Open Watcom
 $ErrorActionPreference = "Stop"
 
 $WATCOM = "C:\WATCOM"
@@ -36,5 +36,3 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Build successful: build\bin\djvm.exe"
-
-# Made with Bob

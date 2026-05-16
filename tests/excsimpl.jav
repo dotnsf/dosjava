@@ -1,4 +1,4 @@
-class ExceptionTest {
+﻿class ExceptionTest {
     public static void main(String[] args) {
         int x;
         try {
@@ -8,5 +8,3 @@ class ExceptionTest {
         }
     }
 }
-
-// Made with Bob

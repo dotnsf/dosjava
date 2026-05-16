@@ -1,4 +1,4 @@
-// E2E Test: BufferedWriter with write() and newLine()
+﻿// E2E Test: BufferedWriter with write() and newLine()
 class E2EWrite {
     static void main() {
         FileOutputStream fos;
@@ -19,5 +19,3 @@ class E2EWrite {
         System.out.println("Write test completed");
     }
 }
-
-// Made with Bob

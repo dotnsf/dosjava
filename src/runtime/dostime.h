@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DOS Time API Wrapper
  * Provides access to DOS system time functions
  */
@@ -48,5 +48,3 @@ int dos_timestamp_to_datetime(uint32_t timestamp, DOSDateTime* dt);
 uint32_t dos_get_timestamp(void);
 
 #endif /* DOSTIME_H */
-
-// Made with Bob

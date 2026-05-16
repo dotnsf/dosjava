@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo ========================================
 echo Date Class Test Program
 echo ========================================
@@ -8,5 +8,3 @@ echo.
 echo ========================================
 echo Test completed
 echo ========================================
-
-@REM Made with Bob

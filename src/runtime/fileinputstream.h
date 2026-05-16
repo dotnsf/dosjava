@@ -1,4 +1,4 @@
-#ifndef FILEINPUTSTREAM_H
+﻿#ifndef FILEINPUTSTREAM_H
 #define FILEINPUTSTREAM_H
 
 #include "inputstream.h"
@@ -49,5 +49,3 @@ int fileinputstream_is_eof(FileInputStream* stream);
 long fileinputstream_get_file_size(FileInputStream* stream);
 
 #endif /* FILEINPUTSTREAM_H */
-
-// Made with Bob

@@ -1,4 +1,4 @@
-// Hex dump utility to see actual byte values
+﻿// Hex dump utility to see actual byte values
 class HexDump {
     static void main() {
         FileInputStream fis;
@@ -46,5 +46,3 @@ class HexDump {
         System.out.println(count);
     }
 }
-
-// Made with Bob

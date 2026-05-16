@@ -1,4 +1,4 @@
-#include <stdlib.h>
+﻿#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "date.h"
@@ -203,5 +203,3 @@ char* date_to_string(Date* date) {
     
     return buffer;
 }
-
-// Made with Bob

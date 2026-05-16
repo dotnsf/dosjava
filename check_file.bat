@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM Check if obj3.djc is being updated
 echo Checking obj3.djc file...
 echo.
@@ -15,5 +15,3 @@ dir tests\obj3.djc
 echo.
 echo Running djvm.exe...
 djvm.exe tests\obj3.djc
-
-@REM Made with Bob

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Throw Statement Tests
  * Tests exception throwing behavior
  */
@@ -80,5 +80,3 @@ class TestThrow {
         System.out.println("  Expected: 20");
     }
 }
-
-// Made with Bob

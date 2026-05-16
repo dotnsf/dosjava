@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM E2E Integration Tests for Phase 3 I/O System
 echo ========================================
 echo Phase 3 E2E Integration Tests
@@ -55,5 +55,3 @@ echo ========================================
 exit /b 1
 
 :end
-
-@REM Made with Bob

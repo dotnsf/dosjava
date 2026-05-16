@@ -1,4 +1,4 @@
-// E2E Test: File copy using FileInputStream and FileOutputStream
+﻿// E2E Test: File copy using FileInputStream and FileOutputStream
 class E2ECopy {
     static void main() {
         FileInputStream fis;
@@ -28,5 +28,3 @@ class E2ECopy {
         System.out.println(" bytes");
     }
 }
-
-// Made with Bob

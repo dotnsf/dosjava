@@ -6,6 +6,7 @@
 #include "../runtime/fileoutputstream.h"
 #include "../runtime/bufferedreader.h"
 #include "../runtime/bufferedwriter.h"
+#include "../runtime/date.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -1976,6 +1977,36 @@ int interpreter_step(ExecutionContext* ctx) {
                 /* In Small memory model, pointer is already 16-bit offset */
                 object_handle = (uint16_t)(uintptr_t)br;
             }
+            else if (strcmp(class_name, "Date") == 0) {
+                /* Date() or Date(long timestamp) */
+                Date* date_obj;
+                
+                if (arg_count == 0) {
+                    /* Date() - current time */
+                    date_obj = date_new();
+                    if (g_debug_mode) {
+                        printf("DEBUG: Created Date with current time\n");
+                    }
+                } else if (arg_count == 1) {
+                    /* Date(long timestamp) */
+                    uint32_t timestamp = (uint32_t)args[0];
+                    date_obj = date_new_with_time(timestamp);
+                    if (g_debug_mode) {
+                        printf("DEBUG: Created Date with timestamp: %lu\n", (unsigned long)timestamp);
+                    }
+                } else {
+                    printf("ERROR: Invalid argument count for Date constructor: %u\n", arg_count);
+                    return -1;
+                }
+                
+                if (date_obj == NULL) {
+                    printf("ERROR: Failed to create Date object\n");
+                    return -1;
+                }
+                
+                /* In Small memory model, pointer is already 16-bit offset */
+                object_handle = (uint16_t)(uintptr_t)date_obj;
+            }
             else {
                 /* Generic object creation (no constructor logic yet) */
                 object_handle = class_name_idx + 1;
@@ -2258,6 +2289,166 @@ int interpreter_step(ExecutionContext* ctx) {
                                 bufferedwriter_close(bw);
                             }
                         }
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "getTime") == 0) {
+                    /* Date.getTime() - returns long (as uint16_t for now) */
+                    Date* date_obj;
+                    uint32_t timestamp;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    date_obj = (Date*)(uintptr_t)object_handle;
+                    timestamp = date_get_time(date_obj);
+                    
+                    /* Push result (truncated to 16-bit for now) */
+                    stack_push_shared(ctx, (uint16_t)timestamp);
+                    
+                    if (g_debug_mode) {
+                        printf("DEBUG: Date.getTime() = %lu\n", (unsigned long)timestamp);
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "setTime") == 0) {
+                    /* Date.setTime(long) */
+                    Date* date_obj;
+                    uint32_t timestamp;
+                    
+                    /* Pop timestamp argument */
+                    timestamp = (uint32_t)stack_pop_shared(ctx);
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    date_obj = (Date*)(uintptr_t)object_handle;
+                    date_set_time(date_obj, timestamp);
+                    
+                    if (g_debug_mode) {
+                        printf("DEBUG: Date.setTime(%lu)\n", (unsigned long)timestamp);
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "getFullYear") == 0) {
+                    /* Date.getFullYear() - returns int */
+                    Date* date_obj;
+                    uint16_t year;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    date_obj = (Date*)(uintptr_t)object_handle;
+                    year = date_get_full_year(date_obj);
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, year);
+                    
+                    if (g_debug_mode) {
+                        printf("DEBUG: Date.getFullYear() = %u\n", year);
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "getMonth") == 0) {
+                    /* Date.getMonth() - returns int (0-11) */
+                    Date* date_obj;
+                    uint8_t month;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    date_obj = (Date*)(uintptr_t)object_handle;
+                    month = date_get_month(date_obj);
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, (uint16_t)month);
+                    
+                    if (g_debug_mode) {
+                        printf("DEBUG: Date.getMonth() = %u\n", month);
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "getDate") == 0) {
+                    /* Date.getDate() - returns int (1-31) */
+                    Date* date_obj;
+                    uint8_t day;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    date_obj = (Date*)(uintptr_t)object_handle;
+                    day = date_get_date(date_obj);
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, (uint16_t)day);
+                    
+                    if (g_debug_mode) {
+                        printf("DEBUG: Date.getDate() = %u\n", day);
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "getHours") == 0) {
+                    /* Date.getHours() - returns int (0-23) */
+                    Date* date_obj;
+                    uint8_t hours;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    date_obj = (Date*)(uintptr_t)object_handle;
+                    hours = date_get_hours(date_obj);
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, (uint16_t)hours);
+                    
+                    if (g_debug_mode) {
+                        printf("DEBUG: Date.getHours() = %u\n", hours);
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "getMinutes") == 0) {
+                    /* Date.getMinutes() - returns int (0-59) */
+                    Date* date_obj;
+                    uint8_t minutes;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    date_obj = (Date*)(uintptr_t)object_handle;
+                    minutes = date_get_minutes(date_obj);
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, (uint16_t)minutes);
+                    
+                    if (g_debug_mode) {
+                        printf("DEBUG: Date.getMinutes() = %u\n", minutes);
+                    }
+                    break;
+                }
+                else if (strcmp(method_name, "getSeconds") == 0) {
+                    /* Date.getSeconds() - returns int (0-59) */
+                    Date* date_obj;
+                    uint8_t seconds;
+                    
+                    /* Pop object reference */
+                    object_handle = stack_pop_shared(ctx);
+                    
+                    /* Call native method */
+                    date_obj = (Date*)(uintptr_t)object_handle;
+                    seconds = date_get_seconds(date_obj);
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, (uint16_t)seconds);
+                    
+                    if (g_debug_mode) {
+                        printf("DEBUG: Date.getSeconds() = %u\n", seconds);
                     }
                     break;
                 }

@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo Copying files to DOSBox environment...
 
 REM Copy compiler and VM executables
@@ -19,5 +19,3 @@ echo.
 
 echo.
 echo Test completed. Check output above.
-
-@REM Made with Bob

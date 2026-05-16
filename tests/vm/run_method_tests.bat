@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM Test script for method invocation
 REM Run this in DOSBox or DOS-compatible environment
 
@@ -33,5 +33,3 @@ echo Test 2: FAILED
 goto end
 
 :end
-
-@REM Made with Bob

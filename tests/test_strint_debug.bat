@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo Testing String + int with debug mode...
 echo.
 
@@ -19,5 +19,3 @@ echo ================================
 echo.
 
 echo Test complete.
-
-@REM Made with Bob

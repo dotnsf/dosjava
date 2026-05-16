@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Basic Exception Handling Tests
  * Tests fundamental try-catch-finally functionality
  */
@@ -79,5 +79,3 @@ class TestBasic {
         System.out.println("  Expected: 3");
     }
 }
-
-// Made with Bob

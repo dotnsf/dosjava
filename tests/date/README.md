@@ -48,7 +48,9 @@ Following JavaScript Date API convention:
 
 ## Test Programs
 
-### test_date.c
+### C Test Programs
+
+#### test_date.c
 Comprehensive test program with 6 test suites:
 
 1. **Test 1: date_new()** - Current time creation
@@ -74,6 +76,115 @@ Comprehensive test program with 6 test suites:
 
 6. **Test 6: Current time validation**
    - Creates Date with current time
+
+### Java Test Programs
+
+The following Java test programs validate the Date class integration with the dosjava compiler and VM:
+
+#### dtest1.jav - Date Class Registration Test
+- **Purpose**: Verify that the Date class is recognized by the compiler
+- **Test**: Creates a Date object with `new Date()`
+- **Expected**: Compiles successfully without errors
+- **Run**: `test_d1.bat`
+
+#### dtest2.jav - Date Constructor Test
+- **Purpose**: Test Date object creation with both constructors
+- **Tests**:
+  - `Date()` - Creates Date with current time
+  - `Date(int timestamp)` - Creates Date with specific timestamp
+- **Expected**: Both constructors work correctly
+- **Run**: `test_d2.bat`
+
+#### dtest3.jav - Date Getter Methods Test
+- **Purpose**: Test all Date getter methods with current time
+- **Tests**:
+  - `getFullYear()` - Returns current year
+  - `getMonth()` - Returns current month (0-11)
+  - `getDate()` - Returns current day (1-31)
+  - `getHours()` - Returns current hour (0-23)
+  - `getMinutes()` - Returns current minute (0-59)
+  - `getSeconds()` - Returns current second (0-59)
+- **Expected**: All getters return reasonable values for current time
+- **Run**: `test_d3.bat`
+
+#### dtest4.jav - Date setTime/getTime Test
+- **Purpose**: Test time modification and retrieval
+- **Tests**:
+  - Create Date with timestamp 10000
+  - Verify date components (1970-01-01 02:46:40)
+  - Call `setTime(20000)`
+  - Verify new date components (1970-01-01 05:33:20)
+  - Call `getTime()` and verify it returns 20000
+- **Expected**: setTime updates the date, getTime returns correct timestamp
+- **Run**: `test_d4.bat`
+
+#### dtest5.jav - Multiple Date Objects Test
+- **Purpose**: Test creating and managing multiple Date objects
+- **Tests**:
+  - Create 3 Date objects with different timestamps
+  - Verify each object maintains its own state
+  - Modify one object with setTime()
+  - Verify other objects are unaffected
+- **Expected**: Each Date object is independent
+- **Run**: `test_d5.bat`
+
+#### dtest6.jav - Date Formatting Test
+- **Purpose**: Demonstrate date formatting in Java
+- **Tests**:
+  - Get current date/time components
+  - Format as "YYYY-MM-DD HH:MM:SS" using println
+  - Display individual components with labels
+- **Expected**: Formatted date output with proper zero-padding
+- **Run**: `test_d6.bat`
+
+#### run_all.bat - Run All Java Tests
+- **Purpose**: Execute all Java Date tests in sequence
+- **Tests**: Runs dtest1 through dtest6
+- **Expected**: All tests pass
+- **Run**: `run_all.bat`
+
+### Java API Usage Examples
+
+```java
+// Example 1: Get current date and time
+Date now = new Date();
+int year = now.getFullYear();
+int month = now.getMonth();  // 0-11
+int day = now.getDate();     // 1-31
+
+// Example 2: Create date with specific timestamp
+Date d = new Date(10000);
+int hours = d.getHours();
+int minutes = d.getMinutes();
+int seconds = d.getSeconds();
+
+// Example 3: Modify date
+Date d = new Date();
+d.setTime(20000);
+int timestamp = d.getTime();
+
+// Example 4: Format date for display
+Date d = new Date();
+System.out.println("Year: ");
+System.out.println(d.getFullYear());
+System.out.println("Month: ");
+System.out.println(d.getMonth() + 1);  // Display as 1-12
+```
+
+### Important Notes for Java Programs
+
+1. **16-bit Integer Limitation**: dosjava only supports 16-bit integers (-32768 to 32767)
+   - Large timestamps (like 1705320645) will overflow
+   - Use small timestamps (< 32767) or current time constructor `Date()`
+   - `getTime()` returns int, not long
+
+2. **Month Convention**: Months are 0-based (0=January, 11=December)
+   - To display as 1-12, add 1: `month + 1`
+
+3. **No String Concatenation**: Use multiple `println()` calls for formatting
+   - Cannot do: `"Year: " + year`
+   - Must do: `println("Year: "); println(year);`
+
    - Validates year is reasonable (>= 2024)
    - Checks month and day ranges
 

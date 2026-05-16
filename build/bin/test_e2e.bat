@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo Testing E2E compilation...
 echo.
 
@@ -32,5 +32,3 @@ echo.
 echo All E2E tests compiled successfully!
 
 :end
-
-@REM Made with Bob

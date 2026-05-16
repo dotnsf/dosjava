@@ -1,4 +1,4 @@
-#ifndef FILEOUTPUTSTREAM_H
+﻿#ifndef FILEOUTPUTSTREAM_H
 #define FILEOUTPUTSTREAM_H
 
 #include "outputstream.h"
@@ -27,5 +27,3 @@ void fileoutputstream_write_bytes(FileOutputStream* stream, const unsigned char*
 void fileoutputstream_flush(FileOutputStream* stream);
 
 #endif /* FILEOUTPUTSTREAM_H */
-
-// Made with Bob

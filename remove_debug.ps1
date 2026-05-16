@@ -1,4 +1,4 @@
-# Remove DEBUG printf/fprintf statements from source files
+﻿# Remove DEBUG printf/fprintf statements from source files
 
 $files = @(
     "tools/compiler/semantic.c",
@@ -39,5 +39,3 @@ foreach ($file in $files) {
 }
 
 Write-Host "`nAll files processed."
-
-# Made with Bob

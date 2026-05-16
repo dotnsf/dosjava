@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DOS Time API Test Program
  */
 
@@ -160,5 +160,3 @@ int main(void) {
         return 1;
     }
 }
-
-// Made with Bob

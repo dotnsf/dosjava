@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Finally Block Tests
  */
 class TestFinally {
@@ -57,5 +57,3 @@ class TestFinally {
         System.out.println("Finally: " + finally_executed);
     }
 }
-
-// Made with Bob

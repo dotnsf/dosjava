@@ -1,4 +1,4 @@
-class strint1 {
+﻿class strint1 {
     public static void main() {
         int count = 42;
         String msg1 = "Count: " + count;
@@ -10,5 +10,3 @@ class strint1 {
         System.out.println(msg3);
     }
 }
-
-// Made with Bob

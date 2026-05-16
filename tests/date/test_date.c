@@ -1,4 +1,4 @@
-#include "../../src/runtime/date.h"
+﻿#include "../../src/runtime/date.h"
 #include "../../src/runtime/dostime.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -262,5 +262,3 @@ int main(void) {
         return 1;
     }
 }
-
-// Made with Bob

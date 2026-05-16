@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Edge Case Tests
  */
 class TestEdge {
@@ -54,5 +54,3 @@ class TestEdge {
         System.out.println("Second: " + count);
     }
 }
-
-// Made with Bob

@@ -1,4 +1,4 @@
-#include <fcntl.h>
+﻿#include <fcntl.h>
 #include <io.h>
 #include "fileinputstream.h"
 #include "../vm/memory.h"
@@ -340,5 +340,3 @@ long fileinputstream_get_file_size(FileInputStream* stream) {
     
     return stream->file_size;
 }
-
-// Made with Bob

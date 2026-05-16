@@ -1,4 +1,4 @@
-#include <fcntl.h>
+﻿#include <fcntl.h>
 #include <io.h>
 #include "fileoutputstream.h"
 #include "../vm/memory.h"
@@ -236,5 +236,3 @@ void fileoutputstream_flush(FileOutputStream* stream) {
     
     flush_buffer(stream);
 }
-
-// Made with Bob

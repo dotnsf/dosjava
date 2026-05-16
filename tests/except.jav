@@ -1,4 +1,4 @@
-class ExceptionTest {
+﻿class ExceptionTest {
     public static void main(String[] args) {
         try {
             System.out.println("In try block");
@@ -11,5 +11,3 @@ class ExceptionTest {
         }
     }
 }
-
-// Made with Bob

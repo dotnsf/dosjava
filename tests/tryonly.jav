@@ -1,4 +1,4 @@
-class TryOnly {
+﻿class TryOnly {
     public static void main(String[] args) {
         int x;
         x = 1;
@@ -10,5 +10,3 @@ class TryOnly {
         x = 4;
     }
 }
-
-// Made with Bob

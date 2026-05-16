@@ -1,4 +1,4 @@
-class Test {
+﻿class Test {
     int x;
     
     void set(int v) {
@@ -15,5 +15,3 @@ class Test {
         System.out.println(t.get());
     }
 }
-
-// Made with Bob

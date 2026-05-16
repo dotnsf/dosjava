@@ -1,4 +1,4 @@
-#ifndef BUFFEREDREADER_H
+﻿#ifndef BUFFEREDREADER_H
 #define BUFFEREDREADER_H
 
 #include "fileinputstream.h"
@@ -23,5 +23,3 @@ int bufferedreader_read(BufferedReader* reader);
 void bufferedreader_close(BufferedReader* reader);
 
 #endif /* BUFFEREDREADER_H */
-
-// Made with Bob

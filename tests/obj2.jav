@@ -1,4 +1,4 @@
-// obj2.jav - Test 2: Field access
+﻿// obj2.jav - Test 2: Field access
 class TestObj2 {
     int x;
     int y;
@@ -11,5 +11,3 @@ class TestObj2 {
         System.out.println(obj.y);
     }
 }
-
-// Made with Bob

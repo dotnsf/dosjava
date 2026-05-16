@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM Wattcp Initialization Test Runner
 REM This batch file runs twatt.exe with wattcp.cfg in current directory
 
@@ -48,5 +48,3 @@ echo.
 echo ========================================
 echo Test completed
 echo ========================================
-
-@REM Made with Bob

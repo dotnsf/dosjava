@@ -57,15 +57,63 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 - 配列要素代入
 - `array.length`
 
+### Dateクラス（Phase 3.5で追加）
+DOS環境で日付・時刻を扱うためのクラス
+
+#### コンストラクタ
+- `Date()` - 現在のシステム時刻でDateオブジェクトを作成
+- `Date(int timestamp)` - 指定したUnixタイムスタンプでDateオブジェクトを作成
+  - **注意**: 16ビット整数制限により、-32768～32767の範囲のみ使用可能
+  - 大きなタイムスタンプは`Date()`コンストラクタ（現在時刻）の使用を推奨
+
+#### メソッド
+- `int getTime()` - Unixタイムスタンプ（秒）を返す
+- `void setTime(int timestamp)` - 指定したタイムスタンプに設定
+- `int getFullYear()` - 年を返す（1980-2099）
+- `int getMonth()` - 月を返す（0-11、0=1月）
+- `int getDate()` - 日を返す（1-31）
+- `int getHours()` - 時を返す（0-23）
+- `int getMinutes()` - 分を返す（0-59）
+- `int getSeconds()` - 秒を返す（0-59）
+
+#### 使用例
+```java
+class DateDemo {
+    public static void main() {
+        Date now = new Date();
+        
+        int year = now.getFullYear();
+        int month = now.getMonth() + 1;  // 1-12で表示
+        int day = now.getDate();
+        
+        System.out.println("Date: ");
+        System.out.println(year);
+        System.out.println("-");
+        System.out.println(month);
+        System.out.println("-");
+        System.out.println(day);
+        
+        return;
+    }
+}
+```
+
+#### 制限事項
+- **16ビット整数制限**: タイムスタンプは-32768～32767の範囲のみ
+- **月の規約**: 0ベース（0=1月、11=12月）、JavaScript Date APIと同じ
+- **日付範囲**: 1980年1月1日～2099年12月31日（DOS制限）
+- **タイムゾーン**: ローカル時刻のみ（タイムゾーン変換なし）
+- **精度**: 秒単位（ミリ秒なし）
+
 ### 制限事項
-- インスタンスメソッド不可
+- インスタンスメソッド不可（Dateクラスを除く）
 - メソッドオーバーロード不可
 - `String` パラメータ不可
 - `String` 戻り値不可
 - `String + int` 不可
-- 一般オブジェクト生成不可
+- 一般オブジェクト生成不可（Dateクラスを除く）
 - 継承・インターフェース不可
-- 例外処理不可
+- 例外処理不可（Phase 3.5.1でテストファイル作成済み、実装は将来）
 - パッケージ・import不可
 
 ## システム要件

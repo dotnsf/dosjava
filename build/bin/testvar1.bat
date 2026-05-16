@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo Testing var1.djc...
 if exist stdout.txt del stdout.txt
 if exist stderr.txt del stderr.txt
@@ -34,5 +34,3 @@ echo.
 echo Test failed!
 
 :end
-
-@REM Made with Bob

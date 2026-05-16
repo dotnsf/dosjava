@@ -1,4 +1,4 @@
-# Stack Overflow Fix - DOS Java Compiler
+﻿# Stack Overflow Fix - DOS Java Compiler
 
 ## Problem Report
 
@@ -22,16 +22,16 @@ Lexer lexer;  // On stack
 ```
 - `buffer[512]` = 512 bytes
 - `string_pool[2048]` = 2,048 bytes
-- Other fields ≈ 20 bytes
+- Other fields 竕・20 bytes
 - **Total: ~2,580 bytes**
 
 #### 2. Parser Phase (`run_parser_phase`)
 ```c
 Parser parser;  // On stack
 ```
-- `ASTNode nodes[128]` = 128 × 20 bytes = 2,560 bytes
+- `ASTNode nodes[128]` = 128 ﾃ・20 bytes = 2,560 bytes
 - `string_pool[2048]` = 2,048 bytes
-- Other fields ≈ 20 bytes
+- Other fields 竕・20 bytes
 - **Total: ~4,628 bytes**
 
 #### 3. Semantic Phase (`run_semantic_phase`)
@@ -170,31 +170,31 @@ $(LD) $(LDFLAGS) option stack=16384 name $@ file { ... }
 ### Before (Both Issues)
 ```
 Stack (4-8 KB):
-├── main() frame
-├── compiler_compile() frame
-├── run_lexer_phase() frame
-│   └── Lexer lexer [2.5 KB] ← OVERFLOW!
-└── [No space left]
+笏懌楳笏 main() frame
+笏懌楳笏 compiler_compile() frame
+笏懌楳笏 run_lexer_phase() frame
+笏・  笏披楳笏 Lexer lexer [2.5 KB] 竊・OVERFLOW!
+笏披楳笏 [No space left]
 
 Heap (~600 KB):
-└── [Mostly unused]
+笏披楳笏 [Mostly unused]
 ```
 
 ### After (Both Fixes Applied)
 ```
 Stack (4-8 KB):
-├── main() frame
-├── compiler_compile() frame
-├── run_lexer_phase() frame
-│   └── Lexer* lexer [2 bytes pointer]
-├── [More function frames...]
-└── [Plenty of space - 16KB total]
+笏懌楳笏 main() frame
+笏懌楳笏 compiler_compile() frame
+笏懌楳笏 run_lexer_phase() frame
+笏・  笏披楳笏 Lexer* lexer [2 bytes pointer]
+笏懌楳笏 [More function frames...]
+笏披楳笏 [Plenty of space - 16KB total]
 
 Heap (~600 KB):
-├── Lexer structure [2.5 KB]
-├── Parser structure [4.6 KB]
-├── SemanticAnalyzer [3 KB]
-└── CodeGenerator [2 KB]
+笏懌楳笏 Lexer structure [2.5 KB]
+笏懌楳笏 Parser structure [4.6 KB]
+笏懌楳笏 SemanticAnalyzer [3 KB]
+笏披楳笏 CodeGenerator [2 KB]
 ```
 
 ## Testing
@@ -238,7 +238,7 @@ After applying this fix:
 ### Best Practices
 
 ```c
-// ✓ GOOD: Heap allocation for large structures
+// 笨・GOOD: Heap allocation for large structures
 MyLargeStruct* s = (MyLargeStruct*)malloc(sizeof(MyLargeStruct));
 if (!s) {
     // Handle error
@@ -247,7 +247,7 @@ if (!s) {
 // Use s...
 free(s);
 
-// ✗ BAD: Stack allocation for large structures
+// 笨・BAD: Stack allocation for large structures
 MyLargeStruct s;  // May cause stack overflow!
 ```
 
@@ -288,11 +288,10 @@ This fix resolves the stack overflow issue through **two complementary solutions
 
 Together, these changes ensure the compiler runs reliably on 16-bit DOS systems.
 
-**Status**: ✅ Fixed and tested
+**Status**: 笨・Fixed and tested
 **Impact**: Critical - Enables compiler to run on target platform
 **Risk**: Low - Standard practice for DOS development
 **Stack Usage**: ~500 bytes (well within 16KB limit)
 **Heap Usage**: ~12KB (well within 600KB DOS heap)
 
 ---
-*Made with Bob - DOS Java Compiler Project*

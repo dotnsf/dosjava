@@ -1,4 +1,4 @@
-# Fix hardcoded values in codegen.c
+﻿# Fix hardcoded values in codegen.c
 $file = "tools/compiler/codegen.c"
 $content = Get-Content $file -Raw
 
@@ -17,5 +17,3 @@ $content = $content -replace '(if \(\(left_node && left_node->type == NODE_LITER
 
 Set-Content $file $content -NoNewline
 Write-Host "Fixed hardcoded values in $file"
-
-# Made with Bob

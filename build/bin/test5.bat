@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo Testing hello.jav compilation and execution...
 
 rem Delete old HELLO.DJC if exists
@@ -33,5 +33,3 @@ echo ERROR: Runtime error
 goto end
 
 :end
-
-@REM Made with Bob

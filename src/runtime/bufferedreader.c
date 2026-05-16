@@ -1,4 +1,4 @@
-#include "bufferedreader.h"
+﻿#include "bufferedreader.h"
 #include "../vm/memory.h"
 #include <string.h>
 
@@ -134,5 +134,3 @@ void bufferedreader_close(BufferedReader* reader) {
     /* Note: We don't close the underlying stream - caller owns it */
     reader->eof_reached = 1;
 }
-
-// Made with Bob

@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo === Starting Test ===
 echo.
 echo [1] Compiling hello.jav with djc.exe...
@@ -19,5 +19,3 @@ echo ERRORLEVEL: %ERRORLEVEL%
 echo.
 :end
 echo === Test Complete ===
-
-@REM Made with Bob

@@ -1,4 +1,4 @@
-Set-Location "c:\Users\KEIKIMURA\src"
+﻿Set-Location "c:\Users\KEIKIMURA\src"
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
@@ -11,5 +11,3 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
                 [System.IO.File]::WriteAllText($path, $text, $utf8NoBom)
             }
     }
-
-# Made with Bob

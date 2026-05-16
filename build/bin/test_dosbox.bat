@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo Testing djc.exe compilation... > result.txt
 djc.exe hello.jav >> result.txt 2>&1
 if errorlevel 1 (
@@ -17,5 +17,3 @@ if errorlevel 1 (
 )
 echo Execution successful! >> result.txt
 type result.txt
-
-@REM Made with Bob

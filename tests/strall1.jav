@@ -1,4 +1,4 @@
-class Student {
+﻿class Student {
     String name;
     int score;
     
@@ -24,5 +24,3 @@ class strall1 {
         System.out.println(s2.getReport());
     }
 }
-
-// Made with Bob

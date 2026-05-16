@@ -1,4 +1,4 @@
-class Simple {
+﻿class Simple {
     public static void main(String[] args) {
         int x;
         x = 1;
@@ -6,5 +6,3 @@ class Simple {
         x = 3;
     }
 }
-
-// Made with Bob

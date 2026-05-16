@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM Check build dates of executables
 echo Checking executable versions...
 echo.
@@ -14,5 +14,3 @@ dir djvm.exe 2>nul
 echo.
 echo PATH:
 echo %PATH%
-
-@REM Made with Bob

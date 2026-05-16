@@ -1,4 +1,4 @@
-class Test {
+﻿class Test {
     int value;
     
     void setValue(int v) {
@@ -16,5 +16,3 @@ class Test {
         System.out.println(t.getValue());
     }
 }
-
-// Made with Bob

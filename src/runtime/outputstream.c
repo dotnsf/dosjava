@@ -1,4 +1,4 @@
-#include "outputstream.h"
+﻿#include "outputstream.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -115,5 +115,3 @@ uint16_t outputstream_get_position(OutputStream* stream) {
     }
     return stream->position;
 }
-
-// Made with Bob

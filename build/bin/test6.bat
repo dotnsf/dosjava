@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo Testing hello_simple.jav compilation and execution...
 
 rem Delete old files
@@ -33,5 +33,3 @@ echo ERROR: Runtime error
 goto end
 
 :end
-
-@REM Made with Bob

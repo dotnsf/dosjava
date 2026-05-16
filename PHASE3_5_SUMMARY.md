@@ -505,3 +505,71 @@ The dosjava project now has a solid foundation for date/time operations and is r
 **Document Version**: 1.0  
 **Last Updated**: 2026-05-16  
 **Status**: Phase 3.5.2 Complete, Phase 3.5.1 Pending Implementation
+### Phase 3.5.3: Date Java Integration (Day 9-13)
+**Status**: ✅ COMPLETED
+
+Integrated the Date class with the dosjava compiler and VM, enabling Java programs to use date/time functionality.
+
+#### Day 9 (Day 1): Semantic Analyzer Update - COMPLETED
+- Modified `tools/compiler/semantic.c`
+- Added "Date" to builtin_classes array
+- Compiler recognizes Date as valid class type
+- Test: dtest1.jav ✅ PASSED
+
+#### Day 10 (Day 2): VM OP_NEW Update - COMPLETED
+- Modified `src/vm/interpreter.c` (OP_NEW case)
+- Implemented Date() and Date(int) constructors
+- Supports current time and timestamp-based creation
+- Test: dtest2.jav ✅ PASSED
+
+#### Day 11 (Day 3): VM OP_INVOKE_VIRTUAL Update - COMPLETED
+- Modified `src/vm/interpreter.c` (OP_INVOKE_VIRTUAL case)
+- Implemented 8 Date methods: getTime, setTime, getFullYear, getMonth, getDate, getHours, getMinutes, getSeconds
+- Modified `tools/compiler/semantic.c` for Date method validation
+- Fixed 16-bit integer limitation (changed long to int)
+- Fixed type checking bug (string comparison vs offset)
+- Tests: dtest3.jav, dtest4.jav ✅ PASSED
+
+#### Day 12 (Day 4): Comprehensive Java Test Programs - COMPLETED
+- Created 6 Java test programs (dtest1-dtest6)
+- Created 7 batch files (test_d1-test_d6, run_all)
+- Updated tests/date/README.md with Java section
+- Fixed string pool overflow issue
+- Fixed semantic analyzer type checking
+- All tests ✅ PASSED
+
+#### Day 13 (Day 5): Integration Testing and Documentation - COMPLETED
+- Created PHASE3_5_3_COMPLETION.md
+- Updated PHASE3_5_SUMMARY.md
+- All integration tests passed
+- Documentation complete
+
+**Java API Available:**
+```java
+Date d = new Date();              // Current time
+Date d = new Date(timestamp);     // Specific time (16-bit)
+int year = d.getFullYear();       // 1980-2099
+int month = d.getMonth();         // 0-11
+int day = d.getDate();            // 1-31
+int hours = d.getHours();         // 0-23
+int minutes = d.getMinutes();     // 0-59
+int seconds = d.getSeconds();     // 0-59
+int time = d.getTime();           // Unix timestamp
+d.setTime(timestamp);             // Set time
+```
+
+**Files Modified:**
+- `tools/compiler/semantic.c` - Date class and method registration
+- `src/vm/interpreter.c` - Date object creation and method invocation
+
+**Test Files:**
+- `tests/date/dtest1.jav` - dtest6.jav - Java test programs
+- `tests/date/test_d1.bat` - test_d6.bat - Test runners
+- `tests/date/run_all.bat` - All tests runner
+
+**Documentation:**
+- `tests/date/README.md` - Updated with Java test section
+- `PHASE3_5_3_COMPLETION.md` - Completion report
+- `PHASE3_5_3_JAVA_INTEGRATION_PLAN.md` - Implementation plan
+
+---

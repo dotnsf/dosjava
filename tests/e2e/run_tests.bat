@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 setlocal enabledelayedexpansion
 
 echo ========================================
@@ -85,5 +85,3 @@ for %%f in (*.java) do (
 
 popd
 goto :eof
-
-@REM Made with Bob

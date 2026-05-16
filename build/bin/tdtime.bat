@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo ========================================
 echo DOS Time API Test
 echo ========================================
@@ -7,5 +7,3 @@ tdtime.exe
 echo.
 echo Test completed.
 echo ========================================
-
-@REM Made with Bob

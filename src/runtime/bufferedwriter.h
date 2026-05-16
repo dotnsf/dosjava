@@ -1,4 +1,4 @@
-#ifndef BUFFEREDWRITER_H
+﻿#ifndef BUFFEREDWRITER_H
 #define BUFFEREDWRITER_H
 
 #include "fileoutputstream.h"
@@ -24,5 +24,3 @@ void bufferedwriter_flush(BufferedWriter* writer);
 void bufferedwriter_close(BufferedWriter* writer);
 
 #endif /* BUFFEREDWRITER_H */
-
-// Made with Bob

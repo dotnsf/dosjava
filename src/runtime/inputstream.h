@@ -1,4 +1,4 @@
-#ifndef INPUTSTREAM_H
+﻿#ifndef INPUTSTREAM_H
 #define INPUTSTREAM_H
 
 #include "object.h"
@@ -90,5 +90,3 @@ uint8_t inputstream_is_open(InputStream* stream);
 uint16_t inputstream_get_position(InputStream* stream);
 
 #endif /* INPUTSTREAM_H */
-
-// Made with Bob

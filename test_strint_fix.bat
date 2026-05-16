@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo Testing String + int fix...
 echo.
 echo Test 1: strint2.jav (System.out.println("Value: " + 42))
@@ -21,5 +21,3 @@ goto end
 :error
 echo Compilation failed!
 :end
-
-@REM Made with Bob

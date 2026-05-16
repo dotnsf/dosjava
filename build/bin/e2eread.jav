@@ -1,4 +1,4 @@
-// E2E Test: BufferedReader with readLine()
+﻿// E2E Test: BufferedReader with readLine()
 class E2ERead {
     static void main() {
         FileInputStream fis;
@@ -21,5 +21,3 @@ class E2ERead {
         System.out.println("Read test completed");
     }
 }
-
-// Made with Bob

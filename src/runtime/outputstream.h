@@ -1,4 +1,4 @@
-#ifndef OUTPUTSTREAM_H
+﻿#ifndef OUTPUTSTREAM_H
 #define OUTPUTSTREAM_H
 
 #include "object.h"
@@ -81,5 +81,3 @@ uint8_t outputstream_is_open(OutputStream* stream);
 uint16_t outputstream_get_position(OutputStream* stream);
 
 #endif /* OUTPUTSTREAM_H */
-
-// Made with Bob

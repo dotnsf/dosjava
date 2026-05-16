@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 echo Testing hello.jav compilation and execution...
 
 rem Compile hello.jav
@@ -30,5 +30,3 @@ echo ERROR: Runtime error
 goto end
 
 :end
-
-@REM Made with Bob

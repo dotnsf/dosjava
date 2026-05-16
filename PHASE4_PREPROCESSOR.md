@@ -1,4 +1,4 @@
-# Phase 4: Java .class to .djc Preprocessor Implementation
+﻿# Phase 4: Java .class to .djc Preprocessor Implementation
 
 ## Overview
 
@@ -72,35 +72,35 @@ JavaMethod* class_find_method(JavaClass* cls, const char* name);
 **Supported Java Opcodes (40+ instructions):**
 
 **Constants:**
-- iconst_m1, iconst_0-5 → PUSH_INT
-- bipush, sipush → PUSH_INT
-- ldc → PUSH_CONST
+- iconst_m1, iconst_0-5 竊・PUSH_INT
+- bipush, sipush 竊・PUSH_INT
+- ldc 竊・PUSH_CONST
 
 **Local Variables:**
-- iload, iload_0-3 → LOAD_LOCAL, LOAD_0-2
-- istore, istore_0-3 → STORE_LOCAL, STORE_0-2
+- iload, iload_0-3 竊・LOAD_LOCAL, LOAD_0-2
+- istore, istore_0-3 竊・STORE_LOCAL, STORE_0-2
 
 **Stack Operations:**
-- pop → POP
-- dup → DUP
+- pop 竊・POP
+- dup 竊・DUP
 
 **Arithmetic:**
-- iadd → ADD
-- isub → SUB
-- imul → MUL
-- idiv → DIV
-- irem → MOD
-- ineg → NEG
-- iinc → INC_LOCAL
+- iadd 竊・ADD
+- isub 竊・SUB
+- imul 竊・MUL
+- idiv 竊・DIV
+- irem 竊・MOD
+- ineg 竊・NEG
+- iinc 竊・INC_LOCAL
 
 **Control Flow:**
-- ifeq, ifne, iflt, ifge, ifgt, ifle → IF_EQ, IF_NE, IF_LT, IF_GE, IF_GT, IF_LE
-- if_icmpeq, if_icmpne, if_icmplt, if_icmpge, if_icmpgt, if_icmple → IF_EQ, IF_NE, IF_LT, IF_GE, IF_GT, IF_LE
-- goto → GOTO
+- ifeq, ifne, iflt, ifge, ifgt, ifle 竊・IF_EQ, IF_NE, IF_LT, IF_GE, IF_GT, IF_LE
+- if_icmpeq, if_icmpne, if_icmplt, if_icmpge, if_icmpgt, if_icmple 竊・IF_EQ, IF_NE, IF_LT, IF_GE, IF_GT, IF_LE
+- goto 竊・GOTO
 
 **Method Returns:**
-- ireturn → RETURN_VALUE
-- return → RETURN
+- ireturn 竊・RETURN_VALUE
+- return 竊・RETURN
 
 ## Build System Updates
 
@@ -171,7 +171,7 @@ test_int Test.djc
 
 ## Bytecode Conversion Examples
 
-### Java Bytecode → .djc Bytecode
+### Java Bytecode 竊・.djc Bytecode
 
 **Example 1: Simple Addition**
 ```
@@ -244,7 +244,7 @@ iflt label          PUSH_INT 0
 
 ### Output Size
 - Typical reduction: 60-80% smaller than .class
-- Example: 2 KB .class → 400 bytes .djc
+- Example: 2 KB .class 竊・400 bytes .djc
 
 ## Testing
 
@@ -305,15 +305,13 @@ test_int Test.djc
 ## Summary
 
 Phase 4 successfully implements:
-- ✅ Integer wrapper class (310 lines)
-- ✅ Java .class parser (529 lines)
-- ✅ Bytecode converter (502 lines)
-- ✅ Build system integration
-- ✅ Documentation
+- 笨・Integer wrapper class (310 lines)
+- 笨・Java .class parser (529 lines)
+- 笨・Bytecode converter (502 lines)
+- 笨・Build system integration
+- 笨・Documentation
 
 **Total New Code:** ~1,341 lines
 **Total Project Code:** ~8,200 lines
 
 The preprocessor enables conversion of standard Java bytecode to the lightweight .djc format, making it possible to run Java programs on 16-bit DOS systems.
-
-## Made with Bob

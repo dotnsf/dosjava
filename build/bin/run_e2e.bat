@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM E2E Integration Tests for Phase 3 I/O System (DOSBox-X version)
 echo ========================================
 echo Phase 3 E2E Integration Tests
@@ -54,5 +54,3 @@ echo E2E tests FAILED!
 echo ========================================
 
 :end
-
-@REM Made with Bob

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Nested Try-Catch Tests
  */
 class TestNested {
@@ -72,5 +72,3 @@ class TestNested {
         System.out.println("Result: " + result);
     }
 }
-
-// Made with Bob

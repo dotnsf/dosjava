@@ -87,6 +87,7 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
         "FileInputStream",
         "OutputStream",
         "InputStream",
+        "Date",
         NULL
     };
     int i;
@@ -2107,6 +2108,80 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
             result_type->kind = TYPE_CLASS;
             result_type->class_name = string_name_off;
         }
+        return 0;
+    }
+    
+    /* Special-case Date instance methods */
+    if (method_name && object_idx != 0 &&
+        (strcmp(method_name, "getTime") == 0 ||
+         strcmp(method_name, "setTime") == 0 ||
+         strcmp(method_name, "getFullYear") == 0 ||
+         strcmp(method_name, "getMonth") == 0 ||
+         strcmp(method_name, "getDate") == 0 ||
+         strcmp(method_name, "getHours") == 0 ||
+         strcmp(method_name, "getMinutes") == 0 ||
+         strcmp(method_name, "getSeconds") == 0)) {
+        
+        TypeInfo object_type;
+        ASTNode* object_node;
+        const char* class_name;
+        
+        /* Check object expression */
+        object_node = semantic_get_node(analyzer, object_idx);
+        if (!object_node || check_expression(analyzer, object_node, &object_type) != 0) {
+            return -1;
+        }
+        
+        /* Object must be of Date class type */
+        if (object_type.kind != TYPE_CLASS) {
+            semantic_error_node(analyzer, call_node, "Date method requires Date receiver");
+            return -1;
+        }
+        
+        /* Get class name string */
+        class_name = semantic_get_string(analyzer, object_type.class_name);
+        if (!class_name) {
+            class_name = symtable_get_string(analyzer->symtable, object_type.class_name);
+        }
+        
+        /* Verify it's a Date object */
+        if (!class_name || strcmp(class_name, "Date") != 0) {
+            semantic_error_node(analyzer, call_node, "Date method requires Date receiver");
+            return -1;
+        }
+        
+        /* Validate argument counts and set return types */
+        if (strcmp(method_name, "getTime") == 0) {
+            /* int getTime() - returns timestamp as int (uint32_t truncated to int) */
+            if (arg_count != 0) {
+                semantic_error_node(analyzer, call_node, "getTime() takes no arguments");
+                return -1;
+            }
+            result_type->kind = TYPE_INT;
+            result_type->class_name = 0;
+        } else if (strcmp(method_name, "setTime") == 0) {
+            /* void setTime(int timestamp) */
+            if (arg_count != 1) {
+                semantic_error_node(analyzer, call_node, "setTime() requires 1 argument");
+                return -1;
+            }
+            result_type->kind = TYPE_VOID;
+            result_type->class_name = 0;
+        } else if (strcmp(method_name, "getFullYear") == 0 ||
+                   strcmp(method_name, "getMonth") == 0 ||
+                   strcmp(method_name, "getDate") == 0 ||
+                   strcmp(method_name, "getHours") == 0 ||
+                   strcmp(method_name, "getMinutes") == 0 ||
+                   strcmp(method_name, "getSeconds") == 0) {
+            /* int getXXX() - all getters return int */
+            if (arg_count != 0) {
+                semantic_error_node(analyzer, call_node, "Date getter methods take no arguments");
+                return -1;
+            }
+            result_type->kind = TYPE_INT;
+            result_type->class_name = 0;
+        }
+        
         return 0;
     }
     

@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM Build script for Wattcp initialization test
 
 echo Building Wattcp initialization test...
@@ -33,5 +33,3 @@ echo Build failed!
 echo.
 
 :end
-
-@REM Made with Bob

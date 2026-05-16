@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 set WATCOM=C:\Watcom
 set PATH=C:\Watcom\BINNT;%PATH%
 set INCLUDE=C:\Watcom\H
@@ -9,5 +9,3 @@ if exist build\bin\djc.exe (
 ) else (
     echo djc.exe not found in build\bin
 )
-
-@REM Made with Bob

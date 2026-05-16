@@ -1,4 +1,4 @@
-#include "bufferedwriter.h"
+﻿#include "bufferedwriter.h"
 #include "../vm/memory.h"
 #include <string.h>
 #include <stdio.h>
@@ -146,5 +146,3 @@ void bufferedwriter_close(BufferedWriter* writer) {
     
     /* Note: We don't close the underlying stream - caller owns it */
 }
-
-// Made with Bob

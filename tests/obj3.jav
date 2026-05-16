@@ -1,4 +1,4 @@
-// obj3.jav - Test 3: Instance method call
+﻿// obj3.jav - Test 3: Instance method call
 class TestObj3 {
     int value;
     
@@ -17,5 +17,3 @@ class TestObj3 {
         System.out.println(result);
     }
 }
-
-// Made with Bob

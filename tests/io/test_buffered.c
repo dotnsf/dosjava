@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <string.h>
 #include "../../src/runtime/bufferedreader.h"
 #include "../../src/runtime/bufferedwriter.h"
@@ -272,5 +272,3 @@ int main(void) {
         return 1;
     }
 }
-
-// Made with Bob

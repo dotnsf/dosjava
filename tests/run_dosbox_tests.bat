@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM DOSBox Test Automation Script for DOS Java Compiler
 REM This script runs the test suite in DOSBox
 
@@ -65,5 +65,3 @@ echo DOSBox test session ended.
 echo Check the DOSBox window for test results.
 echo.
 pause
-
-@REM Made with Bob

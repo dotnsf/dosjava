@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM Rebuild djvm.exe with latest changes
 set WATCOM=C:\WATCOM
 set PATH=C:\WATCOM\binw;%PATH%
@@ -31,5 +31,3 @@ echo Build failed!
 exit /b 1
 
 :end
-
-@REM Made with Bob

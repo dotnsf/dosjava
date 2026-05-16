@@ -1,4 +1,4 @@
-class Person {
+﻿class Person {
     String name;
     int age;
     
@@ -29,5 +29,3 @@ class strfld1 {
         System.out.println(p.getAge());
     }
 }
-
-// Made with Bob
