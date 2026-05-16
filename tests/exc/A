@@ -1,0 +1,7 @@
+=== Edge Tests ===
+Test 1: Empty blocks
+Status: 1
+Test 2: Exc in catch
+Inner try
+Inner catch
+Unhandled exception - halting

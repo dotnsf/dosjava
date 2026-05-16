@@ -188,57 +188,62 @@
 ### Day 5: Exception Testing
 
 #### Basic Exception Tests
-- [ ] `tests/exception/` ディレクトリ作成
+- [x] `tests/exc/` ディレクトリ作成
 
-- [ ] `tests/exception/test_basic.jav` 作成
-  - [ ] Test 1: 基本的なtry-catch
-  - [ ] Test 2: try-finallyのみ（例外なし）
-  - [ ] Test 3: try-catch-finally（例外あり）
+- [x] `tests/exc/exc1.jav` (test_basic) 作成
+  - [x] Test 1: 基本的なtry-catch
+  - [x] Test 2: try-finallyのみ（例外なし）
+  - [x] Test 3: try-catch-finally（例外あり）
   - [ ] コンパイル確認
   - [ ] 実行確認
   - [ ] 出力確認
 
-- [ ] `tests/exception/test_throw.jav` 作成
-  - [ ] Test 1: throw文の基本動作
-  - [ ] Test 2: throw後のコードが実行されないこと
-  - [ ] Test 3: catchで例外をキャッチ
+- [x] `tests/exc/exc2.jav` (test_throw) 作成
+  - [x] Test 1: throw文の基本動作
+  - [x] Test 2: throw後のコードが実行されないこと
+  - [x] Test 3: catchで例外をキャッチ
   - [ ] コンパイル確認
   - [ ] 実行確認
   - [ ] 出力確認
 
 #### Nested Exception Tests
-- [ ] `tests/exception/test_nested.jav` 作成
-  - [ ] Test 1: ネストしたtry-catch
-  - [ ] Test 2: 内側の例外処理
-  - [ ] Test 3: 外側の例外処理
+- [x] `tests/exc/exc3.jav` (test_nested) 作成
+  - [x] Test 1: ネストしたtry-catch
+  - [x] Test 2: 内側の例外処理
+  - [x] Test 3: 外側の例外処理
+  - [x] Test 4: 両レベルでfinally
   - [ ] コンパイル確認
   - [ ] 実行確認
   - [ ] 出力確認
 
 #### Finally Guarantee Tests
-- [ ] `tests/exception/test_finally.jav` 作成
-  - [ ] Test 1: finallyが常に実行されること
-  - [ ] Test 2: return前のfinally実行
-  - [ ] Test 3: 例外発生時のfinally実行
+- [x] `tests/exc/exc4.jav` (test_finally) 作成
+  - [x] Test 1: finallyが常に実行されること
+  - [x] Test 2: 例外なしでのfinally実行
+  - [x] Test 3: 例外発生時のfinally実行
+  - [x] Test 4: catch後のfinally実行
   - [ ] コンパイル確認
   - [ ] 実行確認
   - [ ] 出力確認
 
 #### Edge Case Tests
-- [ ] `tests/exception/test_edge.jav` 作成
-  - [ ] Test 1: 未処理例外
-  - [ ] Test 2: catchブロック内での例外
-  - [ ] Test 3: finallyブロック内での例外
+- [x] `tests/exc/exc5.jav` (test_edge) 作成
+  - [x] Test 1: 空のtryブロック
+  - [x] Test 2: 空のcatchブロック
+  - [x] Test 3: 空のfinallyブロック
+  - [x] Test 4: throw後の複数文
+  - [x] Test 5: catchブロック内での例外
+  - [x] Test 6: finallyブロック内での例外
   - [ ] コンパイル確認
   - [ ] 実行確認
   - [ ] 出力確認
 
 #### Test Documentation
-- [ ] `tests/exception/README.md` 作成
-  - [ ] テスト概要
-  - [ ] 各テストの説明
-  - [ ] 実行方法
-  - [ ] 期待される結果
+- [x] `tests/exc/README.md` 作成
+  - [x] テスト概要
+  - [x] 各テストの説明
+  - [x] 実行方法
+  - [x] 期待される結果
 
 #### Regression Testing
 - [ ] 既存のテストが全てパスすることを確認
@@ -246,13 +251,13 @@
 - [ ] パフォーマンス測定
 
 **Deliverables:**
-- tests/exception/test_basic.jav
-- tests/exception/test_throw.jav
-- tests/exception/test_nested.jav
-- tests/exception/test_finally.jav
-- tests/exception/test_edge.jav
-- tests/exception/README.md
-- 全テストパス確認
+- [x] tests/exc/exc1.jav (test_basic)
+- [x] tests/exc/exc2.jav (test_throw)
+- [x] tests/exc/exc3.jav (test_nested)
+- [x] tests/exc/exc4.jav (test_finally)
+- [x] tests/exc/exc5.jav (test_edge)
+- [x] tests/exc/README.md
+- [ ] 全テストパス確認（DOSBox-Xでの実行待ち）
 
 ## Phase 3.5.2: Date Support (Day 6-8)
 
@@ -542,11 +547,14 @@
   - [ ] New opcodes
   - [ ] Exception handler structure
   - [ ] Exception handling implementation
-- [ ] Day 5: Exception Testing (0%)
-  - [ ] Basic tests
-  - [ ] Nested tests
-  - [ ] Finally tests
-  - [ ] Edge case tests
+- [x] Day 5: Exception Testing (80% - テストファイル作成完了、実行確認待ち)
+  - [x] Basic tests (exc1.jav)
+  - [x] Throw tests (exc2.jav)
+  - [x] Nested tests (exc3.jav)
+  - [x] Finally tests (exc4.jav)
+  - [x] Edge case tests (exc5.jav)
+  - [x] Test documentation (README.md)
+  - [ ] DOSBox-Xでの実行確認
 
 ### Phase 3.5.2: Date Support
 - [ ] Day 6: DOS Time API Integration (0%)
@@ -625,6 +633,6 @@
 
 ---
 
-**Last Updated**: 2026-05-15
-**Status**: Ready to begin Phase 3.5.1 Day 1
-**Next Task**: Lexer updates for exception keywords
+**Last Updated**: 2026-05-16
+**Status**: Phase 3.5.1 Day 5 - Test files created, awaiting DOSBox-X execution
+**Next Task**: DOSBox-Xでの例外処理テスト実行と結果確認
