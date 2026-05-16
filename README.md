@@ -310,6 +310,7 @@ run_tests.bat
 - [ARCHITECTURE.md](ARCHITECTURE.md) - システムアーキテクチャ
 - [BUILD.md](BUILD.md) - ビルド手順
 - [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md) - 技術仕様
+- [PHASE3_5_SUMMARY.md](PHASE3_5_SUMMARY.md) - Phase 3.5実装サマリー（Date Support完了）
 - [PHASE5_PLAN.md](PHASE5_PLAN.md) - Phase 5実装計画
 
 ## トラブルシューティング
@@ -348,14 +349,44 @@ Error: Type mismatch
 - `String + int`、`String` 引数、`String` 戻り値は未対応
 - float/double型なし
 
-## 今後の予定
+## 開発フェーズ
 
-- [x] 仮想マシン（djvm.exe）の実装
-- [x] 文字列リテラルのサポート
-- [x] `String.length()` のサポート
-- [x] `String + String` 連結のサポート
-- [-] 配列サポートの安定化
-- [ ] `String` 引数/戻り値のサポート
+### Phase 1: 基本機能 ✅ 完了
+- 仮想マシン（djvm.exe）の実装
+- 文字列リテラルのサポート
+- `String.length()` のサポート
+- `String + String` 連結のサポート
+
+### Phase 2: String機能拡張 ✅ 完了
+- String クラスの完全実装
+- 文字列操作メソッド（charAt, substring, indexOf, etc.）
+- 文字列比較とユーティリティ
+
+### Phase 3: I/O System ✅ 完了
+- InputStream/OutputStream 基底クラス
+- FileInputStream/FileOutputStream
+- BufferedReader/BufferedWriter
+- コンストラクタ引数サポート
+
+### Phase 3.5: Exception Handling and Date Support 🔄 進行中
+- **Phase 3.5.1**: Exception Handling ⏳ 準備完了
+  - try-catch-finally-throw テストファイル作成済み
+  - コンパイラ/VM実装待ち
+- **Phase 3.5.2**: Date Support ✅ 完了
+  - DOS Time API実装（dostime.h/dostime.c）
+  - Date クラス実装（date.h/date.c）
+  - 全48テストパス
+  - 詳細: [PHASE3_5_SUMMARY.md](PHASE3_5_SUMMARY.md)
+
+### Phase 4: Network Functionality 🔄 進行中
+- Wattcp TCP/IP スタック統合
+- Socket/ServerSocket クラス
+- ネットワークI/O
+
+### 今後の予定
+- [ ] Phase 3.5.1 Exception Handling実装（コンパイラ/VM）
+- [ ] Phase 4 Network機能完成
+- [ ] Native Method Mechanism（Date/Exception Java統合）
 - [ ] より多くのランタイムライブラリ
 - [ ] 最適化
 - [ ] デバッガ

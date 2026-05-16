@@ -3,10 +3,14 @@
 
 /**
  * Common type definitions for DOS Java
- * 
+ *
  * Provides portable integer types for 16-bit DOS environment
  * Compatible with Open Watcom C compiler
  */
+
+/* Prevent stdint.h from redefining our types */
+#define _STDINT_H_INCLUDED
+#define _STDINT_H
 
 /* Define types manually for Open Watcom compatibility */
 typedef signed char        int8_t;

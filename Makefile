@@ -21,6 +21,7 @@ LDFLAGS = system dos
 
 # Directories
 SRC_DIR = src
+TEST_DIR = tests
 BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)/obj
 BIN_DIR = $(BUILD_DIR)/bin
@@ -28,20 +29,20 @@ BIN_DIR = $(BUILD_DIR)/bin
 # Source files
 VM_SRCS = $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/interpreter.c
 FORMAT_SRCS = $(SRC_DIR)/format/djc.c $(SRC_DIR)/format/opcodes.c
-RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedwriter.c
+RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedwriter.c $(SRC_DIR)/runtime/dostime.c $(SRC_DIR)/runtime/date.c
 TEST_SRCS = $(SRC_DIR)/test_memory.c
 
 # Object files
 VM_OBJS = $(OBJ_DIR)/memory.obj $(OBJ_DIR)/stack.obj $(OBJ_DIR)/interpreter.obj
 FORMAT_OBJS = $(OBJ_DIR)/djc.obj $(OBJ_DIR)/opcodes.obj
-RUNTIME_OBJS = $(OBJ_DIR)/object.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/system.obj $(OBJ_DIR)/integer.obj $(OBJ_DIR)/inputstream.obj $(OBJ_DIR)/outputstream.obj $(OBJ_DIR)/fileinputstream.obj $(OBJ_DIR)/fileoutputstream.obj $(OBJ_DIR)/bufferedreader.obj $(OBJ_DIR)/bufferedwriter.obj
+RUNTIME_OBJS = $(OBJ_DIR)/object.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/system.obj $(OBJ_DIR)/integer.obj $(OBJ_DIR)/inputstream.obj $(OBJ_DIR)/outputstream.obj $(OBJ_DIR)/fileinputstream.obj $(OBJ_DIR)/fileoutputstream.obj $(OBJ_DIR)/bufferedreader.obj $(OBJ_DIR)/bufferedwriter.obj $(OBJ_DIR)/dostime.obj $(OBJ_DIR)/date.obj
 TEST_OBJS = $(OBJ_DIR)/test_memory.obj
 
 # Compiler object files
 COMPILER_OBJS = $(OBJ_DIR)/lexer.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/codegen.obj
 
 # Targets
-all: test_memory test_interpreter mkdjc java2djc test_lexer test_parser test_semantic test_codegen djc djvm test_stream test_fileinputstream test_fileoutputstream test_buffered
+all: test_memory test_interpreter mkdjc java2djc test_lexer test_parser test_semantic test_codegen djc djvm test_stream test_fileinputstream test_fileoutputstream test_buffered test_dostime test_date
 
 # Test memory program
 test_memory: $(BIN_DIR)/test_mem.exe
@@ -60,6 +61,12 @@ test_fileoutputstream: $(BIN_DIR)/tfos.exe
 
 # Test buffered reader/writer program
 test_buffered: $(BIN_DIR)/tbuf.exe
+
+# Test DOS time API program
+test_dostime: $(BIN_DIR)/tdtime.exe
+
+# Test Date class program
+test_date: $(BIN_DIR)/tdate.exe
 
 # .djc file generator tool
 mkdjc: $(BIN_DIR)/mkdjc.exe
@@ -99,6 +106,15 @@ $(BIN_DIR)/tfos.exe: $(OBJ_DIR)/test_fileoutputstream.obj $(RUNTIME_OBJS) $(OBJ_
 $(BIN_DIR)/tbuf.exe: $(OBJ_DIR)/test_buffered.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memory.obj
 	@echo Linking tbuf.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_buffered.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memory.obj }
+
+$(BIN_DIR)/tdtime.exe: $(OBJ_DIR)/test_dostime.obj $(OBJ_DIR)/dostime.obj
+	@echo Linking tdtime.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_dostime.obj $(OBJ_DIR)/dostime.obj }
+
+$(BIN_DIR)/tdate.exe: $(OBJ_DIR)/test_date.obj $(OBJ_DIR)/date.obj $(OBJ_DIR)/dostime.obj
+	@echo Linking tdate.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_date.obj $(OBJ_DIR)/date.obj $(OBJ_DIR)/dostime.obj }
+
 
 $(BIN_DIR)/mkdjc.exe: $(OBJ_DIR)/mkdjc.obj
 	@echo Linking mkdjc.exe...
@@ -178,6 +194,22 @@ $(OBJ_DIR)/bufferedreader.obj: $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/ru
 $(OBJ_DIR)/bufferedwriter.obj: $(SRC_DIR)/runtime/bufferedwriter.c $(SRC_DIR)/runtime/bufferedwriter.h $(SRC_DIR)/runtime/fileoutputstream.h
 	@echo Compiling bufferedwriter.c...
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/runtime/bufferedwriter.c
+
+$(OBJ_DIR)/dostime.obj: $(SRC_DIR)/runtime/dostime.c $(SRC_DIR)/runtime/dostime.h
+	@echo Compiling dostime.c...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/runtime/dostime.c
+
+$(OBJ_DIR)/date.obj: $(SRC_DIR)/runtime/date.c $(SRC_DIR)/runtime/date.h $(SRC_DIR)/runtime/dostime.h
+	@echo Compiling date.c...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/runtime/date.c
+
+$(OBJ_DIR)/test_dostime.obj: $(TEST_DIR)/dostime/test_dostime.c $(SRC_DIR)/runtime/dostime.h
+	@echo Compiling test_dostime.c...
+$(OBJ_DIR)/test_date.obj: $(TEST_DIR)/date/test_date.c $(SRC_DIR)/runtime/date.h $(SRC_DIR)/runtime/dostime.h
+	@echo Compiling test_date.c...
+	$(CC) $(CFLAGS) -fo=$@ $(TEST_DIR)/date/test_date.c
+
+	$(CC) $(CFLAGS) -fo=$@ $(TEST_DIR)/dostime/test_dostime.c
 
 # Compile rules - Tests
 $(OBJ_DIR)/test_memory.obj: $(SRC_DIR)/test_memory.c
@@ -335,6 +367,8 @@ test_stream: .SYMBOLIC
 test_fileinputstream: .SYMBOLIC
 test_fileoutputstream: .SYMBOLIC
 test_buffered: .SYMBOLIC
+test_dostime: .SYMBOLIC
+test_date: .SYMBOLIC
 mkdjc: .SYMBOLIC
 java2djc: .SYMBOLIC
 test_lexer: .SYMBOLIC
