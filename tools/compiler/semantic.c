@@ -1117,6 +1117,16 @@ int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node, uint16_t stm
             return 0;
         }
         
+        case NODE_TRY:
+            /* TODO: Implement try-catch-finally semantic check */
+            /* For now, just accept it without checking */
+            return 0;
+        
+        case NODE_THROW:
+            /* TODO: Implement throw semantic check */
+            /* For now, just accept it without checking */
+            return 0;
+        
         default:
             semantic_error_node(analyzer, stmt_node, "Unknown statement type");
             return -1;

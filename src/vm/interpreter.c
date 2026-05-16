@@ -181,6 +181,10 @@ int interpreter_init_context(ExecutionContext* ctx, DJCFile* djc_file, DJCMethod
     ctx->djc_file = djc_file;
     ctx->running = 1;
     
+    /* Initialize exception handling state */
+    ctx->catch_pc = NULL;
+    ctx->in_try_block = 0;
+    
     /* Initialize shared stack */
     ctx->stack_pointer = 0;
     
@@ -2358,6 +2362,65 @@ int interpreter_step(ExecutionContext* ctx) {
             }
             break;
         }
+        
+        /* Exception Handling Opcodes (Simple Implementation) */
+        case OP_TRY_BEGIN: {
+            /* Mark try block begin - read catch offset and set catch_pc */
+            uint16_t catch_offset;
+            
+            catch_offset = interpreter_read_u16(ctx);
+            ctx->in_try_block = 1;
+            
+            /* Set catch_pc to the absolute address of catch block */
+            if (catch_offset != 0) {
+                ctx->catch_pc = ctx->code_start + catch_offset;
+            } else {
+                ctx->catch_pc = NULL;
+            }
+            break;
+        }
+        
+        case OP_TRY_END:
+            /* Mark try block end - clear try block flag */
+            ctx->in_try_block = 0;
+            break;
+        
+        case OP_CATCH_BEGIN:
+            /* Mark catch block begin - catch_pc already set by OP_TRY_BEGIN */
+            break;
+        
+        case OP_CATCH_END:
+            /* Mark catch block end - clear catch PC */
+            ctx->catch_pc = NULL;
+            break;
+        
+        case OP_FINALLY_BEGIN:
+            /* Mark finally block begin - no-op for simple implementation */
+            break;
+        
+        case OP_FINALLY_END:
+            /* Mark finally block end - no-op for simple implementation */
+            break;
+        
+        case OP_THROW:
+            /* Throw exception - simple implementation: jump to catch if available */
+            
+            /* Pop exception value from stack (we don't use it in simple implementation) */
+            if (ctx->stack_pointer > 0) {
+                ctx->stack_pointer--;
+            }
+            
+            /* If we have a catch block, jump to it */
+            if (ctx->catch_pc != NULL) {
+                ctx->pc = ctx->catch_pc;
+                ctx->catch_pc = NULL;  /* Clear catch PC after jumping */
+            } else {
+                /* No catch block - halt execution */
+                printf("Unhandled exception - halting\n");
+                ctx->running = 0;
+                return 1;
+            }
+            break;
         
         case OP_HALT:
             /* Halt execution */

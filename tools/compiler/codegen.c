@@ -418,8 +418,8 @@ int generate_method(CodeGenerator* codegen, ASTNode* method_node) {
     memset(codegen->context->code, 0, sizeof(ByteBuffer));
     memset(codegen->context->labels, 0, sizeof(LabelList));
     
-    /* Allocate code buffer data separately (8KB - reduced for DOS memory constraints) */
-    codegen->context->code->capacity = 8192;
+    /* Allocate code buffer data separately (4KB - reduced for DOS memory constraints) */
+    codegen->context->code->capacity = 4096;
     codegen->context->code->data = (uint8_t*)malloc(codegen->context->code->capacity);
     if (!codegen->context->code->data) {
         codegen_error(codegen, "Failed to allocate method code buffer");
@@ -596,6 +596,100 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
             return 0;
         }
         
+        case NODE_TRY: {
+            /* Try-catch-finally implementation with forward reference */
+            ASTNode* try_block_node;
+            ASTNode* catch_node;
+            ASTNode* catch_block_node;
+            ASTNode* finally_node;
+            ASTNode* finally_block_node;
+            ASTNode try_block_copy;
+            ASTNode catch_block_copy;
+            uint16_t try_begin_pos;
+            uint16_t catch_begin_pos;
+            uint16_t catch_offset;
+            uint16_t try_block_idx;
+            uint16_t catch_block_idx;
+            
+            /* Emit OP_TRY_BEGIN with placeholder offset */
+            try_begin_pos = codegen->context->code->size;
+            emit_opcode(codegen, OP_TRY_BEGIN);
+            emit_u2(codegen, 0);  /* Placeholder for catch offset */
+            
+            /* Generate try block */
+            try_block_idx = stmt_node->data.try_stmt.try_block;
+            try_block_node = codegen_get_node(codegen, try_block_idx);
+            if (try_block_node) {
+                memcpy(&try_block_copy, try_block_node, sizeof(ASTNode));
+                generate_statement(codegen, &try_block_copy);
+            } else {
+                /* Try block node is NULL - this is an error */
+                codegen_error(codegen, "Try block node is NULL");
+                return -1;
+            }
+            emit_opcode(codegen, OP_TRY_END);
+            
+            /* Generate catch block if present */
+            if (stmt_node->data.try_stmt.catch_clause != 0) {
+                emit_opcode(codegen, OP_CATCH_BEGIN);
+                
+                /* Record catch block code position AFTER emitting OP_CATCH_BEGIN */
+                catch_begin_pos = codegen->context->code->size;
+                
+                /* Patch the catch offset in OP_TRY_BEGIN */
+                catch_offset = catch_begin_pos;
+                codegen->context->code->data[try_begin_pos + 1] = (uint8_t)(catch_offset & 0xFF);
+                codegen->context->code->data[try_begin_pos + 2] = (uint8_t)((catch_offset >> 8) & 0xFF);
+                
+                catch_node = codegen_get_node(codegen, stmt_node->data.try_stmt.catch_clause);
+                if (catch_node) {
+                    catch_block_idx = catch_node->data.catch_clause.catch_block;
+                    catch_block_node = codegen_get_node(codegen, catch_block_idx);
+                    if (catch_block_node) {
+                        memcpy(&catch_block_copy, catch_block_node, sizeof(ASTNode));
+                        generate_statement(codegen, &catch_block_copy);
+                    } else {
+                        /* Catch block node is NULL - this is an error */
+                        codegen_error(codegen, "Catch block node is NULL");
+                        return -1;
+                    }
+                } else {
+                    /* Catch clause node is NULL - this is an error */
+                    codegen_error(codegen, "Catch clause node is NULL");
+                    return -1;
+                }
+                emit_opcode(codegen, OP_CATCH_END);
+            }
+            
+            /* Generate finally block if present */
+            if (stmt_node->data.try_stmt.finally_block != 0) {
+                emit_opcode(codegen, OP_FINALLY_BEGIN);
+                finally_node = codegen_get_node(codegen, stmt_node->data.try_stmt.finally_block);
+                if (finally_node) {
+                    finally_block_node = codegen_get_node(codegen, finally_node->data.finally_block.finally_block);
+                    if (finally_block_node) {
+                        generate_statement(codegen, finally_block_node);
+                    }
+                }
+                emit_opcode(codegen, OP_FINALLY_END);
+            }
+            
+            return 0;
+        }
+        
+        case NODE_THROW: {
+            /* Generate throw statement */
+            ASTNode* exception_expr_node = codegen_get_node(codegen, stmt_node->data.throw_stmt.exception_expr);
+            if (exception_expr_node) {
+                /* Evaluate exception expression and push to stack */
+                generate_expression(codegen, exception_expr_node);
+                /* Emit throw opcode */
+                emit_opcode(codegen, OP_THROW);
+                update_stack(codegen, -1);  /* Pop exception from stack */
+            }
+            return 0;
+        }
+        
         default:
             codegen_error(codegen, "Unknown statement type");
             return -1;
@@ -627,7 +721,6 @@ int generate_block(CodeGenerator* codegen, ASTNode* block_node) {
         
         stmt_node = codegen_get_node(codegen, stmt_idx);
         if (!stmt_node) {
-            
             break;
         }
         
@@ -636,7 +729,12 @@ int generate_block(CodeGenerator* codegen, ASTNode* block_node) {
         /* Save next_sibling BEFORE calling generate_statement, which may overwrite stmt_node */
         next_sibling = stmt_node->next_sibling;
         
-        generate_statement(codegen, stmt_node);
+        /* Copy stmt_node to avoid corruption during generate_statement */
+        {
+            ASTNode stmt_copy;
+            memcpy(&stmt_copy, stmt_node, sizeof(ASTNode));
+            generate_statement(codegen, &stmt_copy);
+        }
         
         stmt_idx = next_sibling;
         stmt_count++;
@@ -1715,6 +1813,8 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     uint16_t index_idx;
     uint16_t assign_op;
     uint16_t i;
+    Symbol* field_sym;
+    uint16_t j;
     
     if (!codegen || !assign_node) {
         return -1;
@@ -1870,8 +1970,7 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     
     /* If not a local variable, check if it's a field */
     if (local_idx == 0xFFFF) {
-        Symbol* field_sym = NULL;
-        uint16_t j;
+        field_sym = NULL;
         
         for (j = 0; j < codegen->symtable->symbol_count; j++) {
             Symbol* sym = &codegen->symtable->symbols[j];

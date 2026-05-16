@@ -27,6 +27,10 @@ typedef enum {
     NODE_FOR,               /* For loop */
     NODE_RETURN,            /* Return statement */
     NODE_EXPR_STMT,         /* Expression statement */
+    NODE_TRY,               /* Try statement */
+    NODE_CATCH,             /* Catch clause */
+    NODE_FINALLY,           /* Finally block */
+    NODE_THROW,             /* Throw statement */
     
     /* Expressions */
     NODE_ASSIGN,            /* Assignment = */
@@ -184,6 +188,29 @@ typedef struct ASTNode {
         struct {
             uint16_t expr;          /* Index of expression */
         } expr_stmt;
+        
+        /* Try statement */
+        struct {
+            uint16_t try_block;     /* Index of try block */
+            uint16_t catch_clause;  /* Index of catch clause (0 if none) */
+            uint16_t finally_block; /* Index of finally block (0 if none) */
+        } try_stmt;
+        
+        /* Catch clause */
+        struct {
+            uint16_t exception_var; /* Offset in string pool for exception variable */
+            uint16_t catch_block;   /* Index of catch block */
+        } catch_clause;
+        
+        /* Finally block */
+        struct {
+            uint16_t finally_block; /* Index of finally block */
+        } finally_block;
+        
+        /* Throw statement */
+        struct {
+            uint16_t exception_expr; /* Index of exception expression */
+        } throw_stmt;
         
         /* Assignment */
         struct {

@@ -28,6 +28,10 @@ static const struct {
     {"return", TOK_RETURN},
     {"new", TOK_NEW},
     {"this", TOK_THIS},
+    {"try", TOK_TRY},
+    {"catch", TOK_CATCH},
+    {"finally", TOK_FINALLY},
+    {"throw", TOK_THROW},
     {"true", TOK_TRUE},
     {"false", TOK_FALSE},
     {NULL, TOK_EOF}
@@ -640,6 +644,10 @@ const char* token_type_name(TokenType type) {
         case TOK_RETURN: return "return";
         case TOK_NEW: return "new";
         case TOK_THIS: return "this";
+        case TOK_TRY: return "try";
+        case TOK_CATCH: return "catch";
+        case TOK_FINALLY: return "finally";
+        case TOK_THROW: return "throw";
         case TOK_IDENTIFIER: return "IDENTIFIER";
         case TOK_INTEGER: return "INTEGER";
         case TOK_STRING: return "STRING";

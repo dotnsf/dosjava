@@ -19,6 +19,8 @@ static int read_token_from_file(Parser* parser, Token* token);
 static uint16_t parse_if_stmt(Parser* parser);
 static uint16_t parse_while_stmt(Parser* parser);
 static uint16_t parse_return_stmt(Parser* parser);
+static uint16_t parse_try_stmt(Parser* parser);
+static uint16_t parse_throw_stmt(Parser* parser);
 static int parser_link_sibling(Parser* parser, uint16_t current_node, uint16_t next_node);
 static uint16_t parse_field_decl(Parser* parser, int is_public, int is_static, TypeInfo field_type, uint16_t name_offset);
 static uint16_t parse_method_body(Parser* parser, int is_public, int is_static, TypeInfo return_type, uint16_t name_offset);
@@ -804,6 +806,16 @@ uint16_t parse_statement(Parser* parser) {
         return parse_return_stmt(parser);
     }
     
+    /* Try statement */
+    if (parser_match(parser, TOK_TRY)) {
+        return parse_try_stmt(parser);
+    }
+    
+    /* Throw statement */
+    if (parser_match(parser, TOK_THROW)) {
+        return parse_throw_stmt(parser);
+    }
+    
     /* Expression statement */
     return parse_expr_stmt(parser);
 }
@@ -1140,6 +1152,156 @@ static uint16_t parse_return_stmt(Parser* parser) {
     parser->nodes[return_node - parser->total_nodes - 1].data.return_stmt.expr = expr;
     
     return return_node;
+}
+
+/**
+ * Parse try statement
+ * TryStmt -> 'try' Block ('catch' '(' 'Exception' ID ')' Block)? ('finally' Block)?
+ */
+static uint16_t parse_try_stmt(Parser* parser) {
+    uint16_t try_node;
+    uint16_t try_block;
+    uint16_t catch_node;
+    uint16_t finally_node;
+    uint16_t exception_var;
+    uint16_t catch_block;
+    uint16_t finally_block;
+    
+    /* Expect 'try' */
+    if (parser_expect(parser, TOK_TRY) < 0) {
+        return 0;
+    }
+    
+    /* Parse try block */
+    try_block = parse_block(parser);
+    if (try_block == 0) {
+        return 0;
+    }
+    
+    /* Parse optional catch clause */
+    catch_node = 0;
+    if (parser_consume(parser, TOK_CATCH)) {
+        /* Expect '(' */
+        if (parser_expect(parser, TOK_LPAREN) < 0) {
+            return 0;
+        }
+        
+        /* Expect 'Exception' type */
+        if (!parser_match(parser, TOK_IDENTIFIER)) {
+            parser_error(parser, "Expected 'Exception' type in catch clause");
+            return 0;
+        }
+        
+        /* Verify it's "Exception" */
+        if (strcmp(parser_get_string(parser, parser->current.value.str_offset), "Exception") != 0) {
+            parser_error(parser, "Only 'Exception' type is supported in catch clause");
+            return 0;
+        }
+        parser_next_token(parser);
+        
+        /* Expect exception variable name */
+        if (!parser_match(parser, TOK_IDENTIFIER)) {
+            parser_error(parser, "Expected exception variable name");
+            return 0;
+        }
+        exception_var = parser->current.value.str_offset;
+        parser_next_token(parser);
+        
+        /* Expect ')' */
+        if (parser_expect(parser, TOK_RPAREN) < 0) {
+            return 0;
+        }
+        
+        /* Parse catch block */
+        catch_block = parse_block(parser);
+        if (catch_block == 0) {
+            return 0;
+        }
+        
+        /* Allocate catch node */
+        catch_node = parser_alloc_node(parser, NODE_CATCH);
+        if (catch_node == 0) {
+            return 0;
+        }
+        
+        /* Fill catch node */
+        parser->nodes[catch_node - parser->total_nodes - 1].data.catch_clause.exception_var = exception_var;
+        parser->nodes[catch_node - parser->total_nodes - 1].data.catch_clause.catch_block = catch_block;
+    }
+    
+    /* Parse optional finally block */
+    finally_node = 0;
+    if (parser_consume(parser, TOK_FINALLY)) {
+        /* Parse finally block */
+        finally_block = parse_block(parser);
+        if (finally_block == 0) {
+            return 0;
+        }
+        
+        /* Allocate finally node */
+        finally_node = parser_alloc_node(parser, NODE_FINALLY);
+        if (finally_node == 0) {
+            return 0;
+        }
+        
+        /* Fill finally node */
+        parser->nodes[finally_node - parser->total_nodes - 1].data.finally_block.finally_block = finally_block;
+    }
+    
+    /* Validate: must have at least catch or finally */
+    if (catch_node == 0 && finally_node == 0) {
+        parser_error(parser, "try statement must have at least one catch or finally clause");
+        return 0;
+    }
+    
+    /* Allocate try node */
+    try_node = parser_alloc_node(parser, NODE_TRY);
+    if (try_node == 0) {
+        return 0;
+    }
+    
+    /* Fill try node */
+    parser->nodes[try_node - parser->total_nodes - 1].data.try_stmt.try_block = try_block;
+    parser->nodes[try_node - parser->total_nodes - 1].data.try_stmt.catch_clause = catch_node;
+    parser->nodes[try_node - parser->total_nodes - 1].data.try_stmt.finally_block = finally_node;
+    
+    return try_node;
+}
+
+/**
+ * Parse throw statement
+ * ThrowStmt -> 'throw' Expr ';'
+ */
+static uint16_t parse_throw_stmt(Parser* parser) {
+    uint16_t throw_node;
+    uint16_t exception_expr;
+    
+    /* Expect 'throw' */
+    if (parser_expect(parser, TOK_THROW) < 0) {
+        return 0;
+    }
+    
+    /* Parse exception expression */
+    exception_expr = parse_expression(parser);
+    if (exception_expr == 0) {
+        return 0;
+    }
+    
+    /* Expect ';' */
+    if (parser_expect(parser, TOK_SEMICOLON) < 0) {
+        return 0;
+    }
+    
+    /* Allocate throw node */
+    throw_node = parser_alloc_node(parser, NODE_THROW);
+    if (throw_node == 0) {
+        return 0;
+    }
+    
+    /* Fill throw node */
+    parser->nodes[throw_node - parser->total_nodes - 1].data.throw_stmt.exception_expr = exception_expr;
+    
+    return throw_node;
 }
 
 /**
@@ -1617,9 +1779,12 @@ uint16_t parse_postfix(Parser* parser) {
         }
     }
     
-    if (parser_match(parser, TOK_PLUSPLUS) || parser_match(parser, TOK_MINUSMINUS)) {
+    /* TEMPORARILY DISABLED: Postfix operators (++, --) to debug try-catch issue */
+    if (0 && (parser_match(parser, TOK_PLUSPLUS) || parser_match(parser, TOK_MINUSMINUS))) {
         uint16_t postfix_node;
         TokenType op_type = parser->current.type;
+        
+        printf("DEBUG PARSER: Creating NODE_POSTFIX_OP for token type %d\n", op_type);
         
         parser_next_token(parser);
         
@@ -1837,6 +2002,10 @@ const char* node_type_name(NodeType type) {
         case NODE_WHILE: return "WHILE";
         case NODE_FOR: return "FOR";
         case NODE_RETURN: return "RETURN";
+        case NODE_TRY: return "TRY";
+        case NODE_CATCH: return "CATCH";
+        case NODE_FINALLY: return "FINALLY";
+        case NODE_THROW: return "THROW";
         case NODE_EXPR_STMT: return "EXPR_STMT";
         case NODE_ASSIGN: return "ASSIGN";
         case NODE_BINARY_OP: return "BINARY_OP";

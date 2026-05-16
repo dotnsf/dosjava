@@ -315,9 +315,21 @@ help: .SYMBOLIC
 	@echo Compiler: Open Watcom v2 C Compiler
 	@echo Target: 16-bit DOS (Small memory model)
 
+# Wattcp test
+test_wattcp: $(BIN_DIR)/twatt.exe
+
+$(OBJ_DIR)/test_wattcp_init.obj: tests/network/test_wattcp_init.c
+	@echo Compiling test_wattcp_init.c...
+	$(CC) $(CFLAGS) -i=C:\WATCOM\h\wattcp -fo=$@ tests/network/test_wattcp_init.c
+
+$(BIN_DIR)/twatt.exe: $(OBJ_DIR)/test_wattcp_init.obj
+	@echo Linking twatt.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_wattcp_init.obj } library C:\WATCOM\lib286\wattcpws.lib
+
 # Declare symbolic (phony) targets for wmake
 all: .SYMBOLIC
 test_memory: .SYMBOLIC
+test_wattcp: .SYMBOLIC
 test_interpreter: .SYMBOLIC
 test_stream: .SYMBOLIC
 test_fileinputstream: .SYMBOLIC

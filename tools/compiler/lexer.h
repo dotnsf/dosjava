@@ -29,6 +29,10 @@ typedef enum {
     TOK_RETURN,         /* return */
     TOK_NEW,            /* new */
     TOK_THIS,           /* this */
+    TOK_TRY,            /* try */
+    TOK_CATCH,          /* catch */
+    TOK_FINALLY,        /* finally */
+    TOK_THROW,          /* throw */
     
     /* Literals */
     TOK_IDENTIFIER,     /* variable/method/class names */

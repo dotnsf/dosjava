@@ -78,6 +78,16 @@
 /* Special Operations (0x80-0x8F) */
 #define OP_PRINT_INT     0x80  /* Print integer (debug) */
 #define OP_PRINT_CHAR    0x81  /* Print character (debug) */
+
+/* Exception Handling (0x90-0x9F) */
+#define OP_TRY_BEGIN     0x90  /* Mark try block begin [catch_offset:2] */
+#define OP_TRY_END       0x91  /* Mark try block end */
+#define OP_CATCH_BEGIN   0x92  /* Mark catch block begin */
+#define OP_CATCH_END     0x93  /* Mark catch block end */
+#define OP_FINALLY_BEGIN 0x94  /* Mark finally block begin */
+#define OP_FINALLY_END   0x95  /* Mark finally block end */
+#define OP_THROW         0x96  /* Throw exception */
+
 #define OP_HALT          0xFF  /* Halt execution */
 
 /**

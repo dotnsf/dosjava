@@ -60,6 +60,10 @@ typedef struct {
     
     /* Execution state */
     int running;                /* 1 if executing, 0 if stopped */
+    
+    /* Exception handling (simple implementation) */
+    uint8_t* catch_pc;          /* PC of catch block (0 if none) */
+    uint8_t in_try_block;       /* 1 if currently in try block */
 } ExecutionContext;
 
 /**

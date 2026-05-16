@@ -107,6 +107,13 @@ const char* opcode_name(uint8_t opcode) {
         case OP_CHECKCAST:     return "CHECKCAST";
         case OP_PRINT_INT:     return "PRINT_INT";
         case OP_PRINT_CHAR:    return "PRINT_CHAR";
+        case OP_TRY_BEGIN:     return "TRY_BEGIN";
+        case OP_TRY_END:       return "TRY_END";
+        case OP_CATCH_BEGIN:   return "CATCH_BEGIN";
+        case OP_CATCH_END:     return "CATCH_END";
+        case OP_FINALLY_BEGIN: return "FINALLY_BEGIN";
+        case OP_FINALLY_END:   return "FINALLY_END";
+        case OP_THROW:         return "THROW";
         case OP_HALT:          return "HALT";
         default:               return "UNKNOWN";
     }
@@ -146,6 +153,12 @@ uint8_t opcode_length(uint8_t opcode) {
         case OP_ARRAY_STORE:
         case OP_PRINT_INT:
         case OP_PRINT_CHAR:
+        case OP_TRY_END:
+        case OP_CATCH_BEGIN:
+        case OP_CATCH_END:
+        case OP_FINALLY_BEGIN:
+        case OP_FINALLY_END:
+        case OP_THROW:
         case OP_HALT:
             return 1;
         
@@ -175,6 +188,7 @@ uint8_t opcode_length(uint8_t opcode) {
         case OP_PUT_STATIC:
         case OP_INSTANCEOF:
         case OP_CHECKCAST:
+        case OP_TRY_BEGIN:  /* TRY_BEGIN with catch offset */
             return 3;
         
         /* Instructions with 2-byte + 1-byte operands (4 bytes) */
