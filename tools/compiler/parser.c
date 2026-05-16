@@ -1779,12 +1779,10 @@ uint16_t parse_postfix(Parser* parser) {
         }
     }
     
-    /* TEMPORARILY DISABLED: Postfix operators (++, --) to debug try-catch issue */
-    if (0 && (parser_match(parser, TOK_PLUSPLUS) || parser_match(parser, TOK_MINUSMINUS))) {
+    /* Postfix operators (++, --) */
+    if (parser_match(parser, TOK_PLUSPLUS) || parser_match(parser, TOK_MINUSMINUS)) {
         uint16_t postfix_node;
         TokenType op_type = parser->current.type;
-        
-        printf("DEBUG PARSER: Creating NODE_POSTFIX_OP for token type %d\n", op_type);
         
         parser_next_token(parser);
         

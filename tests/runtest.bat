@@ -821,7 +821,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "Read test completed"
 echo.
 
-goto :completed
+goto :test21
 
 :test20_fail
 echo FAILED: Compilation error
@@ -838,6 +838,46 @@ goto :end
 :test20_badout
 echo FAILED: Output mismatch for Test 20
 echo Expected: "Read test completed"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test21
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 21: try{}catch{}finally{}
+echo ------------------------------
+..\build\bin\djc.exe exc2.jav
+if errorlevel 1 goto :test21_fail
+if not exist exc2.DJC goto :test21_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe exc2.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test21_runfail
+find "  Result: 20" RT_OUT.TXT > nul
+if errorlevel 1 goto :test21_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "  Result: 20"
+echo.
+
+goto :completed
+
+:test21_fail
+echo FAILED: Compilation error
+goto :end
+
+:test21_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test21_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test21_badout
+echo FAILED: Output mismatch for Test 21
+echo Expected: "  Result: 20"
 echo Actual:
 type RT_OUT.TXT
 goto :end
