@@ -1,10 +1,10 @@
-# Network Tests - Wattcp Integration
+# Network Tests - mTCP Integration
 
-## Phase 4.1 Day 1-2: Wattcp Initialization Test
+## Phase 4.1 Day 1-2: mTCP Initialization Test (Current)
 
-### Test Program: twatt.exe
+### Test Program: tmtcp.exe
 
-Basic Wattcp initialization test to verify library integration.
+Basic mTCP initialization test to verify library integration with dosjava.
 
 ### Prerequisites
 
@@ -12,14 +12,15 @@ Basic Wattcp initialization test to verify library integration.
    - NE2000 network card emulation enabled
    - Packet driver support
 
-2. **wattcp.cfg Configuration File**
-   Wattcp searches for `wattcp.cfg` in the current directory.
+2. **MTCP.CFG Configuration File**
+   mTCP searches for configuration via MTCPCFG environment variable.
    Sample content:
    ```
-   my_ip = 192.168.1.100
-   netmask = 255.255.255.0
-   gateway = 192.168.1.1
-   nameserver = 8.8.8.8
+   PACKETINT 0x60
+   IPADDR 192.168.0.123
+   NETMASK 255.255.255.0
+   GATEWAY 192.168.0.1
+   NAMESERVER 8.8.8.8
    ```
 
 3. **Network Setup in DOSBox-X**
@@ -32,97 +33,145 @@ Basic Wattcp initialization test to verify library integration.
 
 **Method 1: Using the batch file (Recommended)**
 1. Copy these files to the same directory in DOSBox-X:
-   - `twatt.exe` (from `build/bin/`)
-   - `runtwatt.bat`
-   - `WATTCP.CFG` → rename to `wattcp.cfg` (lowercase, 8.3 format)
+   - `tmtcp.exe` (from `build/bin/`)
+   - `runtmtcp.bat`
+   - `MTCP.CFG`
 2. Load packet driver: `ne2000 0x60 3 0x300`
-3. Run: `runtwatt.bat`
+3. Run: `runtmtcp.bat`
 
 **Method 2: Manual execution**
-1. Copy these files to the same directory in DOSBox-X:
-   - `twatt.exe` (from `build/bin/`)
-   - `WATTCP.CFG` → rename to `wattcp.cfg` (lowercase)
+1. Copy these files to DOSBox-X:
+   - `tmtcp.exe` (from `build/bin/`)
+   - `MTCP.CFG`
 2. Load packet driver: `ne2000 0x60 3 0x300`
-3. Run: `twatt.exe`
-
-**Important:** Wattcp searches for `wattcp.cfg` in the current directory, so all files must be in the same directory.
+3. Set environment: `SET MTCPCFG=D:\MTCP.CFG`
+4. Run: `tmtcp.exe`
 
 ### Expected Output
 
 ```
-=== Wattcp Initialization Test ===
+=== mTCP Initialization Test for dosjava ===
 
-Test 1: Wattcp headers
+Test 1: mTCP headers
   PASS: tcp.h included successfully
+  INFO: Using mTCP library (Wattcp-compatible API)
 
-Test 2: Configure Wattcp
-  INFO: Setting WATTCP.CFG=D:\WATTCP.CFG
+Test 2: Check for configuration files
+  INFO: MTCPCFG=D:\MTCP.CFG
+  FOUND: Configuration file at MTCPCFG location
 
-Test 3: Initialize Wattcp library
+Test 2b: Display configuration file contents
+  --- Contents of D:\MTCP.CFG ---
+   1: PACKETINT 0x60
+   2: IPADDR 192.168.0.123
+   3: NETMASK 255.255.255.0
+   4: GATEWAY 192.168.0.1
+   5: NAMESERVER 8.8.8.8
+  --- End of file ---
+
+Test 3: Check for packet driver
+  Packet driver vector (INT 60h): xxxx:xxxx
+  INFO: Packet driver vector is set
+        Segment: xxxx, Offset: xxxx
+        Driver appears to be loaded
+
+Test 4: Initialize mTCP library
   Calling sock_init()...
-  PASS: sock_init() succeeded (returned 1)
+  (mTCP will display diagnostic messages)
+  ----------------------------------------
+  [mTCP diagnostic messages]
+  ----------------------------------------
+  PASS: sock_init() succeeded
+  INFO: _watt_do_exit flag is NOT set
 
-Test 4: Wattcp library loaded
-  PASS: Wattcp is initialized and ready
+Test 5: mTCP library loaded
+  PASS: mTCP is initialized and ready
+  INFO: dosjava can now use network sockets
 
 === All Tests Passed ===
 
-Wattcp is ready for socket programming!
+mTCP is ready for socket programming!
 
 Next steps:
-  - Test socket creation
-  - Test TCP connection
-  - Implement socket wrapper API
+  - Implement C-level socket wrapper functions
+  - Test socket creation and connection
+  - Integrate with dosjava VM
+
+Configuration:
+  - Library: mTCP (Wattcp-compatible API)
+  - Memory model: Small
+  - Max sockets: 4
+  - Packet buffers: 10
 ```
 
 ### Troubleshooting
 
-**Issue: "wattcp.cfg not found" or "All attempt to get IP address failed"**
-- **Cause**: wattcp.cfg file not in current directory
-- **Solution**:
-  1. Copy WATTCP.CFG to the same directory as twatt.exe
-  2. Rename it to `wattcp.cfg` (lowercase, 8.3 format)
-  3. Ensure you're running twatt.exe from that directory
+**Issue: "Packet driver vector is NULL"**
+- **Cause**: Packet driver not loaded
+- **Solution**: Load packet driver: `ne2000 0x60 3 0x300`
 
-**If sock_init() returns 0:**
-- Check packet driver is loaded: `ne2000 0x60 3 0x300`
-- Verify wattcp.cfg exists in current directory (lowercase filename)
-- Check DOSBox-X network configuration
-- Verify wattcp.cfg has correct network settings
+**Issue: "sock_init() failed" or "_watt_do_exit flag is set"**
+- **Cause**: Configuration file missing or network setup incorrect
+- **Solution**:
+  1. Verify MTCP.CFG exists and MTCPCFG is set correctly
+  2. Check packet driver is loaded
+  3. Verify DOSBox-X NE2000 emulation is enabled
+  4. Check network settings in MTCP.CFG
 
 **If program crashes:**
-- Verify wattcpws.lib is correct version (small memory model)
+- Verify MTCPWS.LIB is correct version (Small memory model)
 - Check for memory conflicts
-
-### Next Steps
-
-After successful initialization test:
-1. Implement C-level socket wrapper functions (Day 3-5)
-2. Create socket API: socket_create, socket_bind, socket_connect, etc.
-3. Add comprehensive socket tests
-
-### Files
-
-- `test_wattcp_init.c` - Source code
-- `twatt.exe` - Compiled test program (in build/bin/)
-- `runtwatt.bat` - Test runner batch file (8.3 format, sets environment and runs test)
-- `WATTCP.CFG` - Sample Wattcp configuration file
-- `build_test_wattcp.bat` - Build script (deprecated, use wmake)
-- `README.md` - This file
+- Ensure dosjava.cfg is in the project root
 
 ### Build Command
 
 ```
 cd dosjava
-wmake test_wattcp
+wmake test_mtcp
 ```
 
-This compiles the test and links with Wattcp library.
+This compiles the test and links with mTCP library (Small model).
+
+### Files
+
+- `test_mtcp_init.c` - Source code
+- `tmtcp.exe` - Compiled test program (in build/bin/)
+- `runtmtcp.bat` - Test runner batch file
+- `MTCP.CFG` - Sample mTCP configuration file
+- `README.md` - This file
 
 ### Important Notes
 
-- Wattcp searches for `wattcp.cfg` (lowercase) in the current directory
-- The configuration file must be in the same directory as the executable
-- No environment variables are needed when using current directory approach
-- File must be named `wattcp.cfg` (8.3 format, lowercase)
-- For production use, include wattcp.cfg with your application
+- mTCP uses MTCPCFG environment variable to locate configuration
+- Configuration file can be anywhere, just set MTCPCFG to point to it
+- Packet driver must be loaded before running the test
+- mTCP provides Wattcp-compatible API for easier migration
+- dosjava uses Small memory model (MTCPWS.LIB)
+- Configuration in dosjava.cfg: TCP_MAX_SOCKETS=4, PACKET_BUFFERS=10
+
+### Next Steps
+
+After successful initialization test:
+1. Implement C-level socket wrapper functions (Day 3-5)
+2. Create socket API: socket_connect, socket_send, socket_recv, etc.
+3. Add comprehensive socket tests
+
+---
+
+## Wattcp Test (Deprecated)
+
+The original Wattcp test (twatt.exe) is deprecated. Use mTCP (tmtcp.exe) instead.
+
+### Why mTCP?
+
+1. **Proven**: doscurl project successfully uses mTCP
+2. **Compatible**: Wattcp-compatible API
+3. **Stable**: Works reliably in DOSBox-X
+4. **Documented**: Better documentation and examples
+
+### Migration Notes
+
+- mTCP provides same API as Wattcp (sock_init, tcp_open, etc.)
+- Configuration uses MTCPCFG instead of WATTCP.CFG
+- Library: MTCPWS.LIB (Small) instead of wattcpws.lib
+- Include path: C:\mTCP\src\TCPINC instead of C:\WATCOM\h\wattcp

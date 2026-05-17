@@ -3,6 +3,7 @@
 
 # Compiler and linker
 CC = wcc
+CXX = wpp
 LD = wlink
 AR = wlib
 
@@ -15,6 +16,21 @@ AR = wlib
 # -d2: Full debugging info
 # -i: Include path
 CFLAGS = -ms -0 -w4 -zq -os -s -i=C:\WATCOM\h
+CXXFLAGS = -ms -0 -w4 -zq -os -s -i=C:\WATCOM\h
+
+# mTCP library settings (Phase 4.1) - Based on doscurl implementation
+MTCP_TCP_H_DIR = C:\mTCP\src\TCPINC
+MTCP_TCP_C_DIR = C:\mTCP\src\TCPLIB
+MTCP_COMMON_H_DIR = C:\mTCP\src\INCLUDE
+MTCP_CFG_DIR = tests\network
+# Use doscurl-style compile options: optimizations + mTCP config
+# Note: Removed -we (warnings as errors) due to __static_assert issue with small memory model
+MTCP_CXXFLAGS = -0 -ms -DCFG_H="sample.cfg" -oh -ok -ot -s -oa -ei -zp2 -zpw -ob -ol+ -oi+ -i=$(MTCP_TCP_H_DIR) -i=$(MTCP_COMMON_H_DIR) -i=$(MTCP_CFG_DIR)
+
+# Wattcp library settings (deprecated - kept for reference)
+WATTCP_INCLUDE = C:\WATCOM\h\wattcp
+WATTCP_LIB = C:\WATTCP\lib\wattcpws.lib
+WATTCP_CFLAGS = -i=$(WATTCP_INCLUDE)
 
 # Linker flags
 LDFLAGS = system dos
@@ -30,12 +46,14 @@ BIN_DIR = $(BUILD_DIR)/bin
 VM_SRCS = $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/interpreter.c
 FORMAT_SRCS = $(SRC_DIR)/format/djc.c $(SRC_DIR)/format/opcodes.c
 RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedwriter.c $(SRC_DIR)/runtime/dostime.c $(SRC_DIR)/runtime/date.c
+NETWORK_SRCS = $(SRC_DIR)/network/socket.cpp
 TEST_SRCS = $(SRC_DIR)/test_memory.c
 
 # Object files
 VM_OBJS = $(OBJ_DIR)/memory.obj $(OBJ_DIR)/stack.obj $(OBJ_DIR)/interpreter.obj
 FORMAT_OBJS = $(OBJ_DIR)/djc.obj $(OBJ_DIR)/opcodes.obj
 RUNTIME_OBJS = $(OBJ_DIR)/object.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/system.obj $(OBJ_DIR)/integer.obj $(OBJ_DIR)/inputstream.obj $(OBJ_DIR)/outputstream.obj $(OBJ_DIR)/fileinputstream.obj $(OBJ_DIR)/fileoutputstream.obj $(OBJ_DIR)/bufferedreader.obj $(OBJ_DIR)/bufferedwriter.obj $(OBJ_DIR)/dostime.obj $(OBJ_DIR)/date.obj
+NETWORK_OBJS = $(OBJ_DIR)/socket.obj
 TEST_OBJS = $(OBJ_DIR)/test_memory.obj
 
 # Compiler object files
@@ -203,13 +221,18 @@ $(OBJ_DIR)/date.obj: $(SRC_DIR)/runtime/date.c $(SRC_DIR)/runtime/date.h $(SRC_D
 	@echo Compiling date.c...
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/runtime/date.c
 
+# Compile rules - Network
+$(OBJ_DIR)/socket.obj: $(SRC_DIR)/network/socket.cpp $(SRC_DIR)/network/socket.h
+	@echo Compiling socket.cpp...
+	$(CXX) $(MTCP_CXXFLAGS) -i=$(SRC_DIR)/network -fo=$@ $(SRC_DIR)/network/socket.cpp
+
 $(OBJ_DIR)/test_dostime.obj: $(TEST_DIR)/dostime/test_dostime.c $(SRC_DIR)/runtime/dostime.h
 	@echo Compiling test_dostime.c...
+	$(CC) $(CFLAGS) -fo=$@ $(TEST_DIR)/dostime/test_dostime.c
+
 $(OBJ_DIR)/test_date.obj: $(TEST_DIR)/date/test_date.c $(SRC_DIR)/runtime/date.h $(SRC_DIR)/runtime/dostime.h
 	@echo Compiling test_date.c...
 	$(CC) $(CFLAGS) -fo=$@ $(TEST_DIR)/date/test_date.c
-
-	$(CC) $(CFLAGS) -fo=$@ $(TEST_DIR)/dostime/test_dostime.c
 
 # Compile rules - Tests
 $(OBJ_DIR)/test_memory.obj: $(SRC_DIR)/test_memory.c
@@ -347,7 +370,7 @@ help: .SYMBOLIC
 	@echo Compiler: Open Watcom v2 C Compiler
 	@echo Target: 16-bit DOS (Small memory model)
 
-# Wattcp test
+# Wattcp test (deprecated - use mTCP instead)
 test_wattcp: $(BIN_DIR)/twatt.exe
 
 $(OBJ_DIR)/test_wattcp_init.obj: tests/network/test_wattcp_init.c
@@ -358,10 +381,79 @@ $(BIN_DIR)/twatt.exe: $(OBJ_DIR)/test_wattcp_init.obj
 	@echo Linking twatt.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_wattcp_init.obj } library C:\WATCOM\lib286\wattcpws.lib
 
+# mTCP test (Phase 4.1 Day 1-2)
+# Using mTCP source files directly (like mTCP SAMPLE app)
+test_mtcp: $(BIN_DIR)/tmtcp.exe
+
+# Socket wrapper test (Phase 4.1 Day 3-5)
+test_socket: $(BIN_DIR)/tsock.exe
+
+# mTCP object files needed
+MTCP_OBJS = $(OBJ_DIR)/packet.obj $(OBJ_DIR)/arp.obj $(OBJ_DIR)/eth.obj $(OBJ_DIR)/ip.obj $(OBJ_DIR)/tcp.obj $(OBJ_DIR)/tcpsockm.obj $(OBJ_DIR)/udp.obj $(OBJ_DIR)/utils.obj $(OBJ_DIR)/dns.obj $(OBJ_DIR)/timer.obj $(OBJ_DIR)/ipasm.obj $(OBJ_DIR)/trace.obj
+
+# Compile test program
+$(OBJ_DIR)/test_mtcp_init.obj: tests/network/test_mtcp_init.cpp
+	@echo Compiling test_mtcp_init.cpp...
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ tests/network/test_mtcp_init.cpp
+
+# Compile mTCP C++ source files
+$(OBJ_DIR)/packet.obj: $(MTCP_TCP_C_DIR)/packet.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/packet.cpp
+
+$(OBJ_DIR)/arp.obj: $(MTCP_TCP_C_DIR)/arp.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/arp.cpp
+
+$(OBJ_DIR)/eth.obj: $(MTCP_TCP_C_DIR)/eth.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/eth.cpp
+
+$(OBJ_DIR)/ip.obj: $(MTCP_TCP_C_DIR)/ip.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/ip.cpp
+
+$(OBJ_DIR)/tcp.obj: $(MTCP_TCP_C_DIR)/tcp.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/tcp.cpp
+
+$(OBJ_DIR)/tcpsockm.obj: $(MTCP_TCP_C_DIR)/tcpsockm.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/tcpsockm.cpp
+
+$(OBJ_DIR)/udp.obj: $(MTCP_TCP_C_DIR)/udp.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/udp.cpp
+
+$(OBJ_DIR)/utils.obj: $(MTCP_TCP_C_DIR)/utils.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/utils.cpp
+
+$(OBJ_DIR)/dns.obj: $(MTCP_TCP_C_DIR)/dns.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/dns.cpp
+
+$(OBJ_DIR)/timer.obj: $(MTCP_TCP_C_DIR)/timer.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/timer.cpp
+
+$(OBJ_DIR)/trace.obj: $(MTCP_TCP_C_DIR)/trace.cpp
+	$(CXX) $(MTCP_CXXFLAGS) -fo=$@ $(MTCP_TCP_C_DIR)/trace.cpp
+
+# Compile mTCP assembly file
+$(OBJ_DIR)/ipasm.obj: $(MTCP_TCP_C_DIR)/ipasm.asm
+	wasm -0 -ms -fo=$@ $(MTCP_TCP_C_DIR)/ipasm.asm
+
+# Link everything together
+$(BIN_DIR)/tmtcp.exe: $(OBJ_DIR)/test_mtcp_init.obj $(MTCP_OBJS)
+	@echo Linking tmtcp.exe with mTCP objects...
+	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_mtcp_init.obj $(MTCP_OBJS) }
+
+# Socket wrapper test (Phase 4.1 Day 3-5)
+$(OBJ_DIR)/test_socket.obj: tests/network/test_socket.c $(SRC_DIR)/network/socket.h
+	@echo Compiling test_socket.c...
+	$(CC) $(CFLAGS) -i=$(SRC_DIR)/network -fo=$@ tests/network/test_socket.c
+
+$(BIN_DIR)/tsock.exe: $(OBJ_DIR)/test_socket.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS)
+	@echo Linking tsock.exe with socket wrapper and mTCP...
+	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_socket.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
+
 # Declare symbolic (phony) targets for wmake
 all: .SYMBOLIC
 test_memory: .SYMBOLIC
 test_wattcp: .SYMBOLIC
+test_mtcp: .SYMBOLIC
+test_socket: .SYMBOLIC
 test_interpreter: .SYMBOLIC
 test_stream: .SYMBOLIC
 test_fileinputstream: .SYMBOLIC
