@@ -861,7 +861,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "  Result: 20"
 echo.
 
-goto :completed
+goto :test22
 
 :test21_fail
 echo FAILED: Compilation error
@@ -878,6 +878,46 @@ goto :end
 :test21_badout
 echo FAILED: Output mismatch for Test 21
 echo Expected: "  Result: 20"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test22
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 22: Date
+echo ------------------------------
+..\build\bin\djc.exe dtest4.jav
+if errorlevel 1 goto :test22_fail
+if not exist dtest4.DJC goto :test22_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe dtest4.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test22_runfail
+find "20000" RT_OUT.TXT > nul
+if errorlevel 1 goto :test22_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "20000"
+echo.
+
+goto :completed
+
+:test22_fail
+echo FAILED: Compilation error
+goto :end
+
+:test22_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test22_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test22_badout
+echo FAILED: Output mismatch for Test 22
+echo Expected: "20000"
 echo Actual:
 type RT_OUT.TXT
 goto :end
