@@ -134,6 +134,13 @@ int native_invoke(
  */
 int native_register_builtins(void);
 
+/**
+ * Register socket-related native methods
+ * Called by native_register_builtins()
+ * @return 0 on success, -1 on error
+ */
+int native_register_socket_methods(void);
+
 #endif /* NATIVE_H */
 
 // Made with Bob

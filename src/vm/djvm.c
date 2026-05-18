@@ -9,6 +9,7 @@
 #include "native.h"
 #include "../format/djc.h"
 #include "../runtime/system.h"
+#include "../runtime/socket.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -261,6 +262,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
+    /* Initialize socket subsystem (optional - only if network features are used) */
+    /* Note: Socket initialization is deferred until first socket operation */
+    /* This avoids requiring mTCP configuration for non-network programs */
+    
     if (options.verbose) {
         printf("DOS Java Virtual Machine v%s\n", DJVM_VERSION);
         printf("Loading: %s\n", options.filename);
@@ -304,6 +309,12 @@ int main(int argc, char* argv[]) {
     
     /* Cleanup */
     djc_close(djc_file);
+    
+    /* Shutdown socket subsystem if it was initialized */
+    if (socket_subsystem_is_initialized()) {
+        socket_subsystem_shutdown();
+    }
+    
     native_shutdown();
     system_shutdown();
     memory_shutdown();

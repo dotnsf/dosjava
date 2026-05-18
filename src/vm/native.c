@@ -1,5 +1,9 @@
 #include "native.h"
 #include "../runtime/system.h"
+#ifdef ENABLE_SOCKETS
+#include "../runtime/socket.h"
+#endif
+#include "../runtime/string.h"
 #include "../format/djc.h"
 #include <stdio.h>
 #include <string.h>
@@ -427,7 +431,343 @@ int native_register_builtins(void) {
         return -1;
     }
     
+#ifdef ENABLE_SOCKETS
+    /* Register socket native methods */
+    if (native_register_socket_methods() != 0) {
+        return -1;
+    }
+#endif
+    
     return 0;
 }
 
 // Made with Bob
+
+
+#ifdef ENABLE_SOCKETS
+/* ===== Socket Native Methods ===== */
+
+/**
+ * Socket.init() - Initialize socket subsystem
+ * Called automatically on first socket operation
+ */
+static int native_socket_init(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    (void)ctx;
+    (void)args;
+    (void)arg_count;
+    (void)result;
+    
+    if (!socket_subsystem_is_initialized()) {
+        if (socket_subsystem_init() != 0) {
+            printf("ERROR: Failed to initialize socket subsystem\n");
+            return -1;
+        }
+    }
+    
+    return 0;
+}
+
+/**
+ * Socket.new(String host, int port) - Create and connect socket
+ * Returns socket handle (object reference)
+ */
+static int native_socket_new(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t host_idx;
+    uint16_t port;
+    const char* host_str;
+    String* host;
+    Socket* sock;
+    
+    (void)arg_count;
+    
+    /* Initialize socket subsystem if needed */
+    if (!socket_subsystem_is_initialized()) {
+        if (socket_subsystem_init() != 0) {
+            printf("ERROR: Failed to initialize socket subsystem\n");
+            return -1;
+        }
+    }
+    
+    /* Get arguments: host (String constant index), port (int) */
+    host_idx = args[0];
+    port = args[1];
+    
+    /* Get host string from constant pool */
+    host_str = NULL;
+    if (host_idx < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[host_idx].tag == CONST_UTF8) {
+            host_str = ctx->djc_file->constants[host_idx].data.utf8_data;
+        }
+    }
+    
+    if (!host_str) {
+        printf("ERROR: Invalid host string constant index: %d\n", host_idx);
+        return -1;
+    }
+    
+    /* Create String object for host */
+    host = string_new(host_str);
+    if (!host) {
+        printf("ERROR: Failed to create host string\n");
+        return -1;
+    }
+    
+    /* Create and connect socket */
+    sock = socket_runtime_new_connected(host, port);
+    if (!sock) {
+        string_delete(host);
+        printf("ERROR: Failed to create socket\n");
+        return -1;
+    }
+    
+    /* Return socket handle as object reference */
+    *result = (uint16_t)sock;
+    return 0;
+}
+
+/**
+ * Socket.send(Socket sock, String data) - Send data through socket
+ * Returns number of bytes sent
+ */
+static int native_socket_send(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t sock_ref;
+    uint16_t data_idx;
+    Socket* sock;
+    const char* data_str;
+    int sent;
+    
+    (void)arg_count;
+    
+    /* Get arguments: socket reference, data (String constant index) */
+    sock_ref = args[0];
+    data_idx = args[1];
+    
+    /* Get socket object */
+    sock = (Socket*)sock_ref;
+    if (!sock) {
+        printf("ERROR: Invalid socket reference\n");
+        return -1;
+    }
+    
+    /* Get data string from constant pool */
+    data_str = NULL;
+    if (data_idx < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[data_idx].tag == CONST_UTF8) {
+            data_str = ctx->djc_file->constants[data_idx].data.utf8_data;
+        }
+    }
+    
+    if (!data_str) {
+        printf("ERROR: Invalid data string constant index: %d\n", data_idx);
+        return -1;
+    }
+    
+    /* Send data */
+    sent = socket_runtime_send(sock, (const uint8_t*)data_str, (uint16_t)strlen(data_str));
+    if (sent < 0) {
+        printf("ERROR: Failed to send data\n");
+        return -1;
+    }
+    
+    *result = (uint16_t)sent;
+    return 0;
+}
+
+/**
+ * Socket.recv(Socket sock, int max_length) - Receive data from socket
+ * Returns received data as String
+ */
+static int native_socket_recv(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t sock_ref;
+    uint16_t max_length;
+    Socket* sock;
+    uint8_t buffer[256];
+    int received;
+    uint16_t const_idx;
+    
+    (void)arg_count;
+    
+    /* Get arguments: socket reference, max_length */
+    sock_ref = args[0];
+    max_length = args[1];
+    
+    /* Get socket object */
+    sock = (Socket*)sock_ref;
+    if (!sock) {
+        printf("ERROR: Invalid socket reference\n");
+        return -1;
+    }
+    
+    /* Limit max_length to buffer size */
+    if (max_length > sizeof(buffer) - 1) {
+        max_length = sizeof(buffer) - 1;
+    }
+    
+    /* Receive data */
+    received = socket_runtime_recv(sock, buffer, max_length);
+    if (received < 0) {
+        printf("ERROR: Failed to receive data\n");
+        return -1;
+    }
+    
+    /* Null-terminate received data */
+    buffer[received] = '\0';
+    
+    /* Add received data to constant pool */
+    const_idx = djc_add_string(ctx->djc_file, (const char*)buffer);
+    if (const_idx == 0) {
+        printf("ERROR: Failed to add received data to constant pool\n");
+        return -1;
+    }
+    
+    *result = const_idx;
+    return 0;
+}
+
+/**
+ * Socket.close(Socket sock) - Close socket
+ */
+static int native_socket_close(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t sock_ref;
+    Socket* sock;
+    
+    (void)ctx;
+    (void)arg_count;
+    (void)result;
+    
+    /* Get argument: socket reference */
+    sock_ref = args[0];
+    
+    /* Get socket object */
+    sock = (Socket*)sock_ref;
+    if (!sock) {
+        printf("ERROR: Invalid socket reference\n");
+        return -1;
+    }
+    
+    /* Close socket */
+    if (socket_runtime_close(sock) != 0) {
+        printf("ERROR: Failed to close socket\n");
+        return -1;
+    }
+    
+    return 0;
+}
+
+/**
+ * Socket.isConnected(Socket sock) - Check if socket is connected
+ * Returns 1 if connected, 0 otherwise
+ */
+static int native_socket_is_connected(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t sock_ref;
+    Socket* sock;
+    
+    (void)ctx;
+    (void)arg_count;
+    
+    /* Get argument: socket reference */
+    sock_ref = args[0];
+    
+    /* Get socket object */
+    sock = (Socket*)sock_ref;
+    if (!sock) {
+        printf("ERROR: Invalid socket reference\n");
+        return -1;
+    }
+    
+    *result = socket_runtime_is_connected(sock);
+    return 0;
+}
+
+/**
+ * Register socket native methods
+ * Called from native_register_builtins()
+ */
+int native_register_socket_methods(void) {
+    static NativeParamType param_void[] = { NATIVE_PARAM_VOID };
+    static NativeParamType param_string_int[] = { NATIVE_PARAM_STRING, NATIVE_PARAM_INT };
+    static NativeParamType param_object_string[] = { NATIVE_PARAM_OBJECT, NATIVE_PARAM_STRING };
+    static NativeParamType param_object_int[] = { NATIVE_PARAM_OBJECT, NATIVE_PARAM_INT };
+    static NativeParamType param_object[] = { NATIVE_PARAM_OBJECT };
+    
+    /* Socket.init() */
+    if (native_register(
+        "java/net/Socket",
+        "init",
+        "()V",
+        native_socket_init,
+        0,
+        param_void,
+        NATIVE_RETURN_VOID
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Socket.new(String, int) - Constructor */
+    if (native_register(
+        "java/net/Socket",
+        "<init>",
+        "(Ljava/lang/String;I)Ljava/net/Socket;",
+        native_socket_new,
+        2,
+        param_string_int,
+        NATIVE_RETURN_OBJECT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Socket.send(Socket, String) */
+    if (native_register(
+        "java/net/Socket",
+        "send",
+        "(Ljava/net/Socket;Ljava/lang/String;)I",
+        native_socket_send,
+        2,
+        param_object_string,
+        NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Socket.recv(Socket, int) */
+    if (native_register(
+        "java/net/Socket",
+        "recv",
+        "(Ljava/net/Socket;I)Ljava/lang/String;",
+        native_socket_recv,
+        2,
+        param_object_int,
+        NATIVE_RETURN_STRING
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Socket.close(Socket) */
+    if (native_register(
+        "java/net/Socket",
+        "close",
+        "(Ljava/net/Socket;)V",
+        native_socket_close,
+        1,
+        param_object,
+        NATIVE_RETURN_VOID
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Socket.isConnected(Socket) */
+    if (native_register(
+        "java/net/Socket",
+        "isConnected",
+        "(Ljava/net/Socket;)I",
+        native_socket_is_connected,
+        1,
+        param_object,
+        NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    return 0;
+}
+#endif /* ENABLE_SOCKETS */

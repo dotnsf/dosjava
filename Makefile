@@ -18,6 +18,9 @@ AR = wlib
 CFLAGS = -mm -0 -w4 -zq -os -s -i=C:\WATCOM\h
 CXXFLAGS = -mm -0 -w4 -zq -os -s -i=C:\WATCOM\h
 
+# Compiler flags with socket support enabled
+CFLAGS_SOCKET = -mm -0 -w4 -zq -os -s -i=C:\WATCOM\h -DENABLE_SOCKETS
+
 # mTCP library settings (Phase 4.1) - Based on doscurl implementation
 MTCP_TCP_H_DIR = C:\mTCP\src\TCPINC
 MTCP_TCP_C_DIR = C:\mTCP\src\TCPLIB
@@ -40,7 +43,7 @@ BIN_DIR = $(BUILD_DIR)/bin
 # Source files
 VM_SRCS = $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/native.c
 FORMAT_SRCS = $(SRC_DIR)/format/djc.c $(SRC_DIR)/format/opcodes.c
-RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedwriter.c $(SRC_DIR)/runtime/dostime.c $(SRC_DIR)/runtime/date.c
+RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedwriter.c $(SRC_DIR)/runtime/dostime.c $(SRC_DIR)/runtime/date.c $(SRC_DIR)/runtime/socket.c
 NETWORK_SRCS = $(SRC_DIR)/network/socket.cpp
 TEST_SRCS = $(SRC_DIR)/test_memory.c
 
@@ -48,11 +51,15 @@ TEST_SRCS = $(SRC_DIR)/test_memory.c
 VM_OBJS = $(OBJ_DIR)/memory.obj $(OBJ_DIR)/stack.obj $(OBJ_DIR)/interpreter.obj $(OBJ_DIR)/native.obj
 FORMAT_OBJS = $(OBJ_DIR)/djc.obj $(OBJ_DIR)/opcodes.obj
 RUNTIME_OBJS = $(OBJ_DIR)/object.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/system.obj $(OBJ_DIR)/integer.obj $(OBJ_DIR)/inputstream.obj $(OBJ_DIR)/outputstream.obj $(OBJ_DIR)/fileinputstream.obj $(OBJ_DIR)/fileoutputstream.obj $(OBJ_DIR)/bufferedreader.obj $(OBJ_DIR)/bufferedwriter.obj $(OBJ_DIR)/dostime.obj $(OBJ_DIR)/date.obj
-NETWORK_OBJS = $(OBJ_DIR)/socket.obj
+RUNTIME_SOCKET_OBJS = $(OBJ_DIR)/socket_runtime.obj
+NETWORK_OBJS = $(OBJ_DIR)/socket_network.obj
 TEST_OBJS = $(OBJ_DIR)/test_memory.obj
 
 # Compiler object files
 COMPILER_OBJS = $(OBJ_DIR)/lexer.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/codegen.obj
+
+# mTCP object files needed
+MTCP_OBJS = $(OBJ_DIR)/packet.obj $(OBJ_DIR)/arp.obj $(OBJ_DIR)/eth.obj $(OBJ_DIR)/ip.obj $(OBJ_DIR)/tcp.obj $(OBJ_DIR)/tcpsockm.obj $(OBJ_DIR)/udp.obj $(OBJ_DIR)/utils.obj $(OBJ_DIR)/dns.obj $(OBJ_DIR)/timer.obj $(OBJ_DIR)/ipasm.obj $(OBJ_DIR)/trace.obj
 
 # Targets
 all: test_memory test_interpreter mkdjc java2djc test_lexer test_parser test_semantic test_codegen djc djvm test_stream test_fileinputstream test_fileoutputstream test_buffered test_dostime test_date
@@ -96,13 +103,13 @@ java2djc: $(BIN_DIR)/java2djc.exe
 # DOS Java Virtual Machine
 djvm: $(BIN_DIR)/djvm.exe
 
-$(BIN_DIR)/test_mem.exe: $(TEST_OBJS) $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS)
+$(BIN_DIR)/test_mem.exe: $(TEST_OBJS) $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS)
 	@echo Linking test_mem.exe...
-	$(LD) $(LDFLAGS) name $@ file { $(TEST_OBJS) $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) }
+	$(LD) $(LDFLAGS) name $@ file { $(TEST_OBJS) $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS) }
 
-$(BIN_DIR)/test_int.exe: $(OBJ_DIR)/test_interpreter.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS)
+$(BIN_DIR)/test_int.exe: $(OBJ_DIR)/test_interpreter.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS)
 	@echo Linking test_int.exe...
-	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_interpreter.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) }
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_interpreter.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS) }
 
 $(BIN_DIR)/tstrm.exe: $(OBJ_DIR)/test_stream.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memory.obj
 	@echo Linking tstrm.exe...
@@ -133,13 +140,13 @@ $(BIN_DIR)/mkdjc.exe: $(OBJ_DIR)/mkdjc.obj
 	@echo Linking mkdjc.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/mkdjc.obj }
 
-$(BIN_DIR)/java2djc.exe: $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS)
+$(BIN_DIR)/java2djc.exe: $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS)
 	@echo Linking java2djc.exe...
-	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) }
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS) }
 
-$(BIN_DIR)/djvm.exe: $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS)
+$(BIN_DIR)/djvm.exe: $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS)
 	@echo Linking djvm.exe...
-	$(LD) $(LDFLAGS) option stack=16384 name $@ file { $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) }
+	$(LD) $(LDFLAGS) option stack=16384 name $@ file { $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS) }
 
 # Compile rules - VM
 $(OBJ_DIR)/memory.obj: $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/memory.h
@@ -155,12 +162,12 @@ $(OBJ_DIR)/interpreter.obj: $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/interprete
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/interpreter.c
 
 $(OBJ_DIR)/native.obj: $(SRC_DIR)/vm/native.c $(SRC_DIR)/vm/native.h
-	@echo Compiling native.c...
-	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/native.c
+	@echo Compiling native.c with socket support...
+	$(CC) $(CFLAGS_SOCKET) -fo=$@ $(SRC_DIR)/vm/native.c
 
 $(OBJ_DIR)/djvm.obj: $(SRC_DIR)/vm/djvm.c $(SRC_DIR)/vm/interpreter.h $(SRC_DIR)/vm/native.h
-	@echo Compiling djvm.c...
-	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/djvm.c
+	@echo Compiling djvm.c with socket support...
+	$(CC) $(CFLAGS_SOCKET) -fo=$@ $(SRC_DIR)/vm/djvm.c
 
 # Compile rules - Format
 $(OBJ_DIR)/djc.obj: $(SRC_DIR)/format/djc.c $(SRC_DIR)/format/djc.h
@@ -220,9 +227,13 @@ $(OBJ_DIR)/date.obj: $(SRC_DIR)/runtime/date.c $(SRC_DIR)/runtime/date.h $(SRC_D
 	@echo Compiling date.c...
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/runtime/date.c
 
+$(OBJ_DIR)/socket_runtime.obj: $(SRC_DIR)/runtime/socket.c $(SRC_DIR)/runtime/socket.h $(SRC_DIR)/runtime/object.h $(SRC_DIR)/runtime/string.h
+	@echo Compiling socket.c (runtime)...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/runtime/socket.c
+
 # Compile rules - Network
-$(OBJ_DIR)/socket.obj: $(SRC_DIR)/network/socket.cpp $(SRC_DIR)/network/socket.h
-	@echo Compiling socket.cpp...
+$(OBJ_DIR)/socket_network.obj: $(SRC_DIR)/network/socket.cpp $(SRC_DIR)/network/socket.h
+	@echo Compiling socket.cpp (network)...
 	$(CXX) $(MTCP_CXXFLAGS) -i=$(SRC_DIR)/network -fo=$@ $(SRC_DIR)/network/socket.cpp
 
 $(OBJ_DIR)/test_dostime.obj: $(TEST_DIR)/dostime/test_dostime.c $(SRC_DIR)/runtime/dostime.h
@@ -391,9 +402,6 @@ test_memprof: $(BIN_DIR)/tmemprof.exe
 # Runtime Socket test (Phase 4.2 Day 15-17)
 test_sockrt: $(BIN_DIR)/tsockrt.exe
 
-# mTCP object files needed
-MTCP_OBJS = $(OBJ_DIR)/packet.obj $(OBJ_DIR)/arp.obj $(OBJ_DIR)/eth.obj $(OBJ_DIR)/ip.obj $(OBJ_DIR)/tcp.obj $(OBJ_DIR)/tcpsockm.obj $(OBJ_DIR)/udp.obj $(OBJ_DIR)/utils.obj $(OBJ_DIR)/dns.obj $(OBJ_DIR)/timer.obj $(OBJ_DIR)/ipasm.obj $(OBJ_DIR)/trace.obj
-
 # Compile test program
 $(OBJ_DIR)/test_mtcp_init.obj: tests/network/test_mtcp_init.cpp
 	@echo Compiling test_mtcp_init.cpp...
@@ -447,45 +455,45 @@ $(OBJ_DIR)/test_socket.obj: tests/network/test_socket.c $(SRC_DIR)/network/socke
 	@echo Compiling test_socket.c...
 	$(CC) $(CFLAGS) -i=$(SRC_DIR)/network -fo=$@ tests/network/test_socket.c
 
-$(BIN_DIR)/tsock.exe: $(OBJ_DIR)/test_socket.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS)
+$(BIN_DIR)/tsock.exe: $(OBJ_DIR)/test_socket.obj $(OBJ_DIR)/socket_network.obj $(MTCP_OBJS)
 	@echo Linking tsock.exe with socket wrapper and mTCP...
-	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_socket.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
+	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_socket.obj $(OBJ_DIR)/socket_network.obj $(MTCP_OBJS) }
 
 # HTTP client test (Phase 4.1 Day 6-7)
 $(OBJ_DIR)/test_http.obj: tests/network/test_http.c $(SRC_DIR)/network/socket.h
 	@echo Compiling test_http.c...
 	$(CC) $(CFLAGS) -i=$(SRC_DIR)/network -fo=$@ tests/network/test_http.c
 
-$(BIN_DIR)/thttp.exe: $(OBJ_DIR)/test_http.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS)
+$(BIN_DIR)/thttp.exe: $(OBJ_DIR)/test_http.obj $(OBJ_DIR)/socket_network.obj $(MTCP_OBJS)
 	@echo Linking thttp.exe with socket wrapper and mTCP...
-	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_http.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
+	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_http.obj $(OBJ_DIR)/socket_network.obj $(MTCP_OBJS) }
 
 # Network diagnostics test (Phase 4.1 Day 6-7)
 $(OBJ_DIR)/test_network_diag.obj: tests/network/test_network_diag.c $(SRC_DIR)/network/socket.h
 	@echo Compiling test_network_diag.c...
 	$(CC) $(CFLAGS) -i=$(SRC_DIR)/network -fo=$@ tests/network/test_network_diag.c
 
-$(BIN_DIR)/tnetdiag.exe: $(OBJ_DIR)/test_network_diag.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS)
+$(BIN_DIR)/tnetdiag.exe: $(OBJ_DIR)/test_network_diag.obj $(OBJ_DIR)/socket_network.obj $(MTCP_OBJS)
 	@echo Linking tnetdiag.exe with socket wrapper and mTCP...
-	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_network_diag.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
+	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_network_diag.obj $(OBJ_DIR)/socket_network.obj $(MTCP_OBJS) }
 
 # Send/Recv test (Phase 4.1 Day 8-10)
 $(OBJ_DIR)/test_send_recv.obj: tests/network/test_send_recv.c $(SRC_DIR)/network/socket.h
 	@echo Compiling test_send_recv.c...
 	$(CC) $(CFLAGS) -i=$(SRC_DIR)/network -fo=$@ tests/network/test_send_recv.c
 
-$(BIN_DIR)/tsendrcv.exe: $(OBJ_DIR)/test_send_recv.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS)
+$(BIN_DIR)/tsendrcv.exe: $(OBJ_DIR)/test_send_recv.obj $(OBJ_DIR)/socket_network.obj $(MTCP_OBJS)
 	@echo Linking tsendrcv.exe with socket wrapper and mTCP...
-	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_send_recv.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
+	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_send_recv.obj $(OBJ_DIR)/socket_network.obj $(MTCP_OBJS) }
 
 # Memory profiling test (Phase 4.1 Day 11-12)
 $(OBJ_DIR)/test_memory_profile.obj: tests/network/test_memory_profile.c $(SRC_DIR)/network/socket.h
 	@echo Compiling test_memory_profile.c...
 	$(CC) $(CFLAGS) -i=$(SRC_DIR)/network -fo=$@ tests/network/test_memory_profile.c
 
-$(BIN_DIR)/tmemprof.exe: $(OBJ_DIR)/test_memory_profile.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS)
+$(BIN_DIR)/tmemprof.exe: $(OBJ_DIR)/test_memory_profile.obj $(OBJ_DIR)/socket_network.obj $(MTCP_OBJS)
 	@echo Linking tmemprof.exe with socket wrapper and mTCP...
-	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_memory_profile.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
+	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_memory_profile.obj $(OBJ_DIR)/socket_network.obj $(MTCP_OBJS) }
 
 # Runtime Socket test (Phase 4.2 Day 15-17)
 $(OBJ_DIR)/socket_rt.obj: $(SRC_DIR)/runtime/socket.c $(SRC_DIR)/runtime/socket.h
@@ -496,9 +504,9 @@ $(OBJ_DIR)/test_socket_runtime.obj: tests/runtime/test_socket_runtime.c $(SRC_DI
 	@echo Compiling test_socket_runtime.c...
 	$(CC) $(CFLAGS) -i=$(SRC_DIR)/runtime -fo=$@ tests/runtime/test_socket_runtime.c
 
-$(BIN_DIR)/tsockrt.exe: $(OBJ_DIR)/test_socket_runtime.obj $(OBJ_DIR)/socket_rt.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/object.obj $(OBJ_DIR)/socket.obj $(OBJ_DIR)/memory.obj $(MTCP_OBJS)
+$(BIN_DIR)/tsockrt.exe: $(OBJ_DIR)/test_socket_runtime.obj $(OBJ_DIR)/socket_rt.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/object.obj $(OBJ_DIR)/socket_network.obj $(OBJ_DIR)/memory.obj $(MTCP_OBJS)
 	@echo Linking tsockrt.exe with runtime socket, string, object, memory, and mTCP...
-	$(LD) $(LDFLAGS) option stack=8192 name $@ file { $(OBJ_DIR)/test_socket_runtime.obj $(OBJ_DIR)/socket_rt.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/object.obj $(OBJ_DIR)/socket.obj $(OBJ_DIR)/memory.obj $(MTCP_OBJS) }
+	$(LD) $(LDFLAGS) option stack=8192 name $@ file { $(OBJ_DIR)/test_socket_runtime.obj $(OBJ_DIR)/socket_rt.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/object.obj $(OBJ_DIR)/socket_network.obj $(OBJ_DIR)/memory.obj $(MTCP_OBJS) }
 
 # Declare symbolic (phony) targets for wmake
 all: .SYMBOLIC
