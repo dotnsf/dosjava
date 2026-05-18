@@ -8,15 +8,15 @@ LD = wlink
 AR = wlib
 
 # Compiler flags
-# -ms: Small memory model
+# -mm: Medium memory model (changed from -ms for 64KB code segment limit)
 # -0: 8086 instructions
 # -w4: Warning level 4
 # -zq: Quiet mode
-# -od: Disable optimizations (for debugging)
-# -d2: Full debugging info
+# -os: Optimize for size
+# -s: Disable stack overflow checks
 # -i: Include path
-CFLAGS = -ms -0 -w4 -zq -os -s -i=C:\WATCOM\h
-CXXFLAGS = -ms -0 -w4 -zq -os -s -i=C:\WATCOM\h
+CFLAGS = -mm -0 -w4 -zq -os -s -i=C:\WATCOM\h
+CXXFLAGS = -mm -0 -w4 -zq -os -s -i=C:\WATCOM\h
 
 # mTCP library settings (Phase 4.1) - Based on doscurl implementation
 MTCP_TCP_H_DIR = C:\mTCP\src\TCPINC
@@ -24,13 +24,8 @@ MTCP_TCP_C_DIR = C:\mTCP\src\TCPLIB
 MTCP_COMMON_H_DIR = C:\mTCP\src\INCLUDE
 MTCP_CFG_DIR = tests\network
 # Use doscurl-style compile options: optimizations + mTCP config
-# Note: Removed -we (warnings as errors) due to __static_assert issue with small memory model
-MTCP_CXXFLAGS = -0 -ms -DCFG_H="sample.cfg" -oh -ok -ot -s -oa -ei -zp2 -zpw -ob -ol+ -oi+ -i=$(MTCP_TCP_H_DIR) -i=$(MTCP_COMMON_H_DIR) -i=$(MTCP_CFG_DIR)
-
-# Wattcp library settings (deprecated - kept for reference)
-WATTCP_INCLUDE = C:\WATCOM\h\wattcp
-WATTCP_LIB = C:\WATTCP\lib\wattcpws.lib
-WATTCP_CFLAGS = -i=$(WATTCP_INCLUDE)
+# Changed to -mm (medium model) to avoid 64KB code segment limit
+MTCP_CXXFLAGS = -0 -mm -DCFG_H="sample.cfg" -oh -ok -ot -s -oa -ei -zp2 -zpw -ob -ol+ -oi+ -i=$(MTCP_TCP_H_DIR) -i=$(MTCP_COMMON_H_DIR) -i=$(MTCP_CFG_DIR)
 
 # Linker flags
 LDFLAGS = system dos
@@ -368,18 +363,7 @@ help: .SYMBOLIC
 	@echo   help         - Show this help
 	@echo.
 	@echo Compiler: Open Watcom v2 C Compiler
-	@echo Target: 16-bit DOS (Small memory model)
-
-# Wattcp test (deprecated - use mTCP instead)
-test_wattcp: $(BIN_DIR)/twatt.exe
-
-$(OBJ_DIR)/test_wattcp_init.obj: tests/network/test_wattcp_init.c
-	@echo Compiling test_wattcp_init.c...
-	$(CC) $(CFLAGS) -i=C:\WATCOM\h\wattcp -fo=$@ tests/network/test_wattcp_init.c
-
-$(BIN_DIR)/twatt.exe: $(OBJ_DIR)/test_wattcp_init.obj
-	@echo Linking twatt.exe...
-	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_wattcp_init.obj } library C:\WATCOM\lib286\wattcpws.lib
+	@echo Target: 16-bit DOS (Medium memory model)
 
 # mTCP test (Phase 4.1 Day 1-2)
 # Using mTCP source files directly (like mTCP SAMPLE app)
@@ -399,6 +383,9 @@ test_sendrecv: $(BIN_DIR)/tsendrcv.exe
 
 # Memory profiling test (Phase 4.1 Day 11-12)
 test_memprof: $(BIN_DIR)/tmemprof.exe
+
+# Runtime Socket test (Phase 4.2 Day 15-17)
+test_sockrt: $(BIN_DIR)/tsockrt.exe
 
 # mTCP object files needed
 MTCP_OBJS = $(OBJ_DIR)/packet.obj $(OBJ_DIR)/arp.obj $(OBJ_DIR)/eth.obj $(OBJ_DIR)/ip.obj $(OBJ_DIR)/tcp.obj $(OBJ_DIR)/tcpsockm.obj $(OBJ_DIR)/udp.obj $(OBJ_DIR)/utils.obj $(OBJ_DIR)/dns.obj $(OBJ_DIR)/timer.obj $(OBJ_DIR)/ipasm.obj $(OBJ_DIR)/trace.obj
@@ -496,16 +483,29 @@ $(BIN_DIR)/tmemprof.exe: $(OBJ_DIR)/test_memory_profile.obj $(OBJ_DIR)/socket.ob
 	@echo Linking tmemprof.exe with socket wrapper and mTCP...
 	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_memory_profile.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
 
+# Runtime Socket test (Phase 4.2 Day 15-17)
+$(OBJ_DIR)/socket_rt.obj: $(SRC_DIR)/runtime/socket.c $(SRC_DIR)/runtime/socket.h
+	@echo Compiling socket.c (runtime)...
+	$(CC) $(CFLAGS) -i=$(SRC_DIR)/network -fo=$@ $(SRC_DIR)/runtime/socket.c
+
+$(OBJ_DIR)/test_socket_runtime.obj: tests/runtime/test_socket_runtime.c $(SRC_DIR)/runtime/socket.h
+	@echo Compiling test_socket_runtime.c...
+	$(CC) $(CFLAGS) -i=$(SRC_DIR)/runtime -fo=$@ tests/runtime/test_socket_runtime.c
+
+$(BIN_DIR)/tsockrt.exe: $(OBJ_DIR)/test_socket_runtime.obj $(OBJ_DIR)/socket_rt.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/object.obj $(OBJ_DIR)/socket.obj $(OBJ_DIR)/memory.obj $(MTCP_OBJS)
+	@echo Linking tsockrt.exe with runtime socket, string, object, memory, and mTCP...
+	$(LD) $(LDFLAGS) option stack=8192 name $@ file { $(OBJ_DIR)/test_socket_runtime.obj $(OBJ_DIR)/socket_rt.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/object.obj $(OBJ_DIR)/socket.obj $(OBJ_DIR)/memory.obj $(MTCP_OBJS) }
+
 # Declare symbolic (phony) targets for wmake
 all: .SYMBOLIC
 test_memory: .SYMBOLIC
-test_wattcp: .SYMBOLIC
 test_mtcp: .SYMBOLIC
 test_socket: .SYMBOLIC
 test_http: .SYMBOLIC
 test_netdiag: .SYMBOLIC
 test_sendrecv: .SYMBOLIC
 test_memprof: .SYMBOLIC
+test_sockrt: .SYMBOLIC
 test_interpreter: .SYMBOLIC
 test_stream: .SYMBOLIC
 test_fileinputstream: .SYMBOLIC
