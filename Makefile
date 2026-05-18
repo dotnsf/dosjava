@@ -397,6 +397,9 @@ test_netdiag: $(BIN_DIR)/tnetdiag.exe
 # Send/Recv test (Phase 4.1 Day 8-10)
 test_sendrecv: $(BIN_DIR)/tsendrcv.exe
 
+# Memory profiling test (Phase 4.1 Day 11-12)
+test_memprof: $(BIN_DIR)/tmemprof.exe
+
 # mTCP object files needed
 MTCP_OBJS = $(OBJ_DIR)/packet.obj $(OBJ_DIR)/arp.obj $(OBJ_DIR)/eth.obj $(OBJ_DIR)/ip.obj $(OBJ_DIR)/tcp.obj $(OBJ_DIR)/tcpsockm.obj $(OBJ_DIR)/udp.obj $(OBJ_DIR)/utils.obj $(OBJ_DIR)/dns.obj $(OBJ_DIR)/timer.obj $(OBJ_DIR)/ipasm.obj $(OBJ_DIR)/trace.obj
 
@@ -484,6 +487,15 @@ $(BIN_DIR)/tsendrcv.exe: $(OBJ_DIR)/test_send_recv.obj $(OBJ_DIR)/socket.obj $(M
 	@echo Linking tsendrcv.exe with socket wrapper and mTCP...
 	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_send_recv.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
 
+# Memory profiling test (Phase 4.1 Day 11-12)
+$(OBJ_DIR)/test_memory_profile.obj: tests/network/test_memory_profile.c $(SRC_DIR)/network/socket.h
+	@echo Compiling test_memory_profile.c...
+	$(CC) $(CFLAGS) -i=$(SRC_DIR)/network -fo=$@ tests/network/test_memory_profile.c
+
+$(BIN_DIR)/tmemprof.exe: $(OBJ_DIR)/test_memory_profile.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS)
+	@echo Linking tmemprof.exe with socket wrapper and mTCP...
+	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_memory_profile.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
+
 # Declare symbolic (phony) targets for wmake
 all: .SYMBOLIC
 test_memory: .SYMBOLIC
@@ -493,6 +505,7 @@ test_socket: .SYMBOLIC
 test_http: .SYMBOLIC
 test_netdiag: .SYMBOLIC
 test_sendrecv: .SYMBOLIC
+test_memprof: .SYMBOLIC
 test_interpreter: .SYMBOLIC
 test_stream: .SYMBOLIC
 test_fileinputstream: .SYMBOLIC
