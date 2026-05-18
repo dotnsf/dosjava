@@ -1,5 +1,6 @@
 #include "interpreter.h"
 #include "memory.h"
+#include "native.h"
 #include "../format/opcodes.h"
 #include "../runtime/system.h"
 #include "../runtime/fileinputstream.h"
@@ -805,8 +806,52 @@ int interpreter_step(ExecutionContext* ctx) {
             
             /* Check if method is native */
             if (method->flags & METHOD_NATIVE) {
-                /* Handle native methods - don't increment call depth */
+                /* Handle native methods using native method mechanism */
+                const char* descriptor;
+                NativeMethodDescriptor* native_method;
+                uint16_t args[8];  /* Support up to 8 arguments */
+                uint16_t result;
+                uint8_t i;
+                int invoke_result;
                 
+                /* Get method descriptor */
+                descriptor = djc_get_utf8(ctx->djc_file, method->descriptor_index);
+                
+                /* Find native method in registry */
+                native_method = native_find(NULL, method_name, descriptor);
+                
+                if (native_method != NULL) {
+                    /* Pop arguments from stack (in reverse order) */
+                    if (arg_count > 8) {
+                        printf("ERROR: Too many arguments for native method: %u\n", arg_count);
+                        return -1;
+                    }
+                    
+                    for (i = 0; i < arg_count; i++) {
+                        args[arg_count - 1 - i] = stack_pop_shared(ctx);
+                    }
+                    
+                    /* Invoke native method */
+                    result = 0;
+                    invoke_result = native_invoke(ctx, native_method, args, arg_count, &result);
+                    
+                    if (invoke_result != 0) {
+                        printf("ERROR: Native method %s failed\n", method_name ? method_name : "???");
+                        return -1;
+                    }
+                    
+                    /* Push result if method returns a value */
+                    if (native_method->return_type != NATIVE_RETURN_VOID) {
+                        if (stack_push_shared(ctx, result) != 0) {
+                            printf("ERROR: Stack overflow\n");
+                            return -1;
+                        }
+                    }
+                    
+                    break;
+                }
+                
+                /* Fallback: Handle legacy native methods not yet migrated to native mechanism */
                 if (method_name) {
                     /* Check for System.out.println and System.out.print */
                     if (strcmp(method_name, "println") == 0 || strcmp(method_name, "print") == 0) {

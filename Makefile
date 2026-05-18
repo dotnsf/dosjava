@@ -38,14 +38,14 @@ OBJ_DIR = $(BUILD_DIR)/obj
 BIN_DIR = $(BUILD_DIR)/bin
 
 # Source files
-VM_SRCS = $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/interpreter.c
+VM_SRCS = $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/native.c
 FORMAT_SRCS = $(SRC_DIR)/format/djc.c $(SRC_DIR)/format/opcodes.c
 RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedwriter.c $(SRC_DIR)/runtime/dostime.c $(SRC_DIR)/runtime/date.c
 NETWORK_SRCS = $(SRC_DIR)/network/socket.cpp
 TEST_SRCS = $(SRC_DIR)/test_memory.c
 
 # Object files
-VM_OBJS = $(OBJ_DIR)/memory.obj $(OBJ_DIR)/stack.obj $(OBJ_DIR)/interpreter.obj
+VM_OBJS = $(OBJ_DIR)/memory.obj $(OBJ_DIR)/stack.obj $(OBJ_DIR)/interpreter.obj $(OBJ_DIR)/native.obj
 FORMAT_OBJS = $(OBJ_DIR)/djc.obj $(OBJ_DIR)/opcodes.obj
 RUNTIME_OBJS = $(OBJ_DIR)/object.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/system.obj $(OBJ_DIR)/integer.obj $(OBJ_DIR)/inputstream.obj $(OBJ_DIR)/outputstream.obj $(OBJ_DIR)/fileinputstream.obj $(OBJ_DIR)/fileoutputstream.obj $(OBJ_DIR)/bufferedreader.obj $(OBJ_DIR)/bufferedwriter.obj $(OBJ_DIR)/dostime.obj $(OBJ_DIR)/date.obj
 NETWORK_OBJS = $(OBJ_DIR)/socket.obj
@@ -150,11 +150,15 @@ $(OBJ_DIR)/stack.obj: $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/stack.h
 	@echo Compiling stack.c...
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/stack.c
 
-$(OBJ_DIR)/interpreter.obj: $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/interpreter.h
+$(OBJ_DIR)/interpreter.obj: $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/interpreter.h $(SRC_DIR)/vm/native.h
 	@echo Compiling interpreter.c...
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/interpreter.c
 
-$(OBJ_DIR)/djvm.obj: $(SRC_DIR)/vm/djvm.c $(SRC_DIR)/vm/interpreter.h
+$(OBJ_DIR)/native.obj: $(SRC_DIR)/vm/native.c $(SRC_DIR)/vm/native.h
+	@echo Compiling native.c...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/native.c
+
+$(OBJ_DIR)/djvm.obj: $(SRC_DIR)/vm/djvm.c $(SRC_DIR)/vm/interpreter.h $(SRC_DIR)/vm/native.h
 	@echo Compiling djvm.c...
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/djvm.c
 

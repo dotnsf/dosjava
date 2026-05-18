@@ -1,11 +1,12 @@
 /*
  * djvm.c - DOS Java Virtual Machine
- * 
+ *
  * Main program for executing .djc bytecode files
  */
 
 #include "interpreter.h"
 #include "memory.h"
+#include "native.h"
 #include "../format/djc.h"
 #include "../runtime/system.h"
 #include <stdio.h>
@@ -243,6 +244,23 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
+    /* Initialize native method registry */
+    if (native_init() != 0) {
+        fprintf(stderr, "ERROR: Failed to initialize native method registry\n");
+        system_shutdown();
+        memory_shutdown();
+        return 1;
+    }
+    
+    /* Register built-in native methods */
+    if (native_register_builtins() != 0) {
+        fprintf(stderr, "ERROR: Failed to register built-in native methods\n");
+        native_shutdown();
+        system_shutdown();
+        memory_shutdown();
+        return 1;
+    }
+    
     if (options.verbose) {
         printf("DOS Java Virtual Machine v%s\n", DJVM_VERSION);
         printf("Loading: %s\n", options.filename);
@@ -253,6 +271,7 @@ int main(int argc, char* argv[]) {
     djc_file = djc_open(options.filename);
     if (djc_file == NULL) {
         fprintf(stderr, "ERROR: Failed to open file: %s\n", options.filename);
+        native_shutdown();
         system_shutdown();
         memory_shutdown();
         return 1;
@@ -274,6 +293,7 @@ int main(int argc, char* argv[]) {
     if (method == NULL) {
         fprintf(stderr, "ERROR: Method not found: %s\n", options.method_name);
         djc_close(djc_file);
+        native_shutdown();
         system_shutdown();
         memory_shutdown();
         return 1;
@@ -284,6 +304,7 @@ int main(int argc, char* argv[]) {
     
     /* Cleanup */
     djc_close(djc_file);
+    native_shutdown();
     system_shutdown();
     memory_shutdown();
     
