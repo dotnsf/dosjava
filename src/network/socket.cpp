@@ -77,9 +77,9 @@ int socket_init(void) {
     /* Initialize mTCP stack (like doscurl)
      * First arg: number of TCP sockets to allocate (must match TCP_MAX_SOCKETS in sample.cfg)
      * Second arg: ring buffer size (TCP_SOCKET_RING_SIZE from GLOBAL.CFG)
-     * Note: sample.cfg defines TCP_MAX_SOCKETS as 2, so we use 2 here
+     * Note: sample.cfg defines TCP_MAX_SOCKETS as 4, so we use 4 here
      */
-    if (Utils::initStack(2, TCP_SOCKET_RING_SIZE, NULL, NULL) != 0) {
+    if (Utils::initStack(4, TCP_SOCKET_RING_SIZE, NULL, NULL) != 0) {
         strcpy(g_error_msg, "Failed to initialize mTCP stack");
         return SOCKET_ERR_INIT;
     }

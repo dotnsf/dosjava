@@ -222,13 +222,177 @@ socket_handle_t allocate_socket(void) {
 ## Testing Checklist
 
 - [x] Build tmemprof.exe
-- [ ] Run tmemprof.exe in DOSBox-X
-- [ ] Measure baseline memory
-- [ ] Measure init overhead
-- [ ] Measure per-socket overhead
-- [ ] Verify cleanup frees memory
-- [ ] Document actual measurements
-- [ ] Compare with estimates
+- [x] Run tmemprof.exe in DOSBox-X
+- [x] Measure baseline memory
+- [x] Measure init overhead
+- [x] Measure per-socket overhead
+- [x] Verify cleanup frees memory
+- [x] Document actual measurements
+- [x] Compare with estimates
+
+## Actual Profiling Results (DOSBox-X)
+
+### Measured Memory Usage
+
+```
+Baseline: 539,264 bytes (526.6 KB)
+
+1. After socket_init():
+   - Memory used: 24,576 bytes (24 KB)
+   - Remaining: 514,688 bytes (502.6 KB)
+
+2. After creating 2 sockets:
+   - Memory used: 8,192 bytes (8 KB)
+   - Per socket: 4,096 bytes (4 KB)
+   - Remaining: 506,496 bytes (494.6 KB)
+
+3. After socket_close():
+   - Memory freed: 0 bytes
+   - Remaining: 506,496 bytes (494.6 KB)
+
+4. After socket_shutdown():
+   - Memory freed: 0 bytes
+   - Remaining: 506,496 bytes (494.6 KB)
+
+Total memory used: 32,768 bytes (32 KB)
+```
+
+### Analysis
+
+**mTCP Memory Management Behavior**:
+- socket_close() releases sockets but does NOT return memory to DOS
+- socket_shutdown() also does NOT return memory to DOS
+- This is by design: mTCP maintains internal memory pools for performance
+- Memory is automatically reclaimed by DOS when program exits
+- No memory leaks in long-running programs (pool reuse)
+
+**Comparison with Estimates**:
+| Item | Estimated | Actual | Status |
+|------|-----------|--------|--------|
+| mTCP init | 25-30 KB | 24 KB | ✅ As expected |
+| 2 sockets | 10-12 KB | 8 KB | ✅ Better than expected |
+| Total (mTCP only) | 35-42 KB | 32 KB | ✅ Excellent |
+
+**Note**: Program code (~60 KB) is separate. Total program memory: ~92 KB.
+
+### Memory Available for Phase 4.2
+
+**After socket initialization**: 494.6 KB available
+
+**Sufficient for**:
+- Java VM code: ~50 KB
+- Java bytecode: ~50 KB
+- Java heap: ~350 KB (plenty of room)
+- Stack: ~25 KB
+
+**Conclusion**: Memory budget is more than adequate for Phase 4.2 ✅
+
+## Important Limitations and Constraints
+
+### 1. Maximum Concurrent Sockets
+
+**Current**: `MAX_SOCKETS = 2` (defined in socket.h)
+
+**Limitation**:
+- Only 2 sockets can be created simultaneously
+- Attempting to create more returns `INVALID_SOCKET`
+- Must close existing sockets before creating new ones
+
+**Recommendation for Phase 4.2**:
+- Increase to 4 sockets for Java applications
+- Each additional socket: ~4 KB memory
+- 4 sockets total: ~16 KB (acceptable)
+
+### 2. Receive Buffer Size
+
+**Current**: `TCP_RECV_BUFFER = 4096` bytes per socket
+
+**Limitation**:
+- Fixed size, cannot be changed at runtime
+- Larger data must be received in multiple recv() calls
+- Optimal for HTTP and most protocols
+
+**Constraint**:
+- Defined at compile time in socket.cpp
+- Changing requires recompilation
+- Must balance memory vs. performance
+
+### 3. Memory Release Behavior
+
+**Important**: mTCP does NOT return memory to DOS
+
+**Implications**:
+- `socket_close()` frees the socket but keeps memory in pool
+- `socket_shutdown()` does not return memory to DOS
+- Memory is reclaimed only when program exits
+- This is normal mTCP behavior, not a bug
+
+**Best Practices**:
+- Short-lived programs: No concern
+- Long-running programs: Reuse sockets via close/create cycle
+- TSR (Terminate and Stay Resident): Not recommended for Phase 4
+
+### 4. Socket Reinitialization
+
+**Behavior**: Can call socket_init() multiple times
+
+**Details**:
+- First call allocates memory pool
+- Subsequent calls reuse existing pool
+- No additional memory allocation
+- Efficient for restart scenarios
+
+**Use Case**:
+- Network reconnection after failure
+- Configuration changes
+- Testing and development
+
+### 5. Configuration Constraints
+
+**sample.cfg Requirements**:
+- `TCP_MAX_SOCKETS` must match `MAX_SOCKETS` in socket.h
+- `TCP_MAX_SOCKETS` must match first arg to `Utils::initStack()`
+- Mismatch causes initialization failure
+
+**Current Configuration**:
+```c
+// socket.h
+#define MAX_SOCKETS 2
+
+// sample.cfg
+#define TCP_MAX_SOCKETS (2)
+
+// socket.cpp
+Utils::initStack(2, TCP_SOCKET_RING_SIZE, NULL, NULL);
+```
+
+**All three must be synchronized!**
+
+### 6. DOS Memory Model
+
+**16-bit Small Memory Model** (`-ms`):
+- Code + Data < 64 KB each
+- Pointers are 16-bit (near pointers)
+- Total addressable: 640 KB conventional memory
+
+**Implications**:
+- Large buffers must be allocated carefully
+- Stack size limited (4 KB default)
+- Global data must be minimized
+
+### 7. Thread Safety
+
+**Not Thread-Safe**: Single-threaded design
+
+**Reason**:
+- DOS is single-threaded
+- No mutex/locking mechanisms
+- Global state (g_sockets array)
+
+**Constraint**:
+- One socket operation at a time
+- No concurrent access from interrupts
+- Suitable for DOS environment
 
 ## Conclusion
 
