@@ -388,6 +388,12 @@ test_mtcp: $(BIN_DIR)/tmtcp.exe
 # Socket wrapper test (Phase 4.1 Day 3-5)
 test_socket: $(BIN_DIR)/tsock.exe
 
+# HTTP client test (Phase 4.1 Day 6-7)
+test_http: $(BIN_DIR)/thttp.exe
+
+# Network diagnostics test (Phase 4.1 Day 6-7)
+test_netdiag: $(BIN_DIR)/tnetdiag.exe
+
 # mTCP object files needed
 MTCP_OBJS = $(OBJ_DIR)/packet.obj $(OBJ_DIR)/arp.obj $(OBJ_DIR)/eth.obj $(OBJ_DIR)/ip.obj $(OBJ_DIR)/tcp.obj $(OBJ_DIR)/tcpsockm.obj $(OBJ_DIR)/udp.obj $(OBJ_DIR)/utils.obj $(OBJ_DIR)/dns.obj $(OBJ_DIR)/timer.obj $(OBJ_DIR)/ipasm.obj $(OBJ_DIR)/trace.obj
 
@@ -448,12 +454,32 @@ $(BIN_DIR)/tsock.exe: $(OBJ_DIR)/test_socket.obj $(OBJ_DIR)/socket.obj $(MTCP_OB
 	@echo Linking tsock.exe with socket wrapper and mTCP...
 	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_socket.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
 
+# HTTP client test (Phase 4.1 Day 6-7)
+$(OBJ_DIR)/test_http.obj: tests/network/test_http.c $(SRC_DIR)/network/socket.h
+	@echo Compiling test_http.c...
+	$(CC) $(CFLAGS) -i=$(SRC_DIR)/network -fo=$@ tests/network/test_http.c
+
+$(BIN_DIR)/thttp.exe: $(OBJ_DIR)/test_http.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS)
+	@echo Linking thttp.exe with socket wrapper and mTCP...
+	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_http.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
+
+# Network diagnostics test (Phase 4.1 Day 6-7)
+$(OBJ_DIR)/test_network_diag.obj: tests/network/test_network_diag.c $(SRC_DIR)/network/socket.h
+	@echo Compiling test_network_diag.c...
+	$(CC) $(CFLAGS) -i=$(SRC_DIR)/network -fo=$@ tests/network/test_network_diag.c
+
+$(BIN_DIR)/tnetdiag.exe: $(OBJ_DIR)/test_network_diag.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS)
+	@echo Linking tnetdiag.exe with socket wrapper and mTCP...
+	$(LD) $(LDFLAGS) option stack=4096 name $@ file { $(OBJ_DIR)/test_network_diag.obj $(OBJ_DIR)/socket.obj $(MTCP_OBJS) }
+
 # Declare symbolic (phony) targets for wmake
 all: .SYMBOLIC
 test_memory: .SYMBOLIC
 test_wattcp: .SYMBOLIC
 test_mtcp: .SYMBOLIC
 test_socket: .SYMBOLIC
+test_http: .SYMBOLIC
+test_netdiag: .SYMBOLIC
 test_interpreter: .SYMBOLIC
 test_stream: .SYMBOLIC
 test_fileinputstream: .SYMBOLIC

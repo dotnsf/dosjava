@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "socket.h"
 
 /* mTCP headers */
@@ -18,6 +19,13 @@
 #include "tcpsockm.h"
 #include "udp.h"
 #include "dns.h"
+#include "timer.h"
+
+/* TCP receive buffer size (same as doscurl) */
+#define TCP_RECV_BUFFER 4096
+
+/* Note: TCP_SOCKET_RING_SIZE is defined in GLOBAL.CFG (included via sample.cfg) */
+/* We don't redefine it here to avoid conflicts */
 
 /* Socket structure */
 typedef struct {
@@ -57,14 +65,21 @@ int socket_init(void) {
         g_sockets[i].in_use = 0;
     }
     
+    /* Initialize random number generator for local port selection */
+    srand((unsigned int)time(NULL));
+    
     /* Parse mTCP configuration */
     if (Utils::parseEnv() != 0) {
         strcpy(g_error_msg, "Failed to parse mTCP configuration");
         return SOCKET_ERR_INIT;
     }
     
-    /* Initialize mTCP stack */
-    if (Utils::initStack(MAX_SOCKETS, MAX_SOCKETS, NULL, NULL) != 0) {
+    /* Initialize mTCP stack (like doscurl)
+     * First arg: number of TCP sockets to allocate (must match TCP_MAX_SOCKETS in sample.cfg)
+     * Second arg: ring buffer size (TCP_SOCKET_RING_SIZE from GLOBAL.CFG)
+     * Note: sample.cfg defines TCP_MAX_SOCKETS as 2, so we use 2 here
+     */
+    if (Utils::initStack(2, TCP_SOCKET_RING_SIZE, NULL, NULL) != 0) {
         strcpy(g_error_msg, "Failed to initialize mTCP stack");
         return SOCKET_ERR_INIT;
     }
@@ -121,12 +136,20 @@ socket_handle_t socket_create(int type) {
         return INVALID_SOCKET;
     }
     
-    /* Create mTCP socket */
+    /* Create mTCP socket using TcpSocketMgr (like doscurl) */
     if (type == SOCKET_TYPE_TCP) {
-        tcp_sock = new TcpSocket();
+        tcp_sock = TcpSocketMgr::getSocket();
         if (tcp_sock == NULL) {
             free_socket(handle);
-            strcpy(g_error_msg, "Failed to create TCP socket");
+            strcpy(g_error_msg, "Failed to get TCP socket from manager");
+            return INVALID_SOCKET;
+        }
+        
+        /* Set receive buffer size (like doscurl) */
+        if (tcp_sock->setRecvBuffer(TCP_RECV_BUFFER) != 0) {
+            TcpSocketMgr::freeSocket(tcp_sock);
+            free_socket(handle);
+            strcpy(g_error_msg, "Failed to set receive buffer");
             return INVALID_SOCKET;
         }
         
@@ -150,6 +173,7 @@ socket_handle_t socket_create(int type) {
 int socket_connect(socket_handle_t handle, const char* host, unsigned int port) {
     IpAddr_t ip_addr;
     int rc;
+    unsigned char a, b, c, d;
     
     if (!is_valid_handle(handle)) {
         strcpy(g_error_msg, "Invalid socket handle");
@@ -161,26 +185,72 @@ int socket_connect(socket_handle_t handle, const char* host, unsigned int port) 
         return SOCKET_ERR_INVALID;
     }
     
-    /* Resolve hostname to IP address */
-    rc = Dns::resolve((char*)host, ip_addr, 10);
-    if (rc < 0) {
-        strcpy(g_error_msg, "Failed to resolve hostname");
+    /* Check if host is an IP address (xxx.xxx.xxx.xxx format) */
+    if (sscanf(host, "%hhu.%hhu.%hhu.%hhu", &a, &b, &c, &d) == 4) {
+        /* Direct IP address - no DNS resolution needed */
+        ip_addr[0] = a;
+        ip_addr[1] = b;
+        ip_addr[2] = c;
+        ip_addr[3] = d;
+    } else {
+        /* Hostname - resolve via DNS */
+        rc = Dns::resolve((char*)host, ip_addr, 10);
+        if (rc < 0) {
+            strcpy(g_error_msg, "Failed to resolve hostname");
+            return SOCKET_ERR_CONNECT;
+        }
+    }
+    
+    /* Generate random local port (like doscurl does) */
+    unsigned int local_port = 2048 + (rand() % 1000);
+    
+    /* Connect to remote host using non-blocking method (like doscurl) */
+    g_sockets[handle].state = SOCKET_STATE_CONNECTING;
+    rc = g_sockets[handle].tcp_socket->connectNonBlocking(local_port, ip_addr, port);
+    
+    if (rc != 0) {
+        /* Failed to initiate connection */
+        g_sockets[handle].state = SOCKET_STATE_CLOSED;
+        sprintf(g_error_msg, "Failed to initiate connection (rc=%d)", rc);
         return SOCKET_ERR_CONNECT;
     }
     
-    /* Connect to remote host */
-    /* TcpSocket::connect(srcPort, host, dstPort, timeout) */
-    g_sockets[handle].state = SOCKET_STATE_CONNECTING;
-    rc = g_sockets[handle].tcp_socket->connect(0, ip_addr, port, 10000);
+    /* Connection initiated - wait for completion */
+    unsigned long start_time = TIMER_GET_CURRENT();
     
-    if (rc == 0) {
-        g_sockets[handle].state = SOCKET_STATE_CONNECTED;
-        strcpy(g_error_msg, "OK");
-        return SOCKET_OK;
-    } else {
-        g_sockets[handle].state = SOCKET_STATE_CLOSED;
-        strcpy(g_error_msg, "Connection failed");
-        return SOCKET_ERR_CONNECT;
+    /* Poll for connection completion (60 second timeout) */
+    while (1) {
+        unsigned long current_time, ticks_elapsed;
+        
+        /* Process packets */
+        PACKET_PROCESS_SINGLE;
+        Arp::driveArp();
+        Tcp::drivePackets();
+        
+        /* Check if connection completed FIRST (like doscurl) */
+        if (g_sockets[handle].tcp_socket->isConnectComplete()) {
+            g_sockets[handle].state = SOCKET_STATE_CONNECTED;
+            strcpy(g_error_msg, "OK");
+            return SOCKET_OK;
+        }
+        
+        /* Get current time for checks */
+        current_time = TIMER_GET_CURRENT();
+        ticks_elapsed = Timer_diff(start_time, current_time);
+        
+        /* Check for timeout (60 seconds) */
+        if (ticks_elapsed > TIMER_MS_TO_TICKS(60000)) {
+            g_sockets[handle].state = SOCKET_STATE_CLOSED;
+            strcpy(g_error_msg, "Connection timeout");
+            return SOCKET_ERR_TIMEOUT;
+        }
+        
+        /* Check if remote closed (like doscurl) */
+        if (g_sockets[handle].tcp_socket->isRemoteClosed()) {
+            g_sockets[handle].state = SOCKET_STATE_CLOSED;
+            strcpy(g_error_msg, "Connection refused or reset");
+            return SOCKET_ERR_CONNECT;
+        }
     }
 }
 
@@ -336,7 +406,7 @@ int socket_close(socket_handle_t handle) {
     /* Close mTCP socket */
     if (g_sockets[handle].type == SOCKET_TYPE_TCP && g_sockets[handle].tcp_socket != NULL) {
         g_sockets[handle].tcp_socket->close();
-        delete g_sockets[handle].tcp_socket;
+        TcpSocketMgr::freeSocket(g_sockets[handle].tcp_socket);
         g_sockets[handle].tcp_socket = NULL;
     }
     

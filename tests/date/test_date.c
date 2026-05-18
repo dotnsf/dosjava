@@ -1,4 +1,4 @@
-﻿#include "../../src/runtime/date.h"
+#include "../../src/runtime/date.h"
 #include "../../src/runtime/dostime.h"
 #include <stdio.h>
 #include <stdlib.h>

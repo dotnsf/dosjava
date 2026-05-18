@@ -1,4 +1,4 @@
-﻿#ifndef BUFFEREDREADER_H
+#ifndef BUFFEREDREADER_H
 #define BUFFEREDREADER_H
 
 #include "fileinputstream.h"

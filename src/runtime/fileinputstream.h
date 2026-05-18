@@ -1,4 +1,4 @@
-﻿#ifndef FILEINPUTSTREAM_H
+#ifndef FILEINPUTSTREAM_H
 #define FILEINPUTSTREAM_H
 
 #include "inputstream.h"

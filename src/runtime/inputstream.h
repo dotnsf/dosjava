@@ -1,4 +1,4 @@
-﻿#ifndef INPUTSTREAM_H
+#ifndef INPUTSTREAM_H
 #define INPUTSTREAM_H
 
 #include "object.h"

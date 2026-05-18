@@ -1,4 +1,4 @@
-﻿#include <fcntl.h>
+#include <fcntl.h>
 #include <io.h>
 #include "fileinputstream.h"
 #include "../vm/memory.h"

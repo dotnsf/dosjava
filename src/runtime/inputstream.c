@@ -1,4 +1,4 @@
-﻿#include "inputstream.h"
+#include "inputstream.h"
 #include <stdio.h>
 #include <string.h>
 

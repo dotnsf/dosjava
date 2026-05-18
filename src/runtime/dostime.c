@@ -1,4 +1,4 @@
-﻿/**
+/**
  * DOS Time API Wrapper Implementation
  */
 

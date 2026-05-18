@@ -1,4 +1,4 @@
-﻿/**
+/**
  * DOS Time API Wrapper
  * Provides access to DOS system time functions
  */

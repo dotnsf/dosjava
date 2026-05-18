@@ -1,4 +1,4 @@
-﻿#ifndef BUFFEREDWRITER_H
+#ifndef BUFFEREDWRITER_H
 #define BUFFEREDWRITER_H
 
 #include "fileoutputstream.h"

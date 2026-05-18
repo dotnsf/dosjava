@@ -1,4 +1,4 @@
-﻿#ifndef DATE_H
+#ifndef DATE_H
 #define DATE_H
 
 #include "../types.h"

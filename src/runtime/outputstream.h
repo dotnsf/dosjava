@@ -1,4 +1,4 @@
-﻿#ifndef OUTPUTSTREAM_H
+#ifndef OUTPUTSTREAM_H
 #define OUTPUTSTREAM_H
 
 #include "object.h"

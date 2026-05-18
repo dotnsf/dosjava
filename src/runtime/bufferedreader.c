@@ -1,4 +1,4 @@
-﻿#include "bufferedreader.h"
+#include "bufferedreader.h"
 #include "../vm/memory.h"
 #include <string.h>
 

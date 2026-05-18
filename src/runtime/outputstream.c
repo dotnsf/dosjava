@@ -1,4 +1,4 @@
-﻿#include "outputstream.h"
+#include "outputstream.h"
 #include <stdio.h>
 #include <string.h>
 

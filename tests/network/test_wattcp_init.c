@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Wattcp Initialization Test (Simplified)
  *
  * This program tests basic Wattcp functionality:

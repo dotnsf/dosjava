@@ -1,4 +1,4 @@
-﻿#include "bufferedwriter.h"
+#include "bufferedwriter.h"
 #include "../vm/memory.h"
 #include <string.h>
 #include <stdio.h>

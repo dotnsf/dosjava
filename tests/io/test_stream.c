@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Test program for InputStream and OutputStream base classes
  * 
  * This tests the basic functionality of the stream base classes
