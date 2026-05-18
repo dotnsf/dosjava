@@ -330,9 +330,13 @@ socket_handle_t socket_accept(socket_handle_t handle) {
 
 /*
  * Send data through socket
+ * Implements non-blocking send with packet processing loop
+ * Based on doscurl implementation
  */
 int socket_send(socket_handle_t handle, const void* data, unsigned int length) {
-    int sent;
+    unsigned int bytes_to_send;
+    unsigned int bytes_sent;
+    int16_t rc;
     
     if (!is_valid_handle(handle)) {
         strcpy(g_error_msg, "Invalid socket handle");
@@ -349,23 +353,45 @@ int socket_send(socket_handle_t handle, const void* data, unsigned int length) {
         return SOCKET_ERR_INVALID;
     }
     
-    /* Send data */
-    sent = g_sockets[handle].tcp_socket->send((uint8_t*)data, length);
+    bytes_to_send = length;
+    bytes_sent = 0;
     
-    if (sent < 0) {
-        strcpy(g_error_msg, "Send failed");
-        return SOCKET_ERR_SEND;
+    /* Send all data with packet processing loop (like doscurl) */
+    while (bytes_sent < bytes_to_send) {
+        /* Process packets to push out buffers and free them up */
+        PACKET_PROCESS_SINGLE;
+        Arp::driveArp();
+        Tcp::drivePackets();
+        
+        /* Try to send remaining data */
+        rc = g_sockets[handle].tcp_socket->send(
+            (uint8_t*)data + bytes_sent,
+            bytes_to_send - bytes_sent
+        );
+        
+        if (rc > 0) {
+            bytes_sent += rc;
+        } else if (rc == 0) {
+            /* Out of send buffers - loop around to process packets */
+            continue;
+        } else {
+            /* Send error */
+            strcpy(g_error_msg, "Send failed");
+            return SOCKET_ERR_SEND;
+        }
     }
     
     strcpy(g_error_msg, "OK");
-    return sent;
+    return bytes_sent;
 }
 
 /*
  * Receive data from socket
+ * Non-blocking receive with remote close detection
+ * Based on doscurl implementation
  */
 int socket_recv(socket_handle_t handle, void* buffer, unsigned int length) {
-    int received;
+    int16_t received;
     
     if (!is_valid_handle(handle)) {
         strcpy(g_error_msg, "Invalid socket handle");
@@ -382,12 +408,23 @@ int socket_recv(socket_handle_t handle, void* buffer, unsigned int length) {
         return SOCKET_ERR_INVALID;
     }
     
-    /* Receive data */
+    /* Process packets before receiving */
+    PACKET_PROCESS_SINGLE;
+    Arp::driveArp();
+    Tcp::drivePackets();
+    
+    /* Try to receive data */
     received = g_sockets[handle].tcp_socket->recv((uint8_t*)buffer, length);
     
     if (received < 0) {
         strcpy(g_error_msg, "Receive failed");
         return SOCKET_ERR_RECV;
+    }
+    
+    /* Check if remote closed (return 0 to indicate connection closed) */
+    if (received == 0 && g_sockets[handle].tcp_socket->isRemoteClosed()) {
+        strcpy(g_error_msg, "Connection closed by remote");
+        return 0;  /* 0 indicates connection closed */
     }
     
     strcpy(g_error_msg, "OK");
