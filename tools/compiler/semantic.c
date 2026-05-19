@@ -88,6 +88,7 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
         "OutputStream",
         "InputStream",
         "Date",
+        "Socket",
         NULL
     };
     int i;
@@ -337,6 +338,292 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
                 method_sym.data.method_data.is_public = 1;
                 
                 if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+        }
+        
+        /* Add Socket class methods */
+        if (strcmp(builtin_classes[i], "Socket") == 0) {
+            /* Add init() static method */
+            method_offset = semantic_add_string(analyzer, "init");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_VOID;
+            method_sym.data.method_data.param_count = 0;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add create(String, int) static method - returns int (socket handle) */
+            method_offset = semantic_add_string(analyzer, "create");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_INT;
+            method_sym.data.method_data.param_count = 2;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameters for create(String host, int port) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset, string_class_offset;
+                
+                /* Parameter 0: String host */
+                param_offset = semantic_add_string(analyzer, "host");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                string_class_offset = semantic_add_string(analyzer, "String");
+                if (string_class_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* Parameter 1: int port */
+                param_offset = semantic_add_string(analyzer, "port");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_INT;
+                param_sym.data.param_data.index = 1;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+            
+            /* Add close(Socket) static method */
+            method_offset = semantic_add_string(analyzer, "close");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_VOID;
+            method_sym.data.method_data.param_count = 1;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameter for close(int sock) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset;
+                
+                param_offset = semantic_add_string(analyzer, "sock");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_INT;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+            
+            /* Add send(Socket, String) static method - returns int */
+            method_offset = semantic_add_string(analyzer, "send");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_INT;
+            method_sym.data.method_data.param_count = 2;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameters for send(int sock, String data) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset, string_class_offset;
+                
+                /* Parameter 0: int sock */
+                param_offset = semantic_add_string(analyzer, "sock");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_INT;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* Parameter 1: String data */
+                param_offset = semantic_add_string(analyzer, "data");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                string_class_offset = semantic_add_string(analyzer, "String");
+                if (string_class_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 1;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+            
+            /* Add recv(Socket, int) static method - returns String */
+            method_offset = semantic_add_string(analyzer, "recv");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_CLASS;
+            method_sym.type.class_name = semantic_add_string(analyzer, "String");
+            method_sym.data.method_data.param_count = 2;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameters for recv(int sock, int maxlen) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset;
+                
+                /* Parameter 0: int sock */
+                param_offset = semantic_add_string(analyzer, "sock");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_INT;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* Parameter 1: int maxlen */
+                param_offset = semantic_add_string(analyzer, "maxlen");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_INT;
+                param_sym.data.param_data.index = 1;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+            
+            /* Add isConnected(Socket) static method - returns int (boolean) */
+            method_offset = semantic_add_string(analyzer, "isConnected");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_INT;
+            method_sym.data.method_data.param_count = 1;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameter for isConnected(int sock) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset;
+                
+                param_offset = semantic_add_string(analyzer, "sock");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_INT;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
                     return -1;
                 }
             }

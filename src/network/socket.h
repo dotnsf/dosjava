@@ -38,8 +38,8 @@ extern "C" {
 #define SOCKET_ERR_INVALID   -11
 #define SOCKET_ERR_NOMEM     -12
 
-/* Maximum number of sockets (must match sample.cfg) */
-#define MAX_SOCKETS 4
+/* Maximum number of sockets (reduced to 2 like doscurl to avoid memory issues) */
+#define MAX_SOCKETS 2
 
 /* Socket handle type */
 typedef int socket_handle_t;

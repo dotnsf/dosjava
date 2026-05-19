@@ -29,8 +29,6 @@ int socket_subsystem_init(void) {
     
     /* Initialize C-level socket API */
     if (socket_init() != SOCKET_OK) {
-        fprintf(stderr, "ERROR: Failed to initialize socket subsystem: %s\n", 
-                socket_get_error());
         return -1;
     }
     
@@ -61,14 +59,12 @@ Socket* socket_runtime_new(void) {
     
     /* Check if subsystem is initialized */
     if (!g_socket_initialized) {
-        fprintf(stderr, "ERROR: Socket subsystem not initialized\n");
         return NULL;
     }
     
     /* Allocate Socket structure */
     sock = (Socket*)memory_alloc(sizeof(Socket));
     if (sock == NULL) {
-        fprintf(stderr, "ERROR: Failed to allocate Socket\n");
         return NULL;
     }
     
@@ -129,29 +125,24 @@ int socket_runtime_connect(Socket* sock, String* host, uint16_t port) {
     int rc;
     
     if (sock == NULL) {
-        fprintf(stderr, "ERROR: Socket is NULL\n");
         return -1;
     }
     
     if (sock->closed) {
-        fprintf(stderr, "ERROR: Socket is closed\n");
         return -1;
     }
     
     if (sock->connected) {
-        fprintf(stderr, "ERROR: Socket is already connected\n");
         return -1;
     }
     
     if (host == NULL) {
-        fprintf(stderr, "ERROR: Host is NULL\n");
         return -1;
     }
     
     /* Create C-level socket */
     sock->handle = socket_create(SOCKET_TYPE_TCP);
     if (sock->handle == INVALID_SOCKET) {
-        fprintf(stderr, "ERROR: Failed to create socket: %s\n", socket_get_error());
         return -1;
     }
     
@@ -159,8 +150,6 @@ int socket_runtime_connect(Socket* sock, String* host, uint16_t port) {
     host_cstr = string_tocstr(host);
     rc = socket_connect(sock->handle, host_cstr, port);
     if (rc != SOCKET_OK) {
-        fprintf(stderr, "ERROR: Failed to connect to %s:%u: %s\n",
-                host_cstr, port, socket_get_error());
         socket_close(sock->handle);
         sock->handle = -1;
         return -1;
@@ -178,17 +167,14 @@ int socket_runtime_send(Socket* sock, const uint8_t* data, uint16_t length) {
     int sent;
     
     if (sock == NULL) {
-        fprintf(stderr, "ERROR: Socket is NULL\n");
         return -1;
     }
     
     if (sock->closed) {
-        fprintf(stderr, "ERROR: Socket is closed\n");
         return -1;
     }
     
     if (!sock->connected) {
-        fprintf(stderr, "ERROR: Socket is not connected\n");
         return -1;
     }
     
@@ -199,7 +185,6 @@ int socket_runtime_send(Socket* sock, const uint8_t* data, uint16_t length) {
     /* Send data through C-level socket */
     sent = socket_send(sock->handle, data, length);
     if (sent < 0) {
-        fprintf(stderr, "ERROR: Failed to send data: %s\n", socket_get_error());
         return -1;
     }
     
@@ -210,17 +195,14 @@ int socket_runtime_recv(Socket* sock, uint8_t* buffer, uint16_t max_length) {
     int received;
     
     if (sock == NULL) {
-        fprintf(stderr, "ERROR: Socket is NULL\n");
         return -1;
     }
     
     if (sock->closed) {
-        fprintf(stderr, "ERROR: Socket is closed\n");
         return -1;
     }
     
     if (!sock->connected) {
-        fprintf(stderr, "ERROR: Socket is not connected\n");
         return -1;
     }
     
@@ -231,7 +213,6 @@ int socket_runtime_recv(Socket* sock, uint8_t* buffer, uint16_t max_length) {
     /* Receive data from C-level socket */
     received = socket_recv(sock->handle, buffer, max_length);
     if (received < 0) {
-        fprintf(stderr, "ERROR: Failed to receive data: %s\n", socket_get_error());
         return -1;
     }
     
@@ -258,8 +239,6 @@ int socket_runtime_close(Socket* sock) {
     if (sock->handle >= 0) {
         rc = socket_close(sock->handle);
         if (rc != SOCKET_OK) {
-            fprintf(stderr, "WARNING: Failed to close socket: %s\n", 
-                    socket_get_error());
             /* Continue anyway */
         }
         sock->handle = -1;
@@ -317,7 +296,6 @@ SocketException* socket_exception_new(const char* message, int16_t error_code) {
     /* Allocate SocketException structure */
     ex = (SocketException*)memory_alloc(sizeof(SocketException));
     if (ex == NULL) {
-        fprintf(stderr, "ERROR: Failed to allocate SocketException\n");
         return NULL;
     }
     

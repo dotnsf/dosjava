@@ -2249,6 +2249,22 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
                 }
             }
         }
+    } else if (strcmp(method_name, "init") == 0 ||
+               strcmp(method_name, "create") == 0 ||
+               strcmp(method_name, "send") == 0 ||
+               strcmp(method_name, "recv") == 0 ||
+               strcmp(method_name, "close") == 0 ||
+               strcmp(method_name, "isConnected") == 0) {
+        /* Check if this is Socket.method() call */
+        if (object_idx != 0) {
+            ASTNode* obj_node = codegen_get_node(codegen, object_idx);
+            if (obj_node && obj_node->type == NODE_IDENTIFIER) {
+                const char* obj_name = codegen_get_string(codegen, obj_node->data.identifier.name);
+                if (obj_name && strcmp(obj_name, "Socket") == 0) {
+                    is_native = 1;
+                }
+            }
+        }
     }
     
     arg_node_type = NODE_PROGRAM;
@@ -2486,7 +2502,29 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         } else if (strcmp(method_name, "writeLine") == 0) {
             strcpy(descriptor, "(Ljava/lang/String;)V");
         } else if (strcmp(method_name, "close") == 0) {
+            /* Check if this is Socket.close(int) or File.close() */
+            if (arg_count == 1) {
+                /* Socket.close(int sock) */
+                strcpy(descriptor, "(I)V");
+            } else {
+                /* File.close() */
+                strcpy(descriptor, "()V");
+            }
+        } else if (strcmp(method_name, "init") == 0) {
+            /* Socket.init() has no parameters */
             strcpy(descriptor, "()V");
+        } else if (strcmp(method_name, "create") == 0) {
+            /* Socket.create(String host, int port) returns int */
+            strcpy(descriptor, "(Ljava/lang/String;I)I");
+        } else if (strcmp(method_name, "send") == 0) {
+            /* Socket.send(int sock, String data) returns int */
+            strcpy(descriptor, "(ILjava/lang/String;)I");
+        } else if (strcmp(method_name, "recv") == 0) {
+            /* Socket.recv(int sock) returns String */
+            strcpy(descriptor, "(I)Ljava/lang/String;");
+        } else if (strcmp(method_name, "isConnected") == 0) {
+            /* Socket.isConnected(int sock) returns int */
+            strcpy(descriptor, "(I)I");
         } else if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
             strcpy(descriptor, "(Ljava/lang/String;)V");
         } else {
@@ -2563,6 +2601,16 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
     var_name = codegen_get_string(codegen, id_node->data.identifier.name);
     if (!var_name) {
         return -1;
+    }
+    
+    /* Check if this is a builtin class name (Socket, File, System) */
+    /* These are used for static method calls and should not be treated as variables */
+    if (strcmp(var_name, "Socket") == 0 ||
+        strcmp(var_name, "File") == 0 ||
+        strcmp(var_name, "System") == 0) {
+        /* For builtin classes, we don't push anything on the stack */
+        /* The method call handler will deal with it */
+        return 0;
     }
     
     /* Try to get local variable index */

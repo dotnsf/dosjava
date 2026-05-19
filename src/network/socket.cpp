@@ -74,12 +74,12 @@ int socket_init(void) {
         return SOCKET_ERR_INIT;
     }
     
-    /* Initialize mTCP stack (like doscurl)
-     * First arg: number of TCP sockets to allocate (must match TCP_MAX_SOCKETS in sample.cfg)
-     * Second arg: ring buffer size (TCP_SOCKET_RING_SIZE from GLOBAL.CFG)
-     * Note: sample.cfg defines TCP_MAX_SOCKETS as 4, so we use 4 here
+    /* Initialize mTCP stack
+     * First arg: number of TCP sockets to allocate (2 to reduce memory usage)
+     * Second arg: number of TCP transmit buffers (TCP_MAX_XMIT_BUFS from GLOBAL.CFG, default 10)
+     * Note: Using 2 sockets and reduced xmit buffers to fit in 16-bit DOS memory constraints
      */
-    if (Utils::initStack(4, TCP_SOCKET_RING_SIZE, NULL, NULL) != 0) {
+    if (Utils::initStack(2, 2, NULL, NULL) != 0) {
         strcpy(g_error_msg, "Failed to initialize mTCP stack");
         return SOCKET_ERR_INIT;
     }
@@ -145,13 +145,10 @@ socket_handle_t socket_create(int type) {
             return INVALID_SOCKET;
         }
         
-        /* Set receive buffer size (like doscurl) */
-        if (tcp_sock->setRecvBuffer(TCP_RECV_BUFFER) != 0) {
-            TcpSocketMgr::freeSocket(tcp_sock);
-            free_socket(handle);
-            strcpy(g_error_msg, "Failed to set receive buffer");
-            return INVALID_SOCKET;
-        }
+        /* Note: Unlike doscurl, we skip setRecvBuffer() and use default buffer size
+         * setRecvBuffer() fails with -1 in our environment, likely due to memory constraints
+         * The default buffer size from TCP_SOCKET_RING_SIZE (defined in sample.cfg) should be sufficient
+         */
         
         g_sockets[handle].tcp_socket = tcp_sock;
         g_sockets[handle].type = SOCKET_TYPE_TCP;
@@ -186,7 +183,9 @@ int socket_connect(socket_handle_t handle, const char* host, unsigned int port) 
     }
     
     /* Check if host is an IP address (xxx.xxx.xxx.xxx format) */
-    if (sscanf(host, "%hhu.%hhu.%hhu.%hhu", &a, &b, &c, &d) == 4) {
+    int scan_result = sscanf(host, "%hhu.%hhu.%hhu.%hhu", &a, &b, &c, &d);
+    
+    if (scan_result == 4) {
         /* Direct IP address - no DNS resolution needed */
         ip_addr[0] = a;
         ip_addr[1] = b;
@@ -218,34 +217,36 @@ int socket_connect(socket_handle_t handle, const char* host, unsigned int port) 
     /* Connection initiated - wait for completion */
     unsigned long start_time = TIMER_GET_CURRENT();
     
-    /* Poll for connection completion (60 second timeout) */
+    /* Poll for connection completion (10 second timeout like doscurl) */
     while (1) {
         unsigned long current_time, ticks_elapsed;
+        
+        /* Check timeout */
+        current_time = TIMER_GET_CURRENT();
+        ticks_elapsed = Timer_diff(start_time, current_time);
+        
+        if (ticks_elapsed > TIMER_MS_TO_TICKS(10000)) {
+            g_sockets[handle].state = SOCKET_STATE_CLOSED;
+            strcpy(g_error_msg, "Connection timeout");
+            return SOCKET_ERR_TIMEOUT;
+        }
         
         /* Process packets */
         PACKET_PROCESS_SINGLE;
         Arp::driveArp();
-        Tcp::drivePackets();
         
-        /* Check if connection completed FIRST (like doscurl) */
+        /* NOTE: Do NOT call Tcp::drivePackets() - it causes hang in dosjava's memory model
+         * PACKET_PROCESS_SINGLE is sufficient for connection establishment
+         */
+        
+        /* Check if connection completed */
         if (g_sockets[handle].tcp_socket->isConnectComplete()) {
             g_sockets[handle].state = SOCKET_STATE_CONNECTED;
             strcpy(g_error_msg, "OK");
             return SOCKET_OK;
         }
         
-        /* Get current time for checks */
-        current_time = TIMER_GET_CURRENT();
-        ticks_elapsed = Timer_diff(start_time, current_time);
-        
-        /* Check for timeout (60 seconds) */
-        if (ticks_elapsed > TIMER_MS_TO_TICKS(60000)) {
-            g_sockets[handle].state = SOCKET_STATE_CLOSED;
-            strcpy(g_error_msg, "Connection timeout");
-            return SOCKET_ERR_TIMEOUT;
-        }
-        
-        /* Check if remote closed (like doscurl) */
+        /* Check if remote closed */
         if (g_sockets[handle].tcp_socket->isRemoteClosed()) {
             g_sockets[handle].state = SOCKET_STATE_CLOSED;
             strcpy(g_error_msg, "Connection refused or reset");

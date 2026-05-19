@@ -800,6 +800,8 @@ int interpreter_step(ExecutionContext* ctx) {
                 if (descriptor && expected_arg_count != 0xFF && expected_arg_count != arg_count) {
                     printf("ERROR: Method descriptor argument mismatch for %s\n",
                            method_name ? method_name : "???");
+                    printf("  Descriptor: %s\n", descriptor ? descriptor : "NULL");
+                    printf("  Expected args: %d, Actual args: %d\n", expected_arg_count, arg_count);
                     return -1;
                 }
             }

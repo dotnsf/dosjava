@@ -1,0 +1,29 @@
+Test 1: Date(10000)
+Year: 
+1970
+Month: 
+0
+Day: 
+1
+Hours: 
+2
+Minutes: 
+46
+Seconds: 
+40
+Test 2: setTime(20000)
+Year: 
+1970
+Month: 
+0
+Day: 
+1
+Hours: 
+5
+Minutes: 
+33
+Seconds: 
+20
+Test 3: getTime()
+Time: 
+20000

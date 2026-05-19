@@ -106,8 +106,6 @@ int native_invoke(
     
     /* Verify argument count */
     if (arg_count != method->param_count) {
-        printf("ERROR: Native method %s expects %u args, got %u\n",
-               method->method_name, method->param_count, arg_count);
         return -1;
     }
     
@@ -152,7 +150,6 @@ static int native_system_println_string(ExecutionContext* ctx, uint16_t* args, u
     if (str) {
         system_println_cstr(str);
     } else {
-        printf("ERROR: Invalid string constant index: %d\n", value);
         return -1;
     }
     
@@ -194,7 +191,6 @@ static int native_system_print_string(ExecutionContext* ctx, uint16_t* args, uin
     if (str) {
         system_print_cstr(str);
     } else {
-        printf("ERROR: Invalid string constant index: %d\n", value);
         return -1;
     }
     
@@ -222,7 +218,6 @@ static int native_string_length(ExecutionContext* ctx, uint16_t* args, uint8_t a
     }
     
     if (!str) {
-        printf("ERROR: Invalid string constant index for length: %d\n", value);
         return -1;
     }
     
@@ -459,7 +454,6 @@ static int native_socket_init(ExecutionContext* ctx, uint16_t* args, uint8_t arg
     
     if (!socket_subsystem_is_initialized()) {
         if (socket_subsystem_init() != 0) {
-            printf("ERROR: Failed to initialize socket subsystem\n");
             return -1;
         }
     }
@@ -468,22 +462,54 @@ static int native_socket_init(ExecutionContext* ctx, uint16_t* args, uint8_t arg
 }
 
 /**
- * Socket.new(String host, int port) - Create and connect socket
+ * Socket.create(String host, int port) - Create and connect socket
  * Returns socket handle (object reference)
  */
-static int native_socket_new(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+
+/* Global socket table to map int handles to Socket objects */
+#define MAX_SOCKETS 4
+static Socket* g_socket_table[MAX_SOCKETS] = { NULL, NULL, NULL, NULL };
+
+/* Find free socket slot and return handle (0-3), or -1 if full */
+static int socket_table_add(Socket* sock) {
+    int i;
+    for (i = 0; i < MAX_SOCKETS; i++) {
+        if (g_socket_table[i] == NULL) {
+            g_socket_table[i] = sock;
+            return i;
+        }
+    }
+    return -1;  /* Table full */
+}
+
+/* Get Socket object from handle */
+static Socket* socket_table_get(int handle) {
+    if (handle < 0 || handle >= MAX_SOCKETS) {
+        return NULL;
+    }
+    return g_socket_table[handle];
+}
+
+/* Remove socket from table */
+static void socket_table_remove(int handle) {
+    if (handle >= 0 && handle < MAX_SOCKETS) {
+        g_socket_table[handle] = NULL;
+    }
+}
+
+static int native_socket_create(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
     uint16_t host_idx;
     uint16_t port;
     const char* host_str;
     String* host;
     Socket* sock;
+    int handle;
     
     (void)arg_count;
     
     /* Initialize socket subsystem if needed */
     if (!socket_subsystem_is_initialized()) {
         if (socket_subsystem_init() != 0) {
-            printf("ERROR: Failed to initialize socket subsystem\n");
             return -1;
         }
     }
@@ -501,14 +527,12 @@ static int native_socket_new(ExecutionContext* ctx, uint16_t* args, uint8_t arg_
     }
     
     if (!host_str) {
-        printf("ERROR: Invalid host string constant index: %d\n", host_idx);
         return -1;
     }
     
     /* Create String object for host */
     host = string_new(host_str);
     if (!host) {
-        printf("ERROR: Failed to create host string\n");
         return -1;
     }
     
@@ -516,21 +540,28 @@ static int native_socket_new(ExecutionContext* ctx, uint16_t* args, uint8_t arg_
     sock = socket_runtime_new_connected(host, port);
     if (!sock) {
         string_delete(host);
-        printf("ERROR: Failed to create socket\n");
         return -1;
     }
     
-    /* Return socket handle as object reference */
-    *result = (uint16_t)sock;
+    /* Add socket to global table and get handle (0-3) */
+    handle = socket_table_add(sock);
+    if (handle < 0) {
+        socket_runtime_delete(sock);
+        string_delete(host);
+        return -1;
+    }
+    
+    /* Return socket table handle as int */
+    *result = (uint16_t)handle;
     return 0;
 }
 
 /**
- * Socket.send(Socket sock, String data) - Send data through socket
+ * Socket.send(int handle, String data) - Send data through socket
  * Returns number of bytes sent
  */
 static int native_socket_send(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
-    uint16_t sock_ref;
+    int handle;
     uint16_t data_idx;
     Socket* sock;
     const char* data_str;
@@ -538,14 +569,13 @@ static int native_socket_send(ExecutionContext* ctx, uint16_t* args, uint8_t arg
     
     (void)arg_count;
     
-    /* Get arguments: socket reference, data (String constant index) */
-    sock_ref = args[0];
+    /* Get arguments: socket handle (int), data (String constant index) */
+    handle = (int)args[0];
     data_idx = args[1];
     
-    /* Get socket object */
-    sock = (Socket*)sock_ref;
+    /* Get socket object from table */
+    sock = socket_table_get(handle);
     if (!sock) {
-        printf("ERROR: Invalid socket reference\n");
         return -1;
     }
     
@@ -558,14 +588,12 @@ static int native_socket_send(ExecutionContext* ctx, uint16_t* args, uint8_t arg
     }
     
     if (!data_str) {
-        printf("ERROR: Invalid data string constant index: %d\n", data_idx);
         return -1;
     }
     
     /* Send data */
     sent = socket_runtime_send(sock, (const uint8_t*)data_str, (uint16_t)strlen(data_str));
     if (sent < 0) {
-        printf("ERROR: Failed to send data\n");
         return -1;
     }
     
@@ -574,12 +602,11 @@ static int native_socket_send(ExecutionContext* ctx, uint16_t* args, uint8_t arg
 }
 
 /**
- * Socket.recv(Socket sock, int max_length) - Receive data from socket
+ * Socket.recv(int handle) - Receive data from socket
  * Returns received data as String
  */
 static int native_socket_recv(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
-    uint16_t sock_ref;
-    uint16_t max_length;
+    int handle;
     Socket* sock;
     uint8_t buffer[256];
     int received;
@@ -587,26 +614,18 @@ static int native_socket_recv(ExecutionContext* ctx, uint16_t* args, uint8_t arg
     
     (void)arg_count;
     
-    /* Get arguments: socket reference, max_length */
-    sock_ref = args[0];
-    max_length = args[1];
+    /* Get argument: socket handle (int) */
+    handle = (int)args[0];
     
-    /* Get socket object */
-    sock = (Socket*)sock_ref;
+    /* Get socket object from table */
+    sock = socket_table_get(handle);
     if (!sock) {
-        printf("ERROR: Invalid socket reference\n");
         return -1;
     }
     
-    /* Limit max_length to buffer size */
-    if (max_length > sizeof(buffer) - 1) {
-        max_length = sizeof(buffer) - 1;
-    }
-    
-    /* Receive data */
-    received = socket_runtime_recv(sock, buffer, max_length);
+    /* Receive data (use full buffer size) */
+    received = socket_runtime_recv(sock, buffer, sizeof(buffer) - 1);
     if (received < 0) {
-        printf("ERROR: Failed to receive data\n");
         return -1;
     }
     
@@ -616,7 +635,6 @@ static int native_socket_recv(ExecutionContext* ctx, uint16_t* args, uint8_t arg
     /* Add received data to constant pool */
     const_idx = djc_add_string(ctx->djc_file, (const char*)buffer);
     if (const_idx == 0) {
-        printf("ERROR: Failed to add received data to constant pool\n");
         return -1;
     }
     
@@ -625,53 +643,54 @@ static int native_socket_recv(ExecutionContext* ctx, uint16_t* args, uint8_t arg
 }
 
 /**
- * Socket.close(Socket sock) - Close socket
+ * Socket.close(int handle) - Close socket
  */
 static int native_socket_close(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
-    uint16_t sock_ref;
+    int handle;
     Socket* sock;
     
     (void)ctx;
     (void)arg_count;
     (void)result;
     
-    /* Get argument: socket reference */
-    sock_ref = args[0];
+    /* Get argument: socket handle (int) */
+    handle = (int)args[0];
     
-    /* Get socket object */
-    sock = (Socket*)sock_ref;
+    /* Get socket object from table */
+    sock = socket_table_get(handle);
     if (!sock) {
-        printf("ERROR: Invalid socket reference\n");
         return -1;
     }
     
     /* Close socket */
     if (socket_runtime_close(sock) != 0) {
-        printf("ERROR: Failed to close socket\n");
         return -1;
     }
+    
+    /* Remove from socket table and delete */
+    socket_table_remove(handle);
+    socket_runtime_delete(sock);
     
     return 0;
 }
 
 /**
- * Socket.isConnected(Socket sock) - Check if socket is connected
+ * Socket.isConnected(int handle) - Check if socket is connected
  * Returns 1 if connected, 0 otherwise
  */
 static int native_socket_is_connected(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
-    uint16_t sock_ref;
+    int handle;
     Socket* sock;
     
     (void)ctx;
     (void)arg_count;
     
-    /* Get argument: socket reference */
-    sock_ref = args[0];
+    /* Get argument: socket handle (int) */
+    handle = (int)args[0];
     
-    /* Get socket object */
-    sock = (Socket*)sock_ref;
+    /* Get socket object from table */
+    sock = socket_table_get(handle);
     if (!sock) {
-        printf("ERROR: Invalid socket reference\n");
         return -1;
     }
     
@@ -684,85 +703,86 @@ static int native_socket_is_connected(ExecutionContext* ctx, uint16_t* args, uin
  * Called from native_register_builtins()
  */
 int native_register_socket_methods(void) {
-    static NativeParamType param_void[] = { NATIVE_PARAM_VOID };
     static NativeParamType param_string_int[] = { NATIVE_PARAM_STRING, NATIVE_PARAM_INT };
+    static NativeParamType param_int_string[] = { NATIVE_PARAM_INT, NATIVE_PARAM_STRING };
+    static NativeParamType param_int[] = { NATIVE_PARAM_INT };
     static NativeParamType param_object_string[] = { NATIVE_PARAM_OBJECT, NATIVE_PARAM_STRING };
     static NativeParamType param_object_int[] = { NATIVE_PARAM_OBJECT, NATIVE_PARAM_INT };
     static NativeParamType param_object[] = { NATIVE_PARAM_OBJECT };
     
-    /* Socket.init() */
+    /* Socket.init() - no parameters, so param_types is NULL */
     if (native_register(
         "java/net/Socket",
         "init",
         "()V",
         native_socket_init,
         0,
-        param_void,
+        NULL,
         NATIVE_RETURN_VOID
     ) != 0) {
         return -1;
     }
     
-    /* Socket.new(String, int) - Constructor */
+    /* Socket.create(String, int) - Static factory method returns int handle */
     if (native_register(
-        "java/net/Socket",
-        "<init>",
-        "(Ljava/lang/String;I)Ljava/net/Socket;",
-        native_socket_new,
+        "Socket",
+        "create",
+        "(Ljava/lang/String;I)I",
+        native_socket_create,
         2,
         param_string_int,
-        NATIVE_RETURN_OBJECT
-    ) != 0) {
-        return -1;
-    }
-    
-    /* Socket.send(Socket, String) */
-    if (native_register(
-        "java/net/Socket",
-        "send",
-        "(Ljava/net/Socket;Ljava/lang/String;)I",
-        native_socket_send,
-        2,
-        param_object_string,
         NATIVE_RETURN_INT
     ) != 0) {
         return -1;
     }
     
-    /* Socket.recv(Socket, int) */
+    /* Socket.send(int sock, String data) */
     if (native_register(
-        "java/net/Socket",
-        "recv",
-        "(Ljava/net/Socket;I)Ljava/lang/String;",
-        native_socket_recv,
+        "Socket",
+        "send",
+        "(ILjava/lang/String;)I",
+        native_socket_send,
         2,
-        param_object_int,
+        param_int_string,
+        NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Socket.recv(int sock) */
+    if (native_register(
+        "Socket",
+        "recv",
+        "(I)Ljava/lang/String;",
+        native_socket_recv,
+        1,
+        param_int,
         NATIVE_RETURN_STRING
     ) != 0) {
         return -1;
     }
     
-    /* Socket.close(Socket) */
+    /* Socket.close(int sock) */
     if (native_register(
-        "java/net/Socket",
+        "Socket",
         "close",
-        "(Ljava/net/Socket;)V",
+        "(I)V",
         native_socket_close,
         1,
-        param_object,
+        param_int,
         NATIVE_RETURN_VOID
     ) != 0) {
         return -1;
     }
     
-    /* Socket.isConnected(Socket) */
+    /* Socket.isConnected(int sock) */
     if (native_register(
-        "java/net/Socket",
+        "Socket",
         "isConnected",
-        "(Ljava/net/Socket;)I",
+        "(I)I",
         native_socket_is_connected,
         1,
-        param_object,
+        param_int,
         NATIVE_RETURN_INT
     ) != 0) {
         return -1;
