@@ -425,7 +425,3 @@ int native_register_builtins(void) {
     
     return 0;
 }
-
-// Made with Bob
-
-
