@@ -44,6 +44,7 @@ typedef enum {
     
     /* Literals and identifiers */
     NODE_LITERAL_INT,       /* Integer literal */
+    NODE_LITERAL_LONG,      /* Long literal */
     NODE_LITERAL_BOOL,      /* Boolean literal */
     NODE_LITERAL_STRING,    /* String literal */
     NODE_IDENTIFIER,        /* Variable/field reference */
@@ -83,9 +84,10 @@ typedef enum {
 typedef enum {
     TYPE_VOID = 0,
     TYPE_INT = 1,
-    TYPE_BOOLEAN = 2,
-    TYPE_CLASS = 3,
-    TYPE_ARRAY = 4   /* Current implementation treats arrays as int[] */
+    TYPE_LONG = 2,
+    TYPE_BOOLEAN = 3,
+    TYPE_CLASS = 4,
+    TYPE_ARRAY = 5   /* Current implementation treats arrays as int[] */
 } TypeKind;
 
 /* Type information */
@@ -269,6 +271,10 @@ typedef struct ASTNode {
         struct {
             int16_t int_value;
         } literal_int;
+        
+        struct {
+            int32_t long_value;
+        } literal_long;
         
         struct {
             uint16_t bool_value;    /* 0 = false, 1 = true */

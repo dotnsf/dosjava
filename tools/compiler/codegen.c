@@ -768,28 +768,56 @@ int generate_var_decl(CodeGenerator* codegen, ASTNode* var_node) {
     }
 
     /* Get local index */
-
     local_idx = get_local_index(codegen, var_name);
 
-    /* Update max_locals */
-    if (local_idx + 1 > codegen->context->max_locals) {
-        codegen->context->max_locals = local_idx + 1;
-    }
-    
-    /* Generate initializer if present */
-    if (init_expr_idx != 0) {
-        init_expr = codegen_get_node(codegen, init_expr_idx);
-        if (init_expr) {
-            generate_expression(codegen, init_expr);
-            
-            /* Store to local variable */
-            if (local_idx <= 2) {
-                emit_opcode(codegen, OP_STORE_0 + local_idx);
-            } else {
-                emit_opcode(codegen, OP_STORE_LOCAL);
-                emit_u1(codegen, (uint8_t)local_idx);
+    /* Check if this is a long variable */
+    {
+        int is_long = 0;
+        uint16_t i;
+        for (i = 0; i < codegen->symtable->symbol_count; i++) {
+            Symbol* sym = &codegen->symtable->symbols[i];
+            const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+            if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                sym_name && strcmp(sym_name, var_name) == 0) {
+                if (sym->type.kind == TYPE_LONG) {
+                    is_long = 1;
+                }
+                break;
             }
-            update_stack(codegen, -1);
+        }
+
+        /* Update max_locals (long variables use 2 slots) */
+        if (is_long) {
+            if (local_idx + 2 > codegen->context->max_locals) {
+                codegen->context->max_locals = local_idx + 2;
+            }
+        } else {
+            if (local_idx + 1 > codegen->context->max_locals) {
+                codegen->context->max_locals = local_idx + 1;
+            }
+        }
+        
+        /* Generate initializer if present */
+        if (init_expr_idx != 0) {
+            init_expr = codegen_get_node(codegen, init_expr_idx);
+            if (init_expr) {
+                generate_expression(codegen, init_expr);
+                
+                /* Store to local variable */
+                if (is_long) {
+                    emit_opcode(codegen, OP_STORE_LONG);
+                    emit_u1(codegen, (uint8_t)local_idx);
+                    update_stack(codegen, -2);
+                } else {
+                    if (local_idx <= 2) {
+                        emit_opcode(codegen, OP_STORE_0 + local_idx);
+                    } else {
+                        emit_opcode(codegen, OP_STORE_LOCAL);
+                        emit_u1(codegen, (uint8_t)local_idx);
+                    }
+                    update_stack(codegen, -1);
+                }
+            }
         }
     }
     
@@ -1030,6 +1058,18 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             emit_u2(codegen, (uint16_t)expr_node->data.literal_int.int_value);
             update_stack(codegen, 1);
             return 0;
+        
+        case NODE_LITERAL_LONG: {
+            /* Push 32-bit long constant [high:2] [low:2] */
+            int32_t long_val = expr_node->data.literal_long.long_value;
+            uint16_t high = (uint16_t)((long_val >> 16) & 0xFFFF);
+            uint16_t low = (uint16_t)(long_val & 0xFFFF);
+            emit_opcode(codegen, OP_PUSH_LONG);
+            emit_u2(codegen, high);
+            emit_u2(codegen, low);
+            update_stack(codegen, 2);  /* Long takes 2 stack slots */
+            return 0;
+        }
         
         case NODE_LITERAL_BOOL:
             emit_opcode(codegen, OP_PUSH_INT);
@@ -1632,40 +1672,147 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
     }
     
     /* Generate operation - map AST operators to VM opcodes */
+    /* Check if we need Long operations by examining operand types */
     {
+        int use_long_ops = 0;
+        ASTNode* check_left;
+        ASTNode* check_right;
+        
+        /* Check if either operand is a long type */
+        check_left = codegen_get_node(codegen, left_index);
+        check_right = codegen_get_node(codegen, right_index);
+        
+        if (check_left && check_left->type == NODE_LITERAL_LONG) {
+            use_long_ops = 1;
+        }
+        if (check_right && check_right->type == NODE_LITERAL_LONG) {
+            use_long_ops = 1;
+        }
+        
+        /* Check if operands are identifiers with long type */
+        if (check_left && check_left->type == NODE_IDENTIFIER) {
+            const char* var_name = codegen_get_string(codegen, check_left->data.identifier.name);
+            if (var_name) {
+                uint16_t i;
+                for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                    Symbol* sym = &codegen->symtable->symbols[i];
+                    const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                    if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                        sym_name && strcmp(sym_name, var_name) == 0) {
+                        if (sym->type.kind == TYPE_LONG) {
+                            use_long_ops = 1;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (check_right && check_right->type == NODE_IDENTIFIER) {
+            const char* var_name = codegen_get_string(codegen, check_right->data.identifier.name);
+            if (var_name) {
+                uint16_t i;
+                for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                    Symbol* sym = &codegen->symtable->symbols[i];
+                    const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                    if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                        sym_name && strcmp(sym_name, var_name) == 0) {
+                        if (sym->type.kind == TYPE_LONG) {
+                            use_long_ops = 1;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
         switch (op) {
             case (uint16_t)BINOP_ADD:
-                emit_opcode(codegen, OP_ADD);
+                emit_opcode(codegen, use_long_ops ? OP_LADD : OP_ADD);
                 break;
             case (uint16_t)BINOP_SUB:
-                emit_opcode(codegen, OP_SUB);
+                emit_opcode(codegen, use_long_ops ? OP_LSUB : OP_SUB);
                 break;
             case (uint16_t)BINOP_MUL:
-                emit_opcode(codegen, OP_MUL);
+                emit_opcode(codegen, use_long_ops ? OP_LMUL : OP_MUL);
                 break;
             case (uint16_t)BINOP_DIV:
-                emit_opcode(codegen, OP_DIV);
+                emit_opcode(codegen, use_long_ops ? OP_LDIV : OP_DIV);
                 break;
             case (uint16_t)BINOP_MOD:
-                emit_opcode(codegen, OP_MOD);
+                emit_opcode(codegen, use_long_ops ? OP_LMOD : OP_MOD);
                 break;
             case (uint16_t)BINOP_EQ:
-                emit_opcode(codegen, OP_CMP_EQ);
+                if (use_long_ops) {
+                    /* For long comparison: LCMP followed by CMP_EQ with 0 */
+                    emit_opcode(codegen, OP_LCMP);
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_EQ);
+                    update_stack(codegen, -1);
+                } else {
+                    emit_opcode(codegen, OP_CMP_EQ);
+                }
                 break;
             case (uint16_t)BINOP_NE:
-                emit_opcode(codegen, OP_CMP_NE);
+                if (use_long_ops) {
+                    emit_opcode(codegen, OP_LCMP);
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_NE);
+                    update_stack(codegen, -1);
+                } else {
+                    emit_opcode(codegen, OP_CMP_NE);
+                }
                 break;
             case (uint16_t)BINOP_LT:
-                emit_opcode(codegen, OP_CMP_LT);
+                if (use_long_ops) {
+                    emit_opcode(codegen, OP_LCMP);
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_LT);
+                    update_stack(codegen, -1);
+                } else {
+                    emit_opcode(codegen, OP_CMP_LT);
+                }
                 break;
             case (uint16_t)BINOP_LE:
-                emit_opcode(codegen, OP_CMP_LE);
+                if (use_long_ops) {
+                    emit_opcode(codegen, OP_LCMP);
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_LE);
+                    update_stack(codegen, -1);
+                } else {
+                    emit_opcode(codegen, OP_CMP_LE);
+                }
                 break;
             case (uint16_t)BINOP_GT:
-                emit_opcode(codegen, OP_CMP_GT);
+                if (use_long_ops) {
+                    emit_opcode(codegen, OP_LCMP);
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_GT);
+                    update_stack(codegen, -1);
+                } else {
+                    emit_opcode(codegen, OP_CMP_GT);
+                }
                 break;
             case (uint16_t)BINOP_GE:
-                emit_opcode(codegen, OP_CMP_GE);
+                if (use_long_ops) {
+                    emit_opcode(codegen, OP_LCMP);
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_GE);
+                    update_stack(codegen, -1);
+                } else {
+                    emit_opcode(codegen, OP_CMP_GE);
+                }
                 break;
             case (uint16_t)BINOP_AND:
             case (uint16_t)BINOP_OR:
@@ -1705,9 +1852,31 @@ int generate_unary_op(CodeGenerator* codegen, ASTNode* unop_node) {
     
     /* Generate operation */
     switch (op) {
-        case UNOP_NEG:
-            emit_opcode(codegen, OP_NEG);
+        case UNOP_NEG: {
+            /* Check if operand is long type */
+            int is_long = 0;
+            if (operand_node && operand_node->type == NODE_LITERAL_LONG) {
+                is_long = 1;
+            } else if (operand_node && operand_node->type == NODE_IDENTIFIER) {
+                const char* var_name = codegen_get_string(codegen, operand_node->data.identifier.name);
+                if (var_name) {
+                    uint16_t i;
+                    for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                        Symbol* sym = &codegen->symtable->symbols[i];
+                        const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                            sym_name && strcmp(sym_name, var_name) == 0) {
+                            if (sym->type.kind == TYPE_LONG) {
+                                is_long = 1;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            emit_opcode(codegen, is_long ? OP_LNEG : OP_NEG);
             break;
+        }
         case UNOP_NOT:
             /* Logical not: push 0, compare equal */
             emit_opcode(codegen, OP_PUSH_INT);
@@ -2029,19 +2198,45 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     }
     
     if (assign_op == 0) {
+        /* Check if target is long type */
+        int is_long = 0;
+        for (i = 0; i < codegen->symtable->symbol_count; i++) {
+            Symbol* sym = &codegen->symtable->symbols[i];
+            const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+            if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                sym_name && strcmp(sym_name, var_name) == 0) {
+                if (sym->type.kind == TYPE_LONG) {
+                    is_long = 1;
+                }
+                break;
+            }
+        }
+        
         if (generate_expression(codegen, &value_expr_copy) != 0) {
             return -1;
         }
-        emit_opcode(codegen, OP_DUP);
-        update_stack(codegen, 1);
         
-        if (local_idx <= 2) {
-            emit_opcode(codegen, OP_STORE_0 + local_idx);
-        } else {
-            emit_opcode(codegen, OP_STORE_LOCAL);
+        if (is_long) {
+            /* Long assignment: duplicate 2-word value by storing and reloading */
+            emit_opcode(codegen, OP_STORE_LONG);
             emit_u1(codegen, (uint8_t)local_idx);
+            update_stack(codegen, -2);
+            /* Reload for expression result */
+            emit_opcode(codegen, OP_LOAD_LONG);
+            emit_u1(codegen, (uint8_t)local_idx);
+            update_stack(codegen, 2);
+        } else {
+            /* Int/boolean/reference assignment */
+            emit_opcode(codegen, OP_DUP);
+            update_stack(codegen, 1);
+            if (local_idx <= 2) {
+                emit_opcode(codegen, OP_STORE_0 + local_idx);
+            } else {
+                emit_opcode(codegen, OP_STORE_LOCAL);
+                emit_u1(codegen, (uint8_t)local_idx);
+            }
+            update_stack(codegen, -1);
         }
-        update_stack(codegen, -1);
         return 0;
     }
     
@@ -2618,13 +2813,35 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
     
     /* If found as local variable, load it */
     if (local_idx != 0xFFFF) {
-        if (local_idx <= 2) {
-            emit_opcode(codegen, OP_LOAD_0 + local_idx);
-        } else {
-            emit_opcode(codegen, OP_LOAD_LOCAL);
-            emit_u1(codegen, (uint8_t)local_idx);
+        /* Check if this is a long variable */
+        int is_long = 0;
+        for (i = 0; i < codegen->symtable->symbol_count; i++) {
+            Symbol* sym = &codegen->symtable->symbols[i];
+            const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+            if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                sym_name && strcmp(sym_name, var_name) == 0) {
+                if (sym->type.kind == TYPE_LONG) {
+                    is_long = 1;
+                }
+                break;
+            }
         }
-        update_stack(codegen, 1);
+        
+        if (is_long) {
+            /* Load long variable (uses 2 stack slots) */
+            emit_opcode(codegen, OP_LOAD_LONG);
+            emit_u1(codegen, (uint8_t)local_idx);
+            update_stack(codegen, 2);
+        } else {
+            /* Load int/boolean/reference variable */
+            if (local_idx <= 2) {
+                emit_opcode(codegen, OP_LOAD_0 + local_idx);
+            } else {
+                emit_opcode(codegen, OP_LOAD_LOCAL);
+                emit_u1(codegen, (uint8_t)local_idx);
+            }
+            update_stack(codegen, 1);
+        }
         return 0;
     }
     

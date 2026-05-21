@@ -88,6 +88,21 @@
 #define OP_FINALLY_END   0x95  /* Mark finally block end */
 #define OP_THROW         0x96  /* Throw exception */
 
+/* Long Operations (0xA0-0xAF) */
+/* Long values are stored as two 16-bit words on stack: [high:2] [low:2] */
+#define OP_PUSH_LONG     0xA0  /* Push 32-bit long constant [high:2] [low:2] */
+#define OP_LADD          0xA1  /* Long addition: pop L2, pop L1, push (L1+L2) */
+#define OP_LSUB          0xA2  /* Long subtraction: pop L2, pop L1, push (L1-L2) */
+#define OP_LMUL          0xA3  /* Long multiplication: pop L2, pop L1, push (L1*L2) */
+#define OP_LDIV          0xA4  /* Long division: pop L2, pop L1, push (L1/L2) */
+#define OP_LMOD          0xA5  /* Long modulo: pop L2, pop L1, push (L1%L2) */
+#define OP_LNEG          0xA6  /* Long negation: pop L, push (-L) */
+#define OP_I2L           0xA7  /* int to long: pop int, push long */
+#define OP_L2I           0xA8  /* long to int: pop long, push int (truncate) */
+#define OP_LCMP          0xA9  /* Long compare: pop L2, pop L1, push (-1/0/1) */
+#define OP_LOAD_LONG     0xAA  /* Load long from locals [idx:1] (2 slots) */
+#define OP_STORE_LONG    0xAB  /* Store long to locals [idx:1] (2 slots) */
+
 #define OP_HALT          0xFF  /* Halt execution */
 
 /**

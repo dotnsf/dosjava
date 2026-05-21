@@ -21,6 +21,7 @@ typedef enum {
     TOK_STATIC,         /* static */
     TOK_VOID,           /* void */
     TOK_INT,            /* int */
+    TOK_LONG,           /* long */
     TOK_BOOLEAN,        /* boolean */
     TOK_IF,             /* if */
     TOK_ELSE,           /* else */
@@ -37,6 +38,7 @@ typedef enum {
     /* Literals */
     TOK_IDENTIFIER,     /* variable/method/class names */
     TOK_INTEGER,        /* integer literal */
+    TOK_LONG_LITERAL,   /* long literal (e.g., 100L) */
     TOK_STRING,         /* string literal */
     TOK_TRUE,           /* true */
     TOK_FALSE,          /* false */
@@ -84,6 +86,7 @@ typedef struct {
     uint16_t column;
     union {
         int16_t int_value;      /* For TOK_INTEGER */
+        int32_t long_value;     /* For TOK_LONG_LITERAL */
         uint16_t str_offset;    /* For TOK_IDENTIFIER, TOK_STRING */
     } value;
 } Token;

@@ -81,6 +81,7 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
     Symbol class_sym, method_sym;
     uint16_t name_offset, method_offset;
     const char* builtin_classes[] = {
+        "System",
         "BufferedWriter",
         "BufferedReader",
         "FileOutputStream",
@@ -613,6 +614,141 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
                 uint16_t param_offset;
                 
                 param_offset = semantic_add_string(analyzer, "sock");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_INT;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+        }
+        
+        /* Add System class methods */
+        if (strcmp(builtin_classes[i], "System") == 0) {
+            /* Add println(String) static method */
+            method_offset = semantic_add_string(analyzer, "println");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_VOID;
+            method_sym.data.method_data.param_count = 1;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameter for println(String message) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset, string_class_offset;
+                
+                param_offset = semantic_add_string(analyzer, "message");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                string_class_offset = semantic_add_string(analyzer, "String");
+                if (string_class_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+            
+            /* Add print(String) static method */
+            method_offset = semantic_add_string(analyzer, "print");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_VOID;
+            method_sym.data.method_data.param_count = 1;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameter for print(String message) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset, string_class_offset;
+                
+                param_offset = semantic_add_string(analyzer, "message");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                string_class_offset = semantic_add_string(analyzer, "String");
+                if (string_class_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+            
+            /* Add printInt(int) static method */
+            method_offset = semantic_add_string(analyzer, "printInt");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_VOID;
+            method_sym.data.method_data.param_count = 1;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameter for printInt(int value) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset;
+                
+                param_offset = semantic_add_string(analyzer, "value");
                 if (param_offset == 0xFFFF) {
                     return -1;
                 }
@@ -1760,6 +1896,11 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             result_type->class_name = 0;
             return 0;
         
+        case NODE_LITERAL_LONG:
+            result_type->kind = TYPE_LONG;
+            result_type->class_name = 0;
+            return 0;
+        
         case NODE_LITERAL_BOOL:
             result_type->kind = TYPE_BOOLEAN;
             result_type->class_name = 0;
@@ -2794,7 +2935,7 @@ int is_boolean_type(TypeInfo type) {
 }
 
 int is_numeric_type(TypeInfo type) {
-    return type.kind == TYPE_INT;
+    return type.kind == TYPE_INT || type.kind == TYPE_LONG;
 }
 
 int is_void_type(TypeInfo type) {
@@ -2806,13 +2947,19 @@ int get_binary_op_result_type(BinaryOp op, TypeInfo left_type, TypeInfo right_ty
         return -1;
     }
     
-    /* Arithmetic operations: int op int -> int
+    /* Arithmetic operations: numeric op numeric -> result type
+     * If either operand is long, result is long; otherwise int
      * String concatenation is handled in check_binary_op() because nominal
      * String detection needs analyzer access to resolve string-pool names.
      */
     if (op == BINOP_ADD || op == BINOP_SUB || op == BINOP_MUL || op == BINOP_DIV || op == BINOP_MOD) {
         if (is_numeric_type(left_type) && is_numeric_type(right_type)) {
-            result_type->kind = TYPE_INT;
+            /* If either operand is long, result is long */
+            if (left_type.kind == TYPE_LONG || right_type.kind == TYPE_LONG) {
+                result_type->kind = TYPE_LONG;
+            } else {
+                result_type->kind = TYPE_INT;
+            }
             result_type->class_name = 0;
             return 0;
         }
@@ -2857,10 +3004,10 @@ int get_unary_op_result_type(UnaryOp op, TypeInfo operand_type, TypeInfo* result
         return -1;
     }
     
-    /* Negation: -int -> int */
+    /* Negation: -numeric -> same type */
     if (op == UNOP_NEG) {
         if (is_numeric_type(operand_type)) {
-            result_type->kind = TYPE_INT;
+            result_type->kind = operand_type.kind;  /* Preserve int or long */
             result_type->class_name = 0;
             return 0;
         }

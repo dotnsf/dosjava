@@ -657,7 +657,7 @@ uint16_t parse_arg_list(Parser* parser, uint16_t* arg_count) {
 
 /**
  * Parse type
- * Type -> 'void' | 'int' ('[' ']')? | 'boolean' ('[' ']')?
+ * Type -> 'void' | 'int' ('[' ']')? | 'long' | 'boolean' ('[' ']')?
  */
 int parse_type(Parser* parser, TypeInfo* type) {
     uint16_t base_kind = 0;
@@ -670,6 +670,9 @@ int parse_type(Parser* parser, TypeInfo* type) {
     
     if (parser_consume(parser, TOK_INT)) {
         base_kind = TYPE_INT;
+        type->class_name = 0;
+    } else if (parser_consume(parser, TOK_LONG)) {
+        base_kind = TYPE_LONG;
         type->class_name = 0;
     } else if (parser_consume(parser, TOK_BOOLEAN)) {
         base_kind = TYPE_BOOLEAN;
@@ -778,7 +781,7 @@ uint16_t parse_statement(Parser* parser) {
      * Check if this looks like a type declaration by looking ahead.
      * If identifier is followed by another identifier, it's likely a variable declaration.
      */
-    if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN)) {
+    if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN) || parser_match(parser, TOK_LONG)) {
         return parse_var_decl(parser);
     }
     
@@ -1823,6 +1826,19 @@ uint16_t parse_primary(Parser* parser) {
         return node;
     }
     
+    /* Long literal */
+    if (parser_match(parser, TOK_LONG_LITERAL)) {
+        node = parser_alloc_node(parser, NODE_LITERAL_LONG);
+        if (node == 0) {
+            return 0;
+        }
+        
+        parser->nodes[node - parser->total_nodes - 1].data.literal_long.long_value = parser->current.value.long_value;
+        parser_next_token(parser);
+        
+        return node;
+    }
+    
     /* String literal */
     if (parser_match(parser, TOK_STRING)) {
         node = parser_alloc_node(parser, NODE_LITERAL_STRING);
@@ -2008,11 +2024,13 @@ const char* node_type_name(NodeType type) {
         case NODE_ASSIGN: return "ASSIGN";
         case NODE_BINARY_OP: return "BINARY_OP";
         case NODE_UNARY_OP: return "UNARY_OP";
+        case NODE_POSTFIX_OP: return "POSTFIX_OP";
         case NODE_CALL: return "CALL";
         case NODE_NEW: return "NEW";
         case NODE_FIELD_ACCESS: return "FIELD_ACCESS";
         case NODE_ARRAY_ACCESS: return "ARRAY_ACCESS";
         case NODE_LITERAL_INT: return "LITERAL_INT";
+        case NODE_LITERAL_LONG: return "LITERAL_LONG";
         case NODE_LITERAL_BOOL: return "LITERAL_BOOL";
         case NODE_LITERAL_STRING: return "LITERAL_STRING";
         case NODE_IDENTIFIER: return "IDENTIFIER";
@@ -2052,8 +2070,10 @@ const char* type_kind_name(TypeKind kind) {
     switch (kind) {
         case TYPE_VOID: return "void";
         case TYPE_INT: return "int";
+        case TYPE_LONG: return "long";
         case TYPE_BOOLEAN: return "boolean";
         case TYPE_CLASS: return "class";
+        case TYPE_ARRAY: return "array";
         default: return "unknown";
     }
 }

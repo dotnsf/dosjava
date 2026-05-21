@@ -113,6 +113,70 @@ static inline int stack_dup_shared(ExecutionContext* ctx) {
     return 0;
 }
 
+/* ===== Long Type Stack Helper Functions ===== */
+
+/**
+ * Push 32-bit long value onto stack as two 16-bit words
+ * Stack layout: [... | high | low | ...] (low is top)
+ *
+ * @param ctx Execution context
+ * @param value 32-bit long value
+ * @return 0 on success, -1 on stack overflow
+ */
+static inline int stack_push_long(ExecutionContext* ctx, uint32_t value) {
+    uint16_t high;
+    uint16_t low;
+    
+    high = (uint16_t)(value >> 16);
+    low = (uint16_t)(value & 0xFFFF);
+    
+    /* Push high word first, then low word */
+    if (stack_push_shared(ctx, high) != 0) {
+        return -1;  /* Stack overflow */
+    }
+    if (stack_push_shared(ctx, low) != 0) {
+        /* Rollback: pop the high word we just pushed */
+        ctx->stack_pointer--;
+        return -1;  /* Stack overflow */
+    }
+    return 0;
+}
+
+/**
+ * Pop 32-bit long value from stack (two 16-bit words)
+ * Stack layout: [... | high | low | ...] (low is top)
+ *
+ * @param ctx Execution context
+ * @return 32-bit long value
+ */
+static inline uint32_t stack_pop_long(ExecutionContext* ctx) {
+    uint16_t low;
+    uint16_t high;
+    
+    low = stack_pop_shared(ctx);   /* Pop low word first */
+    high = stack_pop_shared(ctx);  /* Then pop high word */
+    return ((uint32_t)high << 16) | low;
+}
+
+/**
+ * Peek at 32-bit long value on top of stack (without popping)
+ * Stack layout: [... | high | low | ...] (low is top)
+ *
+ * @param ctx Execution context
+ * @return 32-bit long value
+ */
+static inline uint32_t stack_peek_long(ExecutionContext* ctx) {
+    uint16_t low;
+    uint16_t high;
+    
+    if (ctx->stack_pointer < 2) {
+        return 0;  /* Stack underflow */
+    }
+    low = ctx->shared_stack[ctx->stack_pointer - 1];
+    high = ctx->shared_stack[ctx->stack_pointer - 2];
+    return ((uint32_t)high << 16) | low;
+}
+
 /* ===== Local Variable Helper Functions ===== */
 
 /**
@@ -155,6 +219,47 @@ static inline void store_local(ExecutionContext* ctx, uint8_t index, uint16_t va
         ctx->shared_locals[base + index] = value;
     }
 }
+
+/**
+ * Load 32-bit long from local variables (2 consecutive slots)
+ * Locals layout: [idx] = high word, [idx+1] = low word
+ *
+ * @param ctx Execution context
+ * @param index Starting index (uses idx and idx+1)
+ * @return 32-bit long value
+ */
+static inline uint32_t load_local_long(ExecutionContext* ctx, uint8_t index) {
+    uint16_t base;
+    uint16_t high;
+    uint16_t low;
+    
+    base = get_local_base(ctx);
+    if (base + index + 1 >= SHARED_LOCALS_SIZE) {
+        return 0;  /* Out of bounds */
+    }
+    high = ctx->shared_locals[base + index];
+    low = ctx->shared_locals[base + index + 1];
+    return ((uint32_t)high << 16) | low;
+}
+
+/**
+ * Store 32-bit long to local variables (2 consecutive slots)
+ * Locals layout: [idx] = high word, [idx+1] = low word
+ *
+ * @param ctx Execution context
+ * @param index Starting index (uses idx and idx+1)
+ * @param value 32-bit long value
+ */
+static inline void store_local_long(ExecutionContext* ctx, uint8_t index, uint32_t value) {
+    uint16_t base;
+    
+    base = get_local_base(ctx);
+    if (base + index + 1 < SHARED_LOCALS_SIZE) {
+        ctx->shared_locals[base + index] = (uint16_t)(value >> 16);      /* High word */
+        ctx->shared_locals[base + index + 1] = (uint16_t)(value & 0xFFFF); /* Low word */
+    }
+}
+
 /* ===== Exception Helper Functions ===== */
 
 /**
@@ -2702,6 +2807,248 @@ int interpreter_step(ExecutionContext* ctx) {
                 return 1;
             }
             break;
+        
+        /* ===== Long Type Operations ===== */
+        
+        case OP_PUSH_LONG: {
+            /* Push 32-bit long constant [high:2] [low:2] */
+            uint16_t high;
+            uint16_t low;
+            uint32_t value;
+            
+            high = interpreter_read_u16(ctx);
+            low = interpreter_read_u16(ctx);
+            value = ((uint32_t)high << 16) | low;
+            
+            if (stack_push_long(ctx, value) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LOAD_LONG: {
+            /* Load long from locals [idx:1] (2 slots) */
+            uint8_t index;
+            uint32_t value;
+            
+            index = interpreter_read_u8(ctx);
+            value = load_local_long(ctx, index);
+            
+            if (stack_push_long(ctx, value) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_STORE_LONG: {
+            /* Store long to locals [idx:1] (2 slots) */
+            uint8_t index;
+            uint32_t value;
+            
+            index = interpreter_read_u8(ctx);
+            value = stack_pop_long(ctx);
+            store_local_long(ctx, index, value);
+            break;
+        }
+        
+        case OP_I2L: {
+            /* int to long conversion (sign extension) */
+            uint16_t int_val;
+            int16_t signed_val;
+            uint32_t long_val;
+            
+            int_val = stack_pop_shared(ctx);
+            signed_val = (int16_t)int_val;
+            
+            /* Sign extend: if negative, high word is 0xFFFF, else 0x0000 */
+            if (signed_val < 0) {
+                long_val = (uint32_t)(int32_t)signed_val;  /* Sign extend */
+            } else {
+                long_val = (uint32_t)signed_val;
+            }
+            
+            if (stack_push_long(ctx, long_val) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_L2I: {
+            /* long to int conversion (truncate) */
+            uint32_t long_val;
+            uint16_t int_val;
+            
+            long_val = stack_pop_long(ctx);
+            int_val = (uint16_t)(long_val & 0xFFFF);  /* Keep low 16 bits */
+            
+            if (stack_push_shared(ctx, int_val) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LADD: {
+            /* Long addition */
+            uint32_t value2;
+            uint32_t value1;
+            uint32_t result;
+            
+            value2 = stack_pop_long(ctx);
+            value1 = stack_pop_long(ctx);
+            result = value1 + value2;
+            
+            if (stack_push_long(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LSUB: {
+            /* Long subtraction */
+            uint32_t value2;
+            uint32_t value1;
+            uint32_t result;
+            
+            value2 = stack_pop_long(ctx);
+            value1 = stack_pop_long(ctx);
+            result = value1 - value2;
+            
+            if (stack_push_long(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LMUL: {
+            /* Long multiplication */
+            uint32_t value2;
+            uint32_t value1;
+            uint32_t result;
+            
+            value2 = stack_pop_long(ctx);
+            value1 = stack_pop_long(ctx);
+            result = value1 * value2;
+            
+            if (stack_push_long(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LDIV: {
+            /* Long division with zero check */
+            uint32_t value2;
+            uint32_t value1;
+            int32_t signed1;
+            int32_t signed2;
+            int32_t result;
+            
+            value2 = stack_pop_long(ctx);
+            value1 = stack_pop_long(ctx);
+            
+            /* Check for division by zero */
+            if (value2 == 0) {
+                if (throw_runtime_exception(ctx, "Division by zero") != 0) {
+                    return -1;
+                }
+                break;
+            }
+            
+            /* Signed division */
+            signed1 = (int32_t)value1;
+            signed2 = (int32_t)value2;
+            result = signed1 / signed2;
+            
+            if (stack_push_long(ctx, (uint32_t)result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LMOD: {
+            /* Long modulo with zero check */
+            uint32_t value2;
+            uint32_t value1;
+            int32_t signed1;
+            int32_t signed2;
+            int32_t result;
+            
+            value2 = stack_pop_long(ctx);
+            value1 = stack_pop_long(ctx);
+            
+            /* Check for division by zero */
+            if (value2 == 0) {
+                if (throw_runtime_exception(ctx, "Division by zero") != 0) {
+                    return -1;
+                }
+                break;
+            }
+            
+            /* Signed modulo */
+            signed1 = (int32_t)value1;
+            signed2 = (int32_t)value2;
+            result = signed1 % signed2;
+            
+            if (stack_push_long(ctx, (uint32_t)result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LNEG: {
+            /* Long negation (two's complement) */
+            uint32_t value;
+            int32_t signed_val;
+            int32_t result;
+            
+            value = stack_pop_long(ctx);
+            signed_val = (int32_t)value;
+            result = -signed_val;
+            
+            if (stack_push_long(ctx, (uint32_t)result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LCMP: {
+            /* Long comparison: returns -1, 0, or 1 */
+            uint32_t value2;
+            uint32_t value1;
+            int32_t signed1;
+            int32_t signed2;
+            uint16_t result;
+            
+            value2 = stack_pop_long(ctx);
+            value1 = stack_pop_long(ctx);
+            
+            signed1 = (int32_t)value1;
+            signed2 = (int32_t)value2;
+            
+            if (signed1 < signed2) {
+                result = (uint16_t)-1;  /* 0xFFFF */
+            } else if (signed1 > signed2) {
+                result = 1;
+            } else {
+                result = 0;
+            }
+            
+            if (stack_push_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
         
         case OP_HALT:
             /* Halt execution */

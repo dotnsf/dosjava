@@ -114,6 +114,18 @@ const char* opcode_name(uint8_t opcode) {
         case OP_FINALLY_BEGIN: return "FINALLY_BEGIN";
         case OP_FINALLY_END:   return "FINALLY_END";
         case OP_THROW:         return "THROW";
+        case OP_PUSH_LONG:     return "PUSH_LONG";
+        case OP_LADD:          return "LADD";
+        case OP_LSUB:          return "LSUB";
+        case OP_LMUL:          return "LMUL";
+        case OP_LDIV:          return "LDIV";
+        case OP_LMOD:          return "LMOD";
+        case OP_LNEG:          return "LNEG";
+        case OP_I2L:           return "I2L";
+        case OP_L2I:           return "L2I";
+        case OP_LCMP:          return "LCMP";
+        case OP_LOAD_LONG:     return "LOAD_LONG";
+        case OP_STORE_LONG:    return "STORE_LONG";
         case OP_HALT:          return "HALT";
         default:               return "UNKNOWN";
     }
@@ -159,6 +171,15 @@ uint8_t opcode_length(uint8_t opcode) {
         case OP_FINALLY_BEGIN:
         case OP_FINALLY_END:
         case OP_THROW:
+        case OP_LADD:
+        case OP_LSUB:
+        case OP_LMUL:
+        case OP_LDIV:
+        case OP_LMOD:
+        case OP_LNEG:
+        case OP_I2L:
+        case OP_L2I:
+        case OP_LCMP:
         case OP_HALT:
             return 1;
         
@@ -166,6 +187,8 @@ uint8_t opcode_length(uint8_t opcode) {
         case OP_LOAD_LOCAL:
         case OP_STORE_LOCAL:
         case OP_NEW_ARRAY:
+        case OP_LOAD_LONG:
+        case OP_STORE_LONG:
             return 2;
         
         /* Instructions with 2-byte operand (3 bytes) */
@@ -198,6 +221,10 @@ uint8_t opcode_length(uint8_t opcode) {
         /* Instructions with 2 operands (3 bytes) */
         case OP_INC_LOCAL:
             return 3;
+        
+        /* Instructions with 4-byte operand (5 bytes) */
+        case OP_PUSH_LONG:  /* [opcode:1] [high:2] [low:2] */
+            return 5;
         
         /* Unknown instruction */
         default:

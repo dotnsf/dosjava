@@ -20,6 +20,7 @@ static const struct {
     {"static", TOK_STATIC},
     {"void", TOK_VOID},
     {"int", TOK_INT},
+    {"long", TOK_LONG},
     {"boolean", TOK_BOOLEAN},
     {"if", TOK_IF},
     {"else", TOK_ELSE},
@@ -242,10 +243,10 @@ static int lexer_read_identifier(Lexer* lexer, Token* token) {
 }
 
 /**
- * Read integer literal
+ * Read integer or long literal
  */
 static int lexer_read_number(Lexer* lexer, Token* token) {
-    int value;
+    long value;
     
     value = 0;
     
@@ -255,8 +256,16 @@ static int lexer_read_number(Lexer* lexer, Token* token) {
         lexer_read_char(lexer);
     }
     
-    token->type = TOK_INTEGER;
-    token->value.int_value = (int16_t)value;
+    /* Check for 'L' or 'l' suffix for long literal */
+    if (lexer->current_char == 'L' || lexer->current_char == 'l') {
+        token->type = TOK_LONG_LITERAL;
+        token->value.long_value = (int32_t)value;
+        lexer->column++;
+        lexer_read_char(lexer);
+    } else {
+        token->type = TOK_INTEGER;
+        token->value.int_value = (int16_t)value;
+    }
     
     return 0;
 }
@@ -636,6 +645,7 @@ const char* token_type_name(TokenType type) {
         case TOK_STATIC: return "static";
         case TOK_VOID: return "void";
         case TOK_INT: return "int";
+        case TOK_LONG: return "long";
         case TOK_BOOLEAN: return "boolean";
         case TOK_IF: return "if";
         case TOK_ELSE: return "else";
@@ -650,6 +660,7 @@ const char* token_type_name(TokenType type) {
         case TOK_THROW: return "throw";
         case TOK_IDENTIFIER: return "IDENTIFIER";
         case TOK_INTEGER: return "INTEGER";
+        case TOK_LONG_LITERAL: return "LONG_LITERAL";
         case TOK_STRING: return "STRING";
         case TOK_TRUE: return "true";
         case TOK_FALSE: return "false";

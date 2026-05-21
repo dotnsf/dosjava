@@ -316,6 +316,7 @@ static const char* get_type_name(TypeKind kind) {
     switch (kind) {
         case TYPE_VOID:    return "void";
         case TYPE_INT:     return "int";
+        case TYPE_LONG:    return "long";
         case TYPE_BOOLEAN: return "boolean";
         case TYPE_CLASS:   return "class";
         default:           return "unknown";
