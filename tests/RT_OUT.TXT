@@ -6,11 +6,11 @@ Month:
 Day: 
 1
 Hours: 
-2
+0
 Minutes: 
-46
+0
 Seconds: 
-40
+0
 Test 2: setTime(20000)
 Year: 
 1970

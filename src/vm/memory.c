@@ -7,6 +7,10 @@
 static MemoryManager g_memory_manager;
 static uint8_t g_memory_initialized = 0;
 
+/* Array handle table for Large memory model compatibility */
+static ArrayHandle g_array_handles[MAX_ARRAY_HANDLES];
+static uint8_t g_array_handles_initialized = 0;
+
 /**
  * Align size to 2-byte boundary for 16-bit efficiency
  */
@@ -339,3 +343,54 @@ MemoryManager* memory_get_manager(void) {
 }
 
 
+
+
+/**
+ * Allocate array handle for pointer
+ */
+uint16_t memory_alloc_array_handle(void* array_ptr) {
+    uint16_t i;
+    
+    /* Initialize handle table on first use */
+    if (!g_array_handles_initialized) {
+        memset(g_array_handles, 0, sizeof(g_array_handles));
+        g_array_handles_initialized = 1;
+    }
+    
+    /* Find free handle (skip 0, use 1-255) */
+    for (i = 1; i < MAX_ARRAY_HANDLES; i++) {
+        if (!g_array_handles[i].in_use) {
+            g_array_handles[i].array_ptr = array_ptr;
+            g_array_handles[i].in_use = 1;
+            return i;
+        }
+    }
+    
+    /* No free handles */
+    return 0;
+}
+
+/**
+ * Get array pointer from handle
+ */
+void* memory_get_array_ptr(uint16_t handle) {
+    if (handle == 0 || handle >= MAX_ARRAY_HANDLES) {
+        return NULL;
+    }
+    
+    if (!g_array_handles[handle].in_use) {
+        return NULL;
+    }
+    
+    return g_array_handles[handle].array_ptr;
+}
+
+/**
+ * Free array handle
+ */
+void memory_free_array_handle(uint16_t handle) {
+    if (handle > 0 && handle < MAX_ARRAY_HANDLES) {
+        g_array_handles[handle].in_use = 0;
+        g_array_handles[handle].array_ptr = NULL;
+    }
+}

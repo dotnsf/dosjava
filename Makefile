@@ -1,5 +1,5 @@
 # DOS Java Makefile for Open Watcom v2
-# Target: 16-bit DOS executable (Medium memory model)
+# Target: 16-bit DOS executable (Large memory model)
 
 # Compiler and linker
 CC = wcc
@@ -8,15 +8,15 @@ LD = wlink
 AR = wlib
 
 # Compiler flags
-# -mm: Medium memory model
+# -ml: Large memory model (Far code, Far data)
 # -0: 8086 instructions
 # -w4: Warning level 4
 # -zq: Quiet mode
 # -os: Optimize for size
 # -s: Disable stack overflow checks
 # -i: Include path
-CFLAGS = -mm -0 -w4 -zq -os -s -i=C:\WATCOM\h
-CXXFLAGS = -mm -0 -w4 -zq -os -s -i=C:\WATCOM\h
+CFLAGS = -ml -0 -w4 -zq -os -s -i=C:\WATCOM\h
+CXXFLAGS = -ml -0 -w4 -zq -os -s -i=C:\WATCOM\h
 
 # Linker flags
 LDFLAGS = system dos

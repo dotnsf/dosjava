@@ -5,13 +5,13 @@
 
 /**
  * Memory Manager for DOS Java VM
- * 
- * Simple heap allocator optimized for Small memory model (64KB data segment)
+ *
+ * Simple heap allocator for Large memory model
  * Uses a free list for memory management
  */
 
 /* Default heap size (in bytes) */
-#define DEFAULT_HEAP_SIZE 2048  /* ~2KB for heap - reduced to leave more memory for mTCP */
+#define DEFAULT_HEAP_SIZE 32768  /* 32KB for heap - expanded for Large memory model */
 
 /* Minimum allocation size */
 #define MIN_ALLOC_SIZE 4
@@ -35,6 +35,14 @@ typedef struct {
     uint16_t alloc_count;    /* Number of allocations */
     uint16_t free_count;     /* Number of frees */
 } MemoryManager;
+
+/* Array handle table for Large memory model compatibility */
+#define MAX_ARRAY_HANDLES 256
+
+typedef struct {
+    void* array_ptr;         /* Pointer to array data */
+    uint8_t in_use;          /* 1 if handle is active, 0 if free */
+} ArrayHandle;
 
 /**
  * Initialize memory manager
@@ -109,6 +117,26 @@ uint8_t memory_check(void);
  * @return Pointer to memory manager
  */
 MemoryManager* memory_get_manager(void);
+
+/**
+ * Allocate array handle for pointer
+ * @param array_ptr Pointer to array data
+ * @return Handle (1-255), or 0 on error
+ */
+uint16_t memory_alloc_array_handle(void* array_ptr);
+
+/**
+ * Get array pointer from handle
+ * @param handle Array handle (1-255)
+ * @return Pointer to array data, or NULL if invalid
+ */
+void* memory_get_array_ptr(uint16_t handle);
+
+/**
+ * Free array handle
+ * @param handle Array handle to free
+ */
+void memory_free_array_handle(uint16_t handle);
 
 #endif /* MEMORY_H */
 

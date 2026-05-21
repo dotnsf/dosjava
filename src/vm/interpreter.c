@@ -678,7 +678,7 @@ int interpreter_step(ExecutionContext* ctx) {
             uint16_t size;
             uint16_t total_size;
             uint16_t* array_data;
-            uint16_t raw_ref;
+            uint16_t array_handle;
             
             elem_type = interpreter_read_u8(ctx);
             size = stack_pop_shared(ctx);
@@ -703,21 +703,30 @@ int interpreter_step(ExecutionContext* ctx) {
             
             memset(array_data, 0, total_size);
             array_data[0] = size;
-            raw_ref = (uint16_t)array_data;
             
-            if (stack_push_shared(ctx, raw_ref) != 0) {
+            /* Allocate handle for array pointer */
+            array_handle = memory_alloc_array_handle(array_data);
+            if (array_handle == 0) {
+                printf("ERROR: Out of array handles\n");
+                memory_free(array_data);
+                return -1;
+            }
+            
+            if (stack_push_shared(ctx, array_handle) != 0) {
                 printf("ERROR: Stack overflow\n");
+                memory_free_array_handle(array_handle);
+                memory_free(array_data);
                 return -1;
             }
             break;
         }
         
         case OP_ARRAY_LENGTH: {
-            uint16_t raw_ref;
+            uint16_t array_handle;
             uint16_t* array_data;
             
-            raw_ref = stack_pop_shared(ctx);
-            array_data = (uint16_t*)raw_ref;
+            array_handle = stack_pop_shared(ctx);
+            array_data = (uint16_t*)memory_get_array_ptr(array_handle);
             if (array_data == NULL) {
                 printf("ERROR: Null array reference (ARRAY_LENGTH)\n");
                 return -1;
@@ -731,13 +740,13 @@ int interpreter_step(ExecutionContext* ctx) {
         }
         
         case OP_ARRAY_LOAD: {
-            uint16_t raw_ref;
+            uint16_t array_handle;
             uint16_t index;
             uint16_t* array_data;
             
             index = stack_pop_shared(ctx);
-            raw_ref = stack_pop_shared(ctx);
-            array_data = (uint16_t*)raw_ref;
+            array_handle = stack_pop_shared(ctx);
+            array_data = (uint16_t*)memory_get_array_ptr(array_handle);
             if (array_data == NULL) {
                 printf("ERROR: Null array reference (ARRAY_LOAD idx=%u)\n", index);
                 return -1;
@@ -755,22 +764,22 @@ int interpreter_step(ExecutionContext* ctx) {
         }
         
         case OP_ARRAY_STORE: {
-            uint16_t raw_ref;
+            uint16_t array_handle;
             uint16_t value;
             uint16_t index;
             uint16_t* array_data;
             
             value = stack_pop_shared(ctx);
             index = stack_pop_shared(ctx);
-            raw_ref = stack_pop_shared(ctx);
-            array_data = (uint16_t*)raw_ref;
+            array_handle = stack_pop_shared(ctx);
+            array_data = (uint16_t*)memory_get_array_ptr(array_handle);
             if (array_data == NULL) {
                 printf("ERROR: Null array reference (ARRAY_STORE idx=%u val=%u)\n", index, value);
                 return -1;
             }
             if (index >= array_data[0]) {
-                printf("ERROR: Array index out of bounds (idx=%u len=%u val=%u raw=%u)\n",
-                    index, array_data[0], value, raw_ref);
+                printf("ERROR: Array index out of bounds (idx=%u len=%u val=%u)\n",
+                    index, array_data[0], value);
                 return -1;
             }
             
