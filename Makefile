@@ -8,7 +8,7 @@ LD = wlink
 AR = wlib
 
 # Compiler flags
-# -ml: Large memory model (for mTCP compatibility and Tcp::drivePackets() support)
+# -mm: Medium memory model
 # -0: 8086 instructions
 # -w4: Warning level 4
 # -zq: Quiet mode
@@ -17,20 +17,6 @@ AR = wlib
 # -i: Include path
 CFLAGS = -mm -0 -w4 -zq -os -s -i=C:\WATCOM\h
 CXXFLAGS = -mm -0 -w4 -zq -os -s -i=C:\WATCOM\h
-
-# Compiler flags with socket support enabled
-CFLAGS_SOCKET = -mm -0 -w4 -zq -os -s -i=C:\WATCOM\h -DENABLE_SOCKETS
-
-# mTCP library settings (Phase 4.1) - Based on doscurl implementation
-MTCP_TCP_H_DIR = C:\mTCP\src\TCPINC
-MTCP_TCP_C_DIR = C:\mTCP\src\TCPLIB
-MTCP_COMMON_H_DIR = C:\mTCP\src\INCLUDE
-MTCP_CFG_DIR = tests\network
-# Use doscurl-style compile options: optimizations + mTCP config
-# Using -mm (medium model) for djvm.exe and sockhelp.exe (same as doscurl)
-MTCP_CXXFLAGS = -0 -mm -DCFG_H="doscurl.cfg" -oh -ok -ot -s -oa -ei -zp2 -zpw -ob -ol+ -oi+ -i=$(MTCP_TCP_H_DIR) -i=$(MTCP_COMMON_H_DIR) -i=../doscurl/cpp
-# Large model flags for sockhelp.exe
-MTCP_CXXFLAGS_LARGE = -0 -ml -DCFG_H="doscurl.cfg" -oh -ok -ot -s -oa -ei -zp2 -zpw -ob -ol+ -oi+ -i=$(MTCP_TCP_H_DIR) -i=$(MTCP_COMMON_H_DIR) -i=../doscurl/cpp
 
 # Linker flags
 LDFLAGS = system dos
@@ -45,23 +31,17 @@ BIN_DIR = $(BUILD_DIR)/bin
 # Source files
 VM_SRCS = $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/native.c
 FORMAT_SRCS = $(SRC_DIR)/format/djc.c $(SRC_DIR)/format/opcodes.c
-RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedwriter.c $(SRC_DIR)/runtime/dostime.c $(SRC_DIR)/runtime/date.c $(SRC_DIR)/runtime/socket.c
-NETWORK_SRCS = $(SRC_DIR)/network/socket.cpp
+RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedwriter.c $(SRC_DIR)/runtime/dostime.c $(SRC_DIR)/runtime/date.c
 TEST_SRCS = $(SRC_DIR)/test_memory.c
 
 # Object files
 VM_OBJS = $(OBJ_DIR)/memory.obj $(OBJ_DIR)/stack.obj $(OBJ_DIR)/interpreter.obj $(OBJ_DIR)/native.obj
 FORMAT_OBJS = $(OBJ_DIR)/djc.obj $(OBJ_DIR)/opcodes.obj
 RUNTIME_OBJS = $(OBJ_DIR)/object.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/system.obj $(OBJ_DIR)/integer.obj $(OBJ_DIR)/inputstream.obj $(OBJ_DIR)/outputstream.obj $(OBJ_DIR)/fileinputstream.obj $(OBJ_DIR)/fileoutputstream.obj $(OBJ_DIR)/bufferedreader.obj $(OBJ_DIR)/bufferedwriter.obj $(OBJ_DIR)/dostime.obj $(OBJ_DIR)/date.obj
-RUNTIME_SOCKET_OBJS = $(OBJ_DIR)/socket_runtime.obj
-NETWORK_OBJS = $(OBJ_DIR)/socket_network.obj
 TEST_OBJS = $(OBJ_DIR)/test_memory.obj
 
 # Compiler object files
 COMPILER_OBJS = $(OBJ_DIR)/lexer.obj $(OBJ_DIR)/parser.obj $(OBJ_DIR)/symtable.obj $(OBJ_DIR)/semantic.obj $(OBJ_DIR)/codegen.obj
-
-# mTCP object files needed
-MTCP_OBJS = $(OBJ_DIR)/packet.obj $(OBJ_DIR)/arp.obj $(OBJ_DIR)/eth.obj $(OBJ_DIR)/ip.obj $(OBJ_DIR)/tcp.obj $(OBJ_DIR)/tcpsockm.obj $(OBJ_DIR)/udp.obj $(OBJ_DIR)/utils.obj $(OBJ_DIR)/dns.obj $(OBJ_DIR)/timer.obj $(OBJ_DIR)/ipasm.obj $(OBJ_DIR)/trace.obj
 
 # Targets
 all: test_memory test_interpreter mkdjc java2djc test_lexer test_parser test_semantic test_codegen djc djvm test_stream test_fileinputstream test_fileoutputstream test_buffered test_dostime test_date
@@ -167,12 +147,12 @@ $(OBJ_DIR)/interpreter.obj: $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/interprete
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/interpreter.c
 
 $(OBJ_DIR)/native.obj: $(SRC_DIR)/vm/native.c $(SRC_DIR)/vm/native.h
-	@echo Compiling native.c with socket support...
-	$(CC) $(CFLAGS_SOCKET) -fo=$@ $(SRC_DIR)/vm/native.c
+	@echo Compiling native.c...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/native.c
 
 $(OBJ_DIR)/djvm.obj: $(SRC_DIR)/vm/djvm.c $(SRC_DIR)/vm/interpreter.h $(SRC_DIR)/vm/native.h
-	@echo Compiling djvm.c with socket support...
-	$(CC) $(CFLAGS_SOCKET) -fo=$@ $(SRC_DIR)/vm/djvm.c
+	@echo Compiling djvm.c...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/djvm.c
 
 # Compile rules - Format
 $(OBJ_DIR)/djc.obj: $(SRC_DIR)/format/djc.c $(SRC_DIR)/format/djc.h
