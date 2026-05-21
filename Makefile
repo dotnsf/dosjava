@@ -1,5 +1,5 @@
 # DOS Java Makefile for Open Watcom v2
-# Target: 16-bit DOS executable (Small memory model)
+# Target: 16-bit DOS executable (Medium memory model)
 
 # Compiler and linker
 CC = wcc
