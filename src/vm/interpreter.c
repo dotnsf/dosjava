@@ -155,6 +155,29 @@ static inline void store_local(ExecutionContext* ctx, uint8_t index, uint16_t va
         ctx->shared_locals[base + index] = value;
     }
 }
+/* ===== Exception Helper Functions ===== */
+
+/**
+ * Throw a runtime exception
+ * If in try block, jump to catch block
+ * Otherwise, print error and terminate
+ * 
+ * @param ctx Execution context
+ * @param message Error message
+ * @return 0 if exception handled (jumped to catch), -1 if should terminate
+ */
+static int throw_runtime_exception(ExecutionContext* ctx, const char* message) {
+    if (ctx->in_try_block && ctx->catch_pc) {
+        /* Jump to catch block */
+        ctx->pc = ctx->catch_pc;
+        ctx->in_try_block = 0;
+        return 0;  /* Exception handled */
+    } else {
+        /* No try block - print error and terminate */
+        printf("ERROR: %s\n", message);
+        return -1;  /* Should terminate */
+    }
+}
 
 /* ===== Context Management ===== */
 
@@ -460,8 +483,11 @@ int interpreter_step(ExecutionContext* ctx) {
             value2 = stack_pop_shared(ctx);
             value1 = stack_pop_shared(ctx);
             if (value2 == 0) {
-                printf("ERROR: Division by zero\n");
-                return -1;
+                /* Try to throw exception */
+                if (throw_runtime_exception(ctx, "Division by zero") != 0) {
+                    return -1;  /* Not in try block - terminate */
+                }
+                break;  /* Exception handled - jumped to catch block */
             }
             result = (uint16_t)((int16_t)value1 / (int16_t)value2);
             if (stack_push_shared(ctx, result) != 0) {
@@ -475,8 +501,11 @@ int interpreter_step(ExecutionContext* ctx) {
             value2 = stack_pop_shared(ctx);
             value1 = stack_pop_shared(ctx);
             if (value2 == 0) {
-                printf("ERROR: Modulo by zero\n");
-                return -1;
+                /* Try to throw exception */
+                if (throw_runtime_exception(ctx, "Modulo by zero") != 0) {
+                    return -1;  /* Not in try block - terminate */
+                }
+                break;  /* Exception handled - jumped to catch block */
             }
             result = (uint16_t)((int16_t)value1 % (int16_t)value2);
             if (stack_push_shared(ctx, result) != 0) {
@@ -1581,8 +1610,13 @@ int interpreter_step(ExecutionContext* ctx) {
                     /* Open file with specified mode */
                     g_file_handle = fopen(filename, mode);
                     if (g_file_handle == NULL) {
-                        printf("ERROR: Cannot open file: %s (mode: %s)\n", filename, mode);
-                        return -1;
+                        /* Try to throw exception */
+                        char error_msg[128];
+                        sprintf(error_msg, "Cannot open file: %s", filename);
+                        if (throw_runtime_exception(ctx, error_msg) != 0) {
+                            return -1;  /* Not in try block - terminate */
+                        }
+                        break;  /* Exception handled - jumped to catch block */
                     }
                     break;
                 } else if (strcmp(method_name, "readLine") == 0) {

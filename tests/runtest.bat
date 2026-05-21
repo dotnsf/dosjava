@@ -568,22 +568,24 @@ echo SUCCESS: Compilation passed
 if errorlevel 1 goto :test13_runfail
 REM find "1\n0\n1\n0\n6\n11\n4\n6\n11\n7\nel\nWorld!" RT_OUT.TXT > nul
 REM find "World!" RT_OUT.TXT > nul
-linechk RT_OUT.TXT 1 "1" > nul
-linechk RT_OUT.TXT 2 "0" > nul
+linechk RT_OUT.TXT 1 "HELLO WORLD!" > nul
+linechk RT_OUT.TXT 2 "hello world!" > nul
 linechk RT_OUT.TXT 3 "1" > nul
 linechk RT_OUT.TXT 4 "0" > nul
-linechk RT_OUT.TXT 5 "6" > nul
-linechk RT_OUT.TXT 6 "11" > nul
-linechk RT_OUT.TXT 7 "4" > nul
-linechk RT_OUT.TXT 8 "6" > nul
-linechk RT_OUT.TXT 9 "11" > nul
-linechk RT_OUT.TXT 10 "7" > nul
-linechk RT_OUT.TXT 11 "el" > nul
-linechk RT_OUT.TXT 12 "World!" > nul
+linechk RT_OUT.TXT 5 "1" > nul
+linechk RT_OUT.TXT 6 "0" > nul
+linechk RT_OUT.TXT 7 "6" > nul
+linechk RT_OUT.TXT 8 "11" > nul
+linechk RT_OUT.TXT 9 "4" > nul
+linechk RT_OUT.TXT 10 "6" > nul
+linechk RT_OUT.TXT 11 "11" > nul
+linechk RT_OUT.TXT 12 "7" > nul
+linechk RT_OUT.TXT 13 "el" > nul
+linechk RT_OUT.TXT 14 "World!" > nul
 if errorlevel 1 goto :test13_badout
 echo Output:
 type RT_OUT.TXT
-echo SUCCESS: Output matched expected value "1\n0\n1\n0\n6\n11\n4\n6\n11\n7\nel\nWorld!" 
+echo SUCCESS: Output matched expected value "HELLO WORLD\!\nhello world\!\n1\n0\n1\n0\n6\n11\n4\n6\n11\n7\nel\nWorld!" 
 echo.
 
 goto :test14
@@ -932,9 +934,20 @@ if not exist exc2.DJC goto :test21_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe exc2.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test21_runfail
-find "  Result: 20" RT_OUT.TXT > nul
+REM find "  Result: 20" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 5 "  Exception caught" > nul
 if errorlevel 1 goto :test21_badout
-find "=== All Throw Tests Completed ===" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 6 "  Status: 3" > nul
+if errorlevel 1 goto :test21_badout
+linechk RT_OUT.TXT 12 "  Exception caught, counter: 1" > nul
+if errorlevel 1 goto :test21_badout
+linechk RT_OUT.TXT 13 "  Final counter: 1" > nul
+if errorlevel 1 goto :test21_badout
+linechk RT_OUT.TXT 17 "  Throwing exception" > nul
+if errorlevel 1 goto :test21_badout
+linechk RT_OUT.TXT 18 "  Handling exception" > nul
+if errorlevel 1 goto :test21_badout
+linechk RT_OUT.TXT 19 "  Result: 20" > nul
 if errorlevel 1 goto :test21_badout
 echo Output:
 type RT_OUT.TXT
@@ -966,22 +979,25 @@ goto :end
 :test22
 
 if exist RT_OUT.TXT del RT_OUT.TXT
-echo Test 22: Date
+echo Test 22: try{}catch{}finally{}
 echo ------------------------------
-..\build\bin\djc.exe dtest4.jav
+..\build\bin\djc.exe exc3.jav
 if errorlevel 1 goto :test22_fail
-if not exist dtest4.DJC goto :test22_nofile
+if not exist exc3.DJC goto :test22_nofile
 echo SUCCESS: Compilation passed
-..\build\bin\djvm.exe dtest4.DJC > RT_OUT.TXT
+..\build\bin\djvm.exe exc3.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test22_runfail
-find "20000" RT_OUT.TXT > nul
+REM find "  Result: 20" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 5 "  Exception caught" > nul
+if errorlevel 1 goto :test22_badout
+linechk RT_OUT.TXT 6 "  Status: 3" > nul
 if errorlevel 1 goto :test22_badout
 echo Output:
 type RT_OUT.TXT
-echo SUCCESS: Output matched expected value "20000"
+echo SUCCESS: Output matched expected value "  Status: 3"
 echo.
 
-goto :completed
+goto :test23
 
 :test22_fail
 echo FAILED: Compilation error
@@ -997,6 +1013,82 @@ goto :end
 
 :test22_badout
 echo FAILED: Output mismatch for Test 22
+echo Expected: "  Result: 20"
+echo Actual:
+
+
+:test23
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 23: try{}catch{}finally{}
+echo ------------------------------
+..\build\bin\djc.exe exc4.jav
+if errorlevel 1 goto :test23_fail
+if not exist exc4.DJC goto :test23_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe exc4.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test23_runfail
+linechk RT_OUT.TXT 1 "Exception caught" > nul
+if errorlevel 1 goto :test23_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "Exception caught"
+echo.
+
+goto :test24
+
+:test23_fail
+echo FAILED: Compilation error
+goto :end
+
+:test23_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test23_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test23_badout
+echo FAILED: Output mismatch for Test 23
+echo Expected: "Exception caught"
+echo Actual:
+
+
+:test24
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 24: Date
+echo ------------------------------
+..\build\bin\djc.exe dtest4.jav
+if errorlevel 1 goto :test24_fail
+if not exist dtest4.DJC goto :test24_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe dtest4.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test24_runfail
+find "20000" RT_OUT.TXT > nul
+if errorlevel 1 goto :test24_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "20000"
+echo.
+
+goto :completed
+
+:test24_fail
+echo FAILED: Compilation error
+goto :end
+
+:test24_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test24_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test24_badout
+echo FAILED: Output mismatch for Test 24
 echo Expected: "20000"
 echo Actual:
 type RT_OUT.TXT
