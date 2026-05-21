@@ -14,7 +14,8 @@ if not exist HELLO.DJC goto :test0_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe HELLO.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test0_runfail
-find "Hello World!" RT_OUT.TXT > nul
+REM find "Hello World!" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "Hello World!" > nul
 if errorlevel 1 goto :test0_badout
 echo Output:
 type RT_OUT.TXT
@@ -52,7 +53,8 @@ if not exist VARTEST.DJC goto :test1_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe VARTEST.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test1_runfail
-find "10" RT_OUT.TXT > nul
+REM find "10" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "10" > nul
 if errorlevel 1 goto :test1_badout
 echo Output:
 type RT_OUT.TXT
@@ -90,7 +92,8 @@ if not exist ARITH.DJC goto :test2_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe ARITH.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test2_runfail
-find "8" RT_OUT.TXT > nul
+REM find "8" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "8" > nul
 if errorlevel 1 goto :test2_badout
 echo Output:
 type RT_OUT.TXT
@@ -128,7 +131,8 @@ if not exist IFTEST.DJC goto :test3_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe IFTEST.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test3_runfail
-find "100" RT_OUT.TXT > nul
+REM find "100" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "100" > nul
 if errorlevel 1 goto :test3_badout
 echo Output:
 type RT_OUT.TXT
@@ -166,7 +170,8 @@ if not exist LOOP.DJC goto :test4_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe LOOP.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test4_runfail
-find "10" RT_OUT.TXT > nul
+REM find "10" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "10" > nul
 if errorlevel 1 goto :test4_badout
 echo Output:
 type RT_OUT.TXT
@@ -206,7 +211,16 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe CALC.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test5_runfail
 REM find "12\n8\n20\n5\n0\n1\n0\n2\n-8" RT_OUT.TXT > nul
-find "-8" RT_OUT.TXT > nul
+REM find "-8" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "12" > nul
+linechk RT_OUT.TXT 2 "8" > nul
+linechk RT_OUT.TXT 3 "20" > nul
+linechk RT_OUT.TXT 4 "5" > nul
+linechk RT_OUT.TXT 5 "0" > nul
+linechk RT_OUT.TXT 6 "1" > nul
+linechk RT_OUT.TXT 7 "0" > nul
+linechk RT_OUT.TXT 8 "2" > nul
+linechk RT_OUT.TXT 9 "-8" > nul
 if errorlevel 1 goto :test5_badout
 echo Output:
 type RT_OUT.TXT
@@ -245,7 +259,8 @@ if not exist FOR.DJC goto :test6_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe FOR.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test6_runfail
-find "10" RT_OUT.TXT > nul
+REM find "10" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "10" > nul
 if errorlevel 1 goto :test6_badout
 echo Output:
 type RT_OUT.TXT
@@ -285,7 +300,18 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe ARRAYS.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test7_runfail
 REM find "12\n22\n25\n34\n64" RT_OUT.TXT > nul
-find "64" RT_OUT.TXT > nul
+REM find "64" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "64" > nul
+linechk RT_OUT.TXT 2 "34" > nul
+linechk RT_OUT.TXT 3 "25" > nul
+linechk RT_OUT.TXT 4 "12" > nul
+linechk RT_OUT.TXT 5 "22" > nul
+linechk RT_OUT.TXT 6 "12" > nul
+linechk RT_OUT.TXT 7 "22" > nul
+linechk RT_OUT.TXT 8 "25" > nul
+linechk RT_OUT.TXT 9 "34" > nul
+linechk RT_OUT.TXT 10 "64" > nul
+
 if errorlevel 1 goto :test7_badout
 echo Output:
 type RT_OUT.TXT
@@ -325,7 +351,10 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe FUNC.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test8_runfail
 REM find "3\n6\n6" RT_OUT.TXT > nul
-find "3" RT_OUT.TXT > nul
+REM find "3" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "3" > nul
+linechk RT_OUT.TXT 2 "6" > nul
+linechk RT_OUT.TXT 3 "6" > nul
 if errorlevel 1 goto :test8_badout
 echo Output:
 type RT_OUT.TXT
@@ -364,7 +393,8 @@ if not exist STR.DJC goto :test9_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe STR.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test9_runfail
-find "Hello World!" RT_OUT.TXT > nul
+REM find "Hello World!" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "Hello World!" > nul
 if errorlevel 1 goto :test9_badout
 echo Output:
 type RT_OUT.TXT
@@ -405,7 +435,10 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe STRLEN.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test10_runfail
 REM find "Hello World!\n12\n5" RT_OUT.TXT > nul
-find "12" RT_OUT.TXT > nul
+REM find "12" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "Hello World!" > nul
+linechk RT_OUT.TXT 2 "12" > nul
+linechk RT_OUT.TXT 3 "5" > nul
 if errorlevel 1 goto :test10_badout
 echo Output:
 type RT_OUT.TXT
@@ -446,7 +479,10 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe STRCAT.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test11_runfail
 REM find "1234\nAABB\n123456" RT_OUT.TXT > nul
-find "123456" RT_OUT.TXT > nul
+REM find "123456" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "1234" > nul
+linechk RT_OUT.TXT 2 "AABB" > nul
+linechk RT_OUT.TXT 3 "123456" > nul
 if errorlevel 1 goto :test11_badout
 echo Output:
 type RT_OUT.TXT
@@ -487,7 +523,10 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe STRFUNC.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test12_runfail
 REM find "ABC\nHello ABC\nABCABCABC" RT_OUT.TXT > nul
-find "ABCABCABC" RT_OUT.TXT > nul
+REM find "ABCABCABC" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "ABC" > nul
+linechk RT_OUT.TXT 2 "Hello ABC" > nul
+linechk RT_OUT.TXT 3 "ABCABCABC" > nul
 if errorlevel 1 goto :test12_badout
 echo Output:
 type RT_OUT.TXT
@@ -528,7 +567,19 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe STREXT.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test13_runfail
 REM find "1\n0\n1\n0\n6\n11\n4\n6\n11\n7\nel\nWorld!" RT_OUT.TXT > nul
-find "World!" RT_OUT.TXT > nul
+REM find "World!" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "1" > nul
+linechk RT_OUT.TXT 2 "0" > nul
+linechk RT_OUT.TXT 3 "1" > nul
+linechk RT_OUT.TXT 4 "0" > nul
+linechk RT_OUT.TXT 5 "6" > nul
+linechk RT_OUT.TXT 6 "11" > nul
+linechk RT_OUT.TXT 7 "4" > nul
+linechk RT_OUT.TXT 8 "6" > nul
+linechk RT_OUT.TXT 9 "11" > nul
+linechk RT_OUT.TXT 10 "7" > nul
+linechk RT_OUT.TXT 11 "el" > nul
+linechk RT_OUT.TXT 12 "World!" > nul
 if errorlevel 1 goto :test13_badout
 echo Output:
 type RT_OUT.TXT
@@ -569,7 +620,10 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe FILES.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test14_runfail
 REM find "ABC\n123\nHello World!" RT_OUT.TXT > nul
-find "Hello World!" RT_OUT.TXT > nul
+REM find "Hello World!" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "ABC" > nul
+linechk RT_OUT.TXT 2 "123" > nul
+linechk RT_OUT.TXT 3 "Hello World!" > nul
 
 if errorlevel 1 goto :test14_badout
 echo Output:
@@ -610,9 +664,11 @@ if not exist STR6.DJC goto :test15_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe STR6.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test15_runfail
-find "true" RT_OUT.TXT > nul
+REM find "true" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "true" > nul
 if errorlevel 1 goto :test15_badout
-find "false" RT_OUT.TXT > nul
+REM find "false" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 2 "false" > nul
 if errorlevel 1 goto :test15_badout
 echo Output:
 type RT_OUT.TXT
@@ -652,9 +708,13 @@ if not exist STRINT1.DJC goto :test16_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe STRINT1.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test16_runfail
-find "Count: 42" RT_OUT.TXT > nul
+REM find "Count: 42" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "Count: 42" > nul
 if errorlevel 1 goto :test16_badout
-find "Total: 42 items" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 2 "42 items" > nul
+if errorlevel 1 goto :test16_badout
+REM find "Total: 42 items" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 3 "Total: 42 items" > nul
 if errorlevel 1 goto :test16_badout
 echo Output:
 type RT_OUT.TXT
@@ -694,7 +754,8 @@ if not exist OBJ3.DJC goto :test17_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe OBJ3.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test17_runfail
-find "42" RT_OUT.TXT > nul
+REM find "42" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "42" > nul
 if errorlevel 1 goto :test17_badout
 echo Output:
 type RT_OUT.TXT
@@ -735,10 +796,11 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe bufrw.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test18_runfail
 REM find "" RT_OUT.TXT > nul
-REM if errorlevel 1 goto :test18_badout
+linechk TEST.TXT 1 "Hello File" > nul
+if errorlevel 1 goto :test18_badout
 echo Output:
 type RT_OUT.TXT
-REM echo SUCCESS: Output matched expected value "42"
+echo SUCCESS: Output matched expected value "Hello File"
 echo.
 
 goto :test19
@@ -757,7 +819,7 @@ goto :end
 
 :test18_badout
 echo FAILED: Output mismatch for Test 18
-echo Expected: "42"
+echo Expected: "Hello File"
 echo Actual:
 type RT_OUT.TXT
 goto :end
@@ -774,7 +836,14 @@ if not exist e2ewrit.DJC goto :test19_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe e2ewrit.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test19_runfail
-find "Write test completed" RT_OUT.TXT > nul
+REM find "Write test completed" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "Write test completed" > nul
+if errorlevel 1 goto :test19_badout
+linechk E2EWRIT.TXT 1 "Line 1" > nul
+if errorlevel 1 goto :test19_badout
+linechk E2EWRIT.TXT 2 "Line 2" > nul
+if errorlevel 1 goto :test19_badout
+linechk E2EWRIT.TXT 3 "Line 3" > nul
 if errorlevel 1 goto :test19_badout
 echo Output:
 type RT_OUT.TXT
@@ -814,7 +883,16 @@ if not exist e2eread.DJC goto :test20_nofile
 echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe e2eread.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test20_runfail
-find "Read test completed" RT_OUT.TXT > nul
+REM find "Read test completed" RT_OUT.TXT > nul
+linechk RT_OUT.TXT 1 "Reading file:" > nul
+if errorlevel 1 goto :test20_badout
+linechk RT_OUT.TXT 2 "Line 1" > nul
+if errorlevel 1 goto :test20_badout
+linechk RT_OUT.TXT 3 "Line 2" > nul
+if errorlevel 1 goto :test20_badout
+linechk RT_OUT.TXT 4 "Line 3" > nul
+if errorlevel 1 goto :test20_badout
+linechk RT_OUT.TXT 5 "Read test completed" > nul
 if errorlevel 1 goto :test20_badout
 echo Output:
 type RT_OUT.TXT
@@ -855,6 +933,8 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe exc2.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test21_runfail
 find "  Result: 20" RT_OUT.TXT > nul
+if errorlevel 1 goto :test21_badout
+find "=== All Throw Tests Completed ===" RT_OUT.TXT > nul
 if errorlevel 1 goto :test21_badout
 echo Output:
 type RT_OUT.TXT

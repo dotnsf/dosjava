@@ -258,4 +258,39 @@ wmake test_sockrt
 Phase 4.2 Day 15-17 successfully implemented the runtime Socket class with proper VM integration. The critical 64KB code segment limit issue was resolved by migrating to Medium memory model. All builds are successful and ready for DOS testing.
 
 **Status**: ✅ COMPLETED
+
+---
+
+## Update: Migration to Large Memory Model (Phase 4.2 Day 22-24)
+
+### Issue with Medium Memory Model
+During Phase 4.2 Day 22-24, discovered that `Tcp::drivePackets()` from mTCP library caused freeze in Medium memory model (-mm). This was due to:
+- Stack and heap sharing same 64KB data segment
+- `Tcp::drivePackets()` requiring significant stack space
+- Stack overflow or heap corruption during packet processing
+
+### Solution: Large Memory Model Migration
+**Date**: 2026-05-19
+
+Migrated from Medium (-mm) to Large (-ml) memory model:
+
+**Changes in Makefile**:
+- Line 18: `CFLAGS = -ml` (was -mm)
+- Line 19: `CXXFLAGS = -ml` (was -mm)
+- Line 22: `CFLAGS_SOCKET = -ml` (was -mm)
+- Line 31: `MTCP_CXXFLAGS = -0 -ml` (was -mm)
+
+**Benefits**:
+- Independent stack segment (no longer shares with heap)
+- Multiple data segments (>64KB data possible)
+- `Tcp::drivePackets()` works correctly (same as doscurl)
+- Better compatibility with mTCP library
+
+**Code Changes**:
+- Restored `Tcp::drivePackets()` call in `socket_connect()` (socket.cpp line 237)
+- No other source code changes required (pointers automatically become far pointers)
+
+**Build Result**: ✅ All executables built successfully with Large memory model
+
+**Status**: ✅ COMPLETED - Ready for DOS testing with full mTCP functionality
 **Next Phase**: Day 18-19 - Native Method Mechanism

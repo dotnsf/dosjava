@@ -57,6 +57,7 @@ static int read_constants(FILE* fp, DJCFile* file) {
     uint16_t i;
     DJCConstant* constant;
     long pos_before, pos_after;
+    uint16_t alloc_count;
     
     if (file->header.constant_pool_count == 0) {
         file->constants = NULL;
@@ -65,12 +66,16 @@ static int read_constants(FILE* fp, DJCFile* file) {
     
     pos_before = ftell(fp);
     
-    
-    /* Allocate constant pool with spare capacity for minimal runtime-generated
-     * String values such as concat results.
+    /* Allocate constant pool with small spare capacity (10 extra slots)
+     * for runtime-generated String values such as concat results.
      */
+    alloc_count = file->header.constant_pool_count + 10;
+    if (alloc_count > DJC_MAX_CONSTANTS) {
+        alloc_count = DJC_MAX_CONSTANTS;
+    }
+    
     file->constants = (DJCConstant*)memory_alloc(
-        sizeof(DJCConstant) * DJC_MAX_CONSTANTS);
+        sizeof(DJCConstant) * alloc_count);
     if (file->constants == NULL) {
         return -1;
     }
@@ -138,10 +143,14 @@ static int read_methods(FILE* fp, DJCFile* file) {
         return 0;
     }
     
+    /* Check if method count exceeds maximum */
+    if (file->header.method_count > DJC_MAX_METHODS) {
+        return -1;
+    }
+    
     pos_before = ftell(fp);
     
-    
-    /* Allocate method array */
+    /* Allocate exact amount needed for methods */
     file->methods = (DJCMethod*)memory_alloc(
         sizeof(DJCMethod) * file->header.method_count);
     if (file->methods == NULL) {
@@ -160,12 +169,16 @@ static int read_methods(FILE* fp, DJCFile* file) {
         method->max_locals = read_uint8(fp);
         method->flags = read_uint8(fp);
         
-        
+        /* Check for read errors */
+        if (feof(fp)) {
+            return -1;
+        }
+        if (ferror(fp)) {
+            return -1;
+        }
     }
     
     pos_after = ftell(fp);
-    
-    
     
     return 0;
 }
@@ -205,16 +218,10 @@ static int read_fields(FILE* fp, DJCFile* file) {
  * Read bytecode section from file
  */
 static int read_bytecode(FILE* fp, DJCFile* file) {
-    long pos_before;
-    uint16_t i;
-    
     if (file->header.code_size == 0) {
         file->bytecode = NULL;
         return 0;
     }
-    
-    pos_before = ftell(fp);
-    
     
     /* Allocate bytecode buffer */
     file->bytecode = (uint8_t*)memory_alloc(file->header.code_size);
@@ -240,12 +247,14 @@ DJCFile* djc_open(const char* filename) {
     DJCFile* file;
     
     if (filename == NULL) {
+        printf("djc_open: filename is NULL\n");
         return NULL;
     }
     
     /* Open file */
     fp = fopen(filename, "rb");
     if (fp == NULL) {
+        perror("djc_open: fopen failed");
         return NULL;
     }
     

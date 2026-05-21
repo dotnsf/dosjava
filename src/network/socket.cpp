@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <malloc.h>
 #include "socket.h"
 
 /* mTCP headers */
@@ -51,10 +52,19 @@ static int is_valid_handle(socket_handle_t handle);
  */
 int socket_init(void) {
     int i;
+    int rc;
     
     if (g_initialized) {
         return SOCKET_OK;
     }
+    
+    printf("DEBUG: socket_init() starting\n");
+    fflush(stdout);
+    
+    /* Check available memory */
+    printf("DEBUG: Available memory: %lu bytes\n", (unsigned long)_memavl());
+    printf("DEBUG: Largest free block: %lu bytes\n", (unsigned long)_memmax());
+    fflush(stdout);
     
     /* Initialize socket table */
     for (i = 0; i < MAX_SOCKETS; i++) {
@@ -68,18 +78,35 @@ int socket_init(void) {
     /* Initialize random number generator for local port selection */
     srand((unsigned int)time(NULL));
     
+    printf("DEBUG: Calling Utils::parseEnv()\n");
+    fflush(stdout);
+    
     /* Parse mTCP configuration */
-    if (Utils::parseEnv() != 0) {
+    rc = Utils::parseEnv();
+    printf("DEBUG: Utils::parseEnv() returned: %d\n", rc);
+    fflush(stdout);
+    
+    if (rc != 0) {
         strcpy(g_error_msg, "Failed to parse mTCP configuration");
         return SOCKET_ERR_INIT;
     }
     
+    printf("DEBUG: Memory before initStack: %lu bytes\n", (unsigned long)_memavl());
+    printf("DEBUG: Attempting minimal configuration: 1 socket, 1 buffer\n");
+    fflush(stdout);
+    
     /* Initialize mTCP stack
-     * First arg: number of TCP sockets to allocate (2 to reduce memory usage)
-     * Second arg: number of TCP transmit buffers (TCP_MAX_XMIT_BUFS from GLOBAL.CFG, default 10)
-     * Note: Using 2 sockets and reduced xmit buffers to fit in 16-bit DOS memory constraints
+     * First arg: number of TCP sockets to allocate (1 - absolute minimum)
+     * Second arg: number of TCP transmit buffers (1 - absolute minimum)
+     * Note: Reduced to absolute minimum due to severe memory constraints in VM
      */
-    if (Utils::initStack(2, 2, NULL, NULL) != 0) {
+    rc = Utils::initStack(1, 1, NULL, NULL);
+    
+    printf("DEBUG: Utils::initStack() returned: %d\n", rc);
+    printf("DEBUG: Memory after initStack: %lu bytes\n", (unsigned long)_memavl());
+    fflush(stdout);
+    
+    if (rc != 0) {
         strcpy(g_error_msg, "Failed to initialize mTCP stack");
         return SOCKET_ERR_INIT;
     }
@@ -234,10 +261,9 @@ int socket_connect(socket_handle_t handle, const char* host, unsigned int port) 
         /* Process packets */
         PACKET_PROCESS_SINGLE;
         Arp::driveArp();
-        
-        /* NOTE: Do NOT call Tcp::drivePackets() - it causes hang in dosjava's memory model
-         * PACKET_PROCESS_SINGLE is sufficient for connection establishment
-         */
+        /* NOTE: Tcp::drivePackets() disabled - causes issues in VM environment
+         * Connection will timeout but won't freeze */
+        /* Tcp::drivePackets(); */
         
         /* Check if connection completed */
         if (g_sockets[handle].tcp_socket->isConnectComplete()) {

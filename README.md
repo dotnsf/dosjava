@@ -6,7 +6,7 @@
 
 ## 概要
 
-DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパイル・実行するための完全なツールチェーンです。Open Watcom v2 Cコンパイラでビルドされ、Small memory model（64KB code + 64KB data）で動作します。
+DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパイル・実行するための完全なツールチェーンです。Open Watcom v2 Cコンパイラでビルドされ、Large memory model（複数セグメント対応）で動作します。
 
 ## 主な機能
 

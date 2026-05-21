@@ -1,0 +1,778 @@
+Open Watcom Linker Version 2.0 beta May 10 2026 04:44:38 (32-bit)
+Copyright (c) 2002-2026 The Open Watcom Contributors. All Rights Reserved.
+Portions Copyright (c) 1985-2002 Sybase, Inc. All Rights Reserved.
+新規作成:       26/05/20 16:54:31
+実行可能イメージ: build\bin\sockhelp.exe
+a DOS 実行可能 を作成中
+
+
+                        +------------+
+                        |  グループ  |
+                        +------------+
+
+グループ                        アドレス             サイズ
+=====                           =======              ====
+
+DGROUP                          123f:0000            00003880
+
+
+
+                        +--------------+
+                        |  セグメント  |
+                        +--------------+
+
+セグメント             クラス         グループ      アドレス        サイズ
+=========              ======         =========      ========        ======
+
+sockhelp_TEXT          CODE           AUTO           0000:0000       00001150
+packet_TEXT            CODE           AUTO           0000:1150       000006a3
+arp_TEXT               CODE           AUTO           0000:1800       00000aae
+eth_TEXT               CODE           AUTO           0000:22b0       00000000
+ip_TEXT                CODE           AUTO           0000:22b0       00000d19
+tcp_TEXT               CODE           AUTO           0000:2fd0       00002947
+tcpsockm_TEXT          CODE           AUTO           0000:5920       00000454
+udp_TEXT               CODE           AUTO           0000:5d80       00000472
+utils_TEXT             CODE           AUTO           0000:6200       000013f2
+dns_TEXT               CODE           AUTO           0000:7600       00000e80
+timer_TEXT             CODE           AUTO           0000:8480       00000150
+_TEXT                  CODE           AUTO           0000:85d0       000071a4
+trace_TEXT             CODE           AUTO           0000:f780       000000fa
+fsroot_TEXT            CODE           AUTO           0000:f87a       0000000b
+cppdata_TEXT           CODE           AUTO           0000:f885       00000000
+sockhelp_DATA1         FAR_CONST      AUTO           0f88:0005       00000dc3
+packet_DATA1           FAR_CONST      AUTO           0f88:0dc8       00000164
+arp_DATA1              FAR_CONST      AUTO           0f88:0f2c       00000279
+ip_DATA1               FAR_CONST      AUTO           0f88:11a5       00000285
+tcp_DATA1              FAR_CONST      AUTO           0f88:142a       00000c50
+tcpsockm_DATA1         FAR_CONST      AUTO           0f88:207a       000001b0
+udp_DATA1              FAR_CONST      AUTO           0f88:222a       0000014d
+utils_DATA1            FAR_CONST      AUTO           0f88:2377       000004b2
+dns_DATA1              FAR_CONST      AUTO           0f88:2829       0000031b
+trace_DATA1            FAR_CONST      AUTO           0f88:2b44       0000002a
+fsroot_DATA1           FAR_CONST      AUTO           123f:0000       00000000
+cppdata_DATA1          FAR_CONST      AUTO           123f:0000       00000000
+FAR_DATA               FAR_DATA       AUTO           123f:0000       00000000
+_NULL                  BEGDATA        DGROUP         123f:0000       00000020
+_AFTERNULL             BEGDATA        DGROUP         1241:0000       00000002
+CONST                  DATA           DGROUP         1241:0002       00000366
+CONST2                 DATA           DGROUP         1278:0000       00000251
+_DATA                  DATA           DGROUP         129e:0000       00000578
+XIB                    DATA           DGROUP         12f5:0008       00000000
+XI                     DATA           DGROUP         12f5:0008       00000024
+XIE                    DATA           DGROUP         12f7:000c       00000000
+YIB                    DATA           DGROUP         12f7:000c       00000000
+YI                     DATA           DGROUP         12f7:000c       00000018
+YIE                    DATA           DGROUP         12f9:0004       00000000
+DATA                   DATA           DGROUP         12f9:0004       00000000
+_BSS                   BSS            DGROUP         12fa:0000       00000cc2
+STACK                  STACK          DGROUP         13c7:0000       00002000
+
+
+                        +----------------+
+                        | メモリ・マップ |
+                        +----------------+
+
+* = 参照されないシンボル
++ = シンボルはローカルでの参照のみです
+
+アドレス       シンボル
+========       ========
+
+モジュール: build/obj/sockhelp.obj(build/obj/sockhelp.obj)
+0000:0000+     void __far ctrlBreakHandler()
+0000:0042+     int __far init_mtcp()
+0000:01c2+     int __far init_network_stack()
+0000:0294+     void __far shutdown_mtcp()
+0000:02de+     int __far do_connect( char const __far *, int )
+0000:095c+     int __far do_send_data( int, char const __far * )
+0000:0aca+     int __far do_recv_data( int )
+0000:0d7a+     int __far do_close_socket( int )
+0000:0dfc+     int __far do_status( int )
+0000:0e9c      main_
+モジュール: build/obj/packet_l.obj(build/obj/packet_l.obj)
+123f:0c3e      char unsigned __far Buffer_first
+123f:0c3f      char unsigned __far Buffer_next
+123f:0c9a+     char unsigned __far Buffer_lowFreeCount
+123f:0c9c+     long unsigned __far Packets_dropped
+123f:0ca0+     long unsigned __far Packets_received
+123f:0ca4+     long unsigned __far Packets_sent
+123f:0ca8+     long unsigned __far Packets_send_errs
+123f:0cac+     long unsigned __far Packets_send_retries
+0000:1150      char signed __far Buffer_init()
+0000:11e2      void __far Buffer_startReceiving()
+0000:11ea      void __far Buffer_free( char unsigned const __far * )
+0000:124c      void __far Buffer_stopReceiving()
+0000:1254      void __far Buffer_stop()
+0000:1270      char signed __far Packet_registerEtherType( short unsigned, void (__far *)())
+0000:12b2*     void __far Packet_registerDefault( void (__far *)())
+0000:139a      char signed __far Packet_init( char unsigned )
+0000:13ac+     char signed __far Packet_init2( char unsigned, short unsigned, short unsigned )
+0000:14a0      char signed __far Packet_release_type()
+0000:1522      void __far Packet_get_addr( char unsigned __far * )
+0000:1560      void __far Packet_send_pkt( void __far *, short unsigned )
+0000:1682      void __far Packet_process_internal()
+0000:178c      void __far Packet_dumpStats( __iobuf __far * )
+0000:17dc*     char unsigned __far Packet_getSoftwareInt()
+0000:17e2*     short unsigned __far Packet_getHandle()
+0000:17e8*     void __far Packet_setHandle( short unsigned )
+0000:17ee*     void __far Packet_setInt( char unsigned )
+123f:05f0+     char const __far * __far PKT_DRVR_EYE_CATCHER
+123f:0cb4+     void (__far * __far Packet_EtherTypeHandler[])( char unsigned __far *, short unsigned )
+123f:0cbc+     short unsigned __far Packet_EtherTypeVal[]
+123f:0cc0+     char unsigned __far Packet_EtherTypeHandlers
+123f:0cc2+     void (__far * __far Packet_typeUnhandled)( char unsigned __far *, short unsigned )
+モジュール: build/obj/arp_l.obj(build/obj/arp_l.obj)
+123f:0cd0+     Arp::__5QEQH2Pending_t __far Arp::pending[]
+123f:0ce4      short unsigned __far Arp::pendingEntries
+123f:0ce6+     Arp::__2AF1EIRec_t __far Arp::arpTable[]
+123f:0d2c+     short unsigned __far Arp::entries
+123f:0d30+     long unsigned __far Arp::RequestsReceived
+123f:0d34+     long unsigned __far Arp::RepliesReceived
+0000:1800      void __far Arp::dumpStats( __iobuf __far * )
+0000:1852      void __far Arp::init()
+0000:19de      void __far Arp::clearPendingTable()
+0000:1a04*     void __far Arp::dumpTable()
+0000:1aa2+     char signed __far Arp::findEth( char unsigned const __far *, char unsigned __far * )
+0000:1b38      void __far Arp::processArp( char unsigned __far *, short unsigned )
+0000:1d86      void __far Arp::driveArp2()
+0000:1e78+     void __far Arp::updateEntry( short unsigned, char unsigned const __far * )
+0000:1ef2+     void __far Arp::updateOrAddCache( char unsigned __far *, char unsigned __far * )
+0000:2080+     void __far Arp::sendArpRequest( char unsigned __far * )
+0000:2162      void __far Arp::sendArpRequest2( char unsigned __far * )
+0000:21dc+     void __far Arp::sendArpResponse( ArpHeader __far * )
+0000:228e      char signed __far Arp::resolve( char unsigned __far *, char unsigned __far * )
+123f:0d38+     long unsigned __far Arp::RequestsSent
+123f:0d3c+     long unsigned __far Arp::RepliesSent
+123f:0d40+     long unsigned __far Arp::CacheModifiedCount
+123f:0d44+     long unsigned __far Arp::CacheEvictions
+123f:0d48+     __4DJ5K5ArpPacket_t __far Arp_prebuiltResponse
+123f:0d84+     __4DJ5K5ArpPacket_t __far Arp_prebuiltRequest
+モジュール: build/obj/eth_l.obj(build/obj/eth_l.obj)
+123f:0390      char unsigned const __far Eth::Eth_Broadcast[]
+123f:0612      short unsigned __far MyMTU
+123f:0dc0      char unsigned __far MyEthAddr[]
+モジュール: build/obj/ip_l.obj(build/obj/ip_l.obj)
+123f:0dd0      char unsigned __far Gateway[]
+123f:0dd4      char unsigned const __far IpInvalid[]
+123f:0dd8+     long unsigned __far Ip::icmpRecvPackets
+123f:0ddc*     long unsigned __far Ip::ptrWrapCorrected
+123f:0de0+     long unsigned __far Ip::badChecksum
+123f:0de4+     long unsigned __far Ip::unhandledProtocol
+123f:0de8+     long unsigned __far Ip::fragsReceived
+123f:0dec+     long unsigned __far Ip::goodReassemblies
+123f:0df0+     long unsigned __far Ip::timeoutReassemblies
+123f:0df4+     long unsigned __far Ip::notEnoughSlots
+123f:0df8+     long unsigned __far Ip::tooManyInFlight
+123f:0dfc+     long unsigned __far Ip::payloadTooBig
+123f:0e00+     short unsigned __far IpHeader::IpIdent
+123f:0e02      char unsigned __far * __far Ip::ipReassemblyMemoryStart
+123f:0e06      char unsigned __far * __far Ip::ipReassemblyMemoryEnd
+123f:0e0a      char unsigned __far Ip::fragsInReassembly
+123f:0620      char __far MyHostname[]
+123f:0634      char unsigned __far MyIpAddr[]
+123f:0638      char unsigned __far Netmask[]
+123f:063c      long unsigned __far MyIpAddr_u
+123f:0640      long unsigned __far Netmask_u
+0000:22b0      void __far Ip::dumpStats( __iobuf __far * )
+0000:2426      int __far Ip::initForReassembly()
+0000:24a4      void __far Ip::reassemblyStop()
+0000:24e8      void __far Ip::returnBigPacket( char unsigned __far * )
+0000:2504      void __far Ip::purgeOverdue()
+0000:2aae      void __far Ip::process( char unsigned __far *, short unsigned )
+0000:2c1e      void __far IpHeader::set( char unsigned, char unsigned const __far *, short unsigned, char unsigned, short unsigned )
+0000:2d08      char signed __far IpHeader::setDestEth( char unsigned __far * )
+0000:2dc8      void __far Icmp::init()
+0000:2df4+     void __near Icmp::process( char unsigned __far *, IpHeader __far * )
+123f:03a0      char unsigned const __far IpBroadcastNonRoutable[]
+123f:0f96+     void (__far * __far Icmp::icmpCallback)( char unsigned const __far *, IcmpHeader const __far * )
+123f:0f9a+     __4C6MUKIcmpEchoPacket_t __far Icmp::icmpEchoPacket
+モジュール: build/obj/tcp_l.obj(build/obj/tcp_l.obj)
+123f:10d0+     long unsigned __far Tcp::Packets_Sent
+123f:10d4+     long unsigned __far Tcp::Packets_Received
+123f:10d8+     long unsigned __far Tcp::Packets_Retransmitted
+123f:10dc+     long unsigned __far Tcp::Packets_SeqOrAckError
+123f:10e0+     long unsigned __far Tcp::Packets_DroppedNoSpace
+123f:10e4+     long unsigned __far Tcp::OurWindowReopened
+123f:10e8+     long unsigned __far Tcp::SentZeroWindowProbe
+123f:10ec+     long unsigned __far Tcp::ChecksumErrors
+123f:10f0      short unsigned __far Tcp::Pending_Sent
+123f:10f2      short unsigned __far Tcp::Pending_Outgoing
+123f:10f4+     TcpBuffer __far * __far TcpBuffer::xmitBuffers[]
+123f:111c+     char unsigned __far TcpBuffer::freeXmitBuffers
+123f:0670+     char __far * __far TcpSocket::StateDesc[]
+0000:2fd0      void __far Tcp::dumpStats( __iobuf __far * )
+0000:3022      char signed __far TcpBuffer::init( char unsigned )
+0000:3134      void __far TcpBuffer::stop()
+0000:3150*     __far TcpSocket::TcpSocket()
+0000:3162      void __far TcpSocket::reinit()
+0000:327c      char signed __far TcpSocket::setRecvBuffer( short unsigned )
+0000:337c+     char signed __near TcpSocket::connect2( short unsigned, char unsigned __far *, short unsigned )
+0000:3470*     char signed __far TcpSocket::connect( short unsigned, char unsigned __far *, short unsigned, long unsigned )
+0000:35a8      char signed __far TcpSocket::connectNonBlocking( short unsigned, char unsigned __far *, short unsigned )
+0000:35bc*     char signed __far TcpSocket::shutdown( char unsigned )
+0000:3626+     char signed __near TcpSocket::closeLocal()
+0000:3782      void __far TcpSocket::close()
+0000:382e*     void __far TcpSocket::closeNonblocking()
+0000:387e+     char signed __far TcpSocket::isCloseDone()
+0000:3926+     void __near TcpSocket::clearQueues()
+0000:3a56      void __far TcpSocket::destroy()
+0000:3ada+     void __near TcpSocket::setMaxEnqueueSize( TcpHeader __far * )
+0000:3b22+     short __far TcpSocket::enqueue( TcpBuffer __far * )
+0000:3cf4+     void __near TcpSocket::resendPacket( TcpBuffer __far * )
+0000:3db4+     char signed __near TcpSocket::sendPacket( TcpBuffer __far * )
+0000:4272+     void __near TcpSocket::sendResetPacket( IpHeader __far *, TcpHeader __far *, short unsigned )
+0000:43b2+     void __near TcpSocket::sendPureAck( bool )
+0000:4484      void __far Tcp::process( char unsigned __far *, IpHeader __far * )
+0000:46b6+     void __near Tcp::process2( char unsigned __far *, IpHeader __far *, TcpHeader __far *, TcpSocket __far * )
+0000:4da0+     int __far Tcp::processPacketData( TcpSocket __far *, short unsigned, char unsigned __far *, IpHeader __far *, TcpHeader __far * )
+0000:4f9e+     void __near TcpSocket::removeSentPackets( long unsigned )
+0000:51be+     char signed __near TcpSocket::addToRcvBuf( char unsigned __far *, short unsigned )
+0000:52a6      short __far TcpSocket::recv( char unsigned __far *, short unsigned )
+0000:541e      short __far TcpSocket::send( char unsigned __far *, short unsigned )
+0000:5550      void __far Tcp::drivePackets2()
+0000:58be+     short unsigned __near TcpHeader::readMSS( TcpHeader __far * )
+123f:111d+     char unsigned __far TcpBuffer::allocatedXmitBuffers
+123f:111e+     void __far * __far TcpBuffer::xmitBuffersMemPtr
+モジュール: build/obj/tcpsockm_l.obj(build/obj/tcpsockm_l.obj)
+123f:1122      TcpSocket __far * __far TcpSocketMgr::socketTable[]
+123f:1132+     TcpSocket __far * __far TcpSocketMgr::availSocketTable[]
+123f:1142+     TcpSocket __far * __far TcpSocketMgr::socketsMemPtr
+123f:1146      char unsigned __far TcpSocketMgr::activeSockets
+123f:1147+     char unsigned __far TcpSocketMgr::availSockets
+0000:5920      char signed __far TcpSocketMgr::init( char unsigned )
+0000:5a62      void __far TcpSocketMgr::stop()
+0000:5a7e      TcpSocket __far * __far TcpSocketMgr::getSocket()
+0000:5af6      char signed __far TcpSocketMgr::freeSocket( TcpSocket __far * )
+0000:5b70*     TcpSocket __far * __far TcpSocketMgr::accept()
+0000:5c88      void __far TcpSocketMgr::makeActive( TcpSocket __far * )
+0000:5d08      void __far TcpSocketMgr::makeInactive( TcpSocket __far * )
+123f:1148+     char unsigned __far TcpSocketMgr::allocatedSockets
+123f:1149      char unsigned __far TcpSocketMgr::pendingAccepts
+123f:114a      short unsigned __far TcpSocketMgr::MSS_to_advertise
+モジュール: build/obj/udp_l.obj(build/obj/udp_l.obj)
+123f:1150+     char unsigned __far Udp::callbackPorts
+123f:1152+     short unsigned __far Udp::callbackList[]
+123f:1154+     void (__far * __far Udp::callbackFunctions[])( char unsigned const __far *, UdpHeader const __far * )
+123f:1158+     long unsigned __far Udp::Packets_Sent
+123f:115c+     long unsigned __far Udp::Fragments_Sent
+123f:1160+     long unsigned __far Udp::Packets_Received
+0000:5d80      void __far Udp::dumpStats( __iobuf __far * )
+0000:5dc8*     short unsigned __far Udp::getUnusedCallbackPort()
+0000:5e08      char signed __far Udp::registerCallback( short unsigned, void (__far *)())
+0000:5e64      char signed __far Udp::unregisterCallback( short unsigned )
+0000:5ece      char signed __far Udp::sendUdp( char unsigned const __far *, short unsigned, short unsigned, short unsigned, char unsigned __far *, char unsigned )
+0000:60a0      void __far Udp::process( char unsigned const __far *, IpHeader __far * )
+123f:1164+     long unsigned __far Udp::NoHandler
+123f:1168+     long unsigned __far Udp::ChecksumErrors
+モジュール: build/obj/utils_l.obj(build/obj/utils_l.obj)
+123f:03b0+     char const __far Parm_PacketInt[]
+123f:03c0+     char const __far Parm_Hostname[]
+123f:03d0*     char const __far Parm_Hostname_Assigned[]
+123f:03e8+     char const __far Parm_Domain[]
+123f:03f0+     char const __far Parm_IpAddr[]
+123f:03f8+     char const __far Parm_Gateway[]
+123f:0400+     char const __far Parm_Netmask[]
+123f:0408+     char const __far Parm_Nameserver[]
+123f:0418+     char const __far Parm_Nameserver_preferred[]
+123f:0430+     char const __far Parm_Mtu[]
+123f:0438+     char const __far Parm_HostsFilename[]
+123f:0448*     char const __far Parm_DHCPLeaseRequest[]
+123f:1170      char unsigned __far mTCP_releaseTimesliceEnabled
+123f:1174+     char unsigned __far Preferred_nameserver[]
+123f:1178+     bool __far Preferred_nameserver_set
+123f:1179+     char unsigned __far Utils::packetInt
+123f:117a+     char unsigned __far Utils::packetInt2
+123f:117c+     __iobuf __far * __far Utils::CfgFile
+123f:1180+     char __far * __far Utils::CfgFilenamePtr
+123f:1184+     void (__far * __far Utils::oldCtrlBreakHandler)()
+123f:1188+     char __far Utils::lineBuffer[]
+123f:1228+     char __far Utils::parmName[]
+0000:6200      void __far Utils::dumpBytes( __iobuf __far *, char unsigned __far *, int unsigned )
+0000:6304+     bool __far Utils::rtrim( char __far * )
+0000:632e+     int __far Utils::getLine( __iobuf __far *, bool, char __far *, int, int )
+0000:63f0      char signed __far Utils::parseEnv()
+0000:6b1c+     void __far Utils::parseOptionalEnvVars()
+0000:6bb4*     __iobuf __far * __far Utils::openCfgFile()
+0000:6c10*     void __far Utils::closeCfgFile()
+0000:6c22*     char signed __far Utils::getAppValue( char const __far *, char __far *, short unsigned )
+0000:6d0c      char signed __far Utils::initStack( char unsigned, char unsigned, void (__far *)(), void (__far *)())
+0000:7206      void __far Utils::endStack2( bool )
+0000:72a2+     void __far Utils::dumpStats( __iobuf __far * )
+0000:72d4*     long unsigned __far Utils::timeDiff( dostime_t, dostime_t )
+0000:73cc      char __far * __far Utils::getNextToken( char __far *, char __far *, short unsigned )
+123f:06b7      char unsigned __far mTCP_sleepCallEnabled
+モジュール: build/obj/dns_l.obj(build/obj/dns_l.obj)
+123f:12a0      char unsigned __far Dns::NameServer[]
+123f:12a4+     char unsigned __far Dns::queryPending
+123f:12a6+     __anonymous_enum __far Dns::lastQueryRc
+123f:12a8+     Dns::__3D3F4ADNS_Pending_Rec_t __far Dns::pendingQuery
+123f:13b6+     Dns::__19OH6NDNS_Rec_t __far Dns::dnsTable[]
+123f:143e+     char unsigned __far Dns::entries
+123f:06c0      char __far Dns::Domain[]
+123f:06f8      char __far Dns::HostsFilename[]
+0000:7600*     void __far Dns::flushCache()
+0000:7620+     char signed __far Dns::find( char const __far * )
+0000:7684+     void __far Dns::addOrUpdate( char const __far *, char unsigned __far * )
+0000:778c*     void __far Dns::deleteFromCache( char const __far * )
+0000:77e4      char signed __far Dns::init()
+0000:7832      void __far Dns::stop()
+0000:783a      char signed __far Dns::resolve( char const __far *, char unsigned __far *, char unsigned )
+0000:7ae8+     void __far Dns::sendRequest( char unsigned __far *, char const __far *, short unsigned )
+0000:7dec+     void __far Dns::udpHandler( char unsigned const __far *, UdpHeader const __far * )
+0000:821e*     void __far Dns::drivePendingQuery1()
+0000:82b8+     void __far Dns::drivePendingQuery2()
+0000:82ea+     void __far Dns::scanHostsFile( char const __far *, char const __far *, char unsigned __far * )
+モジュール: build/obj/timer_l.obj(build/obj/timer_l.obj)
+123f:15c0      long unsigned volatile __far Timer_CurrentTicks
+0000:8480+     void __far Timer_tick_handler()
+0000:84d2      void __far Timer_start()
+0000:8504      void __far Timer_stop()
+0000:8538*     void __far Timer_manageTimer( short unsigned __far * )
+0000:8566*     void __far Timer_stopManagingTimer( short unsigned __far * )
+123f:15f0+     void (__far * __far Timer_old_tick_handler)()
+モジュール: build/obj/ipasm.obj(build/obj/ipasm.obj)
+0000:85d0      _ipchksum
+0000:8600      _ip_p_chksum
+0000:8675*     _ip_p_chksum2
+モジュール: build/obj/trace_l.obj(build/obj/trace_l.obj)
+0000:f780      void __far Trace_beginTracing()
+0000:f7da      void __far Trace_endTracing()
+0000:f7ec      void __far Trace_tprintf( char __far *, ... )
+123f:0758      __iobuf __far * __far Trace_Stream
+123f:075c      char __far Trace_Severity
+123f:15f4      short unsigned __far Trace_Debugging
+123f:15f6      char __far * __far Trace_LogFile
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(printf.c)
+0000:870b      printf_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(memavl.c)
+0000:872a      _memavl_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(memmax.c)
+0000:876f      _memmax_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(getenv.c)
+0000:87c0      getenv_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fopen.c)
+0000:888f+     __open_flags_
+0000:8a76+     _fsopen_
+0000:8ad7      fopen_
+0000:8bab*     freopen_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fprintf.c)
+0000:8c17      fprintf_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fclose.c)
+0000:8c36      __doclose_
+0000:8cf4      __shutdown_stream_
+0000:8d0b      fclose_
+123f:15fa+     ___RmTmpFileFn
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(sscanf.c)
+0000:8d80+     vsscanf_
+0000:8daa      sscanf_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(time.c)
+0000:8dca      time_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(rand.c)
+0000:8e0b      rand_
+0000:8e4d      srand_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(strlen.c)
+0000:8e70      strlen_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(strcmp.c)
+0000:8e85      strcmp_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(atoi.c)
+0000:8ead      atoi_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(iob.c)
+123f:0762      ___iob
+123f:15fc      ___OpenStreams
+123f:1600      ___ClosedStreams
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(cstart)
+123f:0000*     __nullarea
+123f:08ca*     __ovlflag
+123f:08cb*     __intno
+123f:08cc*     __ovlvec
+0000:8f1e      _cstart_
+0000:90c9      __exit_
+0000:90e6      __do_exit_with_msg_
+0000:91c3      __GETDS
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(argcv.c)
+123f:1604      __argv
+123f:1608      ___argv
+123f:160c      __argc
+123f:160e      ___argc
+モジュール: C:\WATCOM\lib286\plibl.lib(fsroot.cpp)
+123f:0b74      ___wcpp_4_data_init_fs_root_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fmalloc.c)
+0000:91cd      _fmalloc_
+0000:91cd      malloc_
+123f:08d0      ___fheapbeg
+123f:08d2      ___fheapRover
+123f:08d4      ___LargestSizeB4Rover
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(ffree.c)
+0000:92de      _ffree_
+0000:92de      free_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fmemcmp.c)
+0000:9326      _fmemcmp_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(intx086.c)
+0000:934e      int86x_
+0000:93ef*     int86_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(strcpy.c)
+0000:941c      strcpy_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(memcpy.c)
+0000:9464      memcpy_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(memset.c)
+0000:9486      memset_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(i4d)
+0000:949e*     __I4D
+0000:94ed      __U4D
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fputs.c)
+0000:9571      fputs_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fgets.c)
+0000:960d      fgets_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(feof.c)
+0000:969c      feof_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(errno.c)
+0000:96a9      __get_errno_ptr_
+123f:1610      _errno
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(strerror.c)
+0000:96b0      strerror_
+0000:96d8*     _strerror_
+123f:08d6+     __sys_errlist
+123f:097a+     __sys_nerr
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(_istricm.gas)
+0000:974e      stricmp_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fseek.c)
+0000:97be      fseek_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(isspace.c)
+0000:991c      isspace_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(strncpy.c)
+0000:9945      strncpy_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(puts.c)
+0000:9981      puts_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(d_getvec.c)
+0000:99b1      _dos_getvect_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(d_setvec.c)
+0000:99bc      _dos_setvect_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fheapchk.c)
+0000:9a70*     _fheapchk_
+0000:9a70      _heapchk_
+123f:1712+     ___fheapchk_current
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fflush.c)
+0000:9aea      fflush_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(i4m)
+0000:9afe      __I4M
+0000:9afe      __U4M
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(isdigit.c)
+0000:9b16      isdigit_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(strcat.c)
+0000:9b3f      strcat_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(chainint)
+0000:9b6a      _chain_intr_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(dosgtime)
+0000:9b8a      _dos_getdate_
+0000:9ba8      _dos_gettime_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(vfprintf.c)
+0000:9bc6      vfprintf_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(flushall.c)
+0000:9bd6      __flushall_
+0000:9c31      flushall_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fprtf.c)
+0000:9c54      __fprtf_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(nmalloc.c)
+0000:9d17      _nmalloc_
+123f:097c      ___nheapbeg
+123f:097e      ___MiniHeapRover
+123f:0980      ___LargestSizeB4MiniHeapRover
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(environ.c)
+123f:1716      ___env_mask
+123f:171a      _environ
+123f:171e      __wenviron
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mbterm.c)
+0000:9dee      _mbterm_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mbsnextc.c)
+0000:9e1a      _mbsnextc_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mbcupper.c)
+0000:9e3f      _mbctoupper_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mbsinc.c)
+0000:9e62      _mbsinc_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(comtflag.c)
+123f:0982      __commode
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(textmode.c)
+123f:0984      __fmode
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(tolower.c)
+0000:9e86      tolower_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(open.c)
+0000:a084*     open_
+0000:a0ab      _sopen_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(chktty.c)
+0000:a0ca      __chktty_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(freefp.c)
+0000:a0f5      __freefp_
+0000:a16a      __purgefp_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(allocfp.c)
+0000:a1a6      __allocfp_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(__lseek.c)
+0000:a2c0      __lseek_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(_clse.c)
+0000:a2fe      __close_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(flush.c)
+0000:a327      __flush_
+0000:a459*     __clib_flush_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(scnf.c)
+0000:b1c6      __scnf_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(gtctm.c)
+0000:b42d      __getctime_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mktime.c)
+0000:b4b6      mktime_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(istable.c)
+123f:04b2      __IsTable
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(initfile.c)
+0000:b56a      __InitFiles_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(ioexit.c)
+0000:b6c1*     fcloseall_
+0000:b6c8      __full_io_exit_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(xmsg.c)
+0000:b6d0*     __exit_with_msg_
+0000:b6d3      __fatal_runtime_error_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(cmain086.c)
+0000:b6ec      __CMain
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(initrtns.c)
+0000:b73a      __InitRtns
+0000:b791      __FiniRtns
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(crwdata)
+123f:0986      __curbrk
+123f:098e      __STACKLOW
+123f:0990      __STACKTOP
+123f:0992      __cbyte
+123f:0994      __child
+123f:0996      __no87
+123f:09a3      ___FPE_handler
+123f:0988      __psp
+123f:0997      __get_ovl_stack
+123f:099b      __restore_ovl_stack
+123f:099f      __close_ovl_file
+123f:09a7      __LpCmdLine
+123f:09ab      __LpPgmName
+123f:098a      __osmajor
+123f:098b      __osminor
+123f:098c      __osmode
+123f:098d      __HShift
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(uselfn.c)
+123f:09b0      ___uselfn
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(initargv.c)
+0000:b9ed      __Init_Argv_
+0000:ba49      __Fini_Argv_
+モジュール: C:\WATCOM\lib286\plibl.lib(cppdata.cpp)
+123f:1726      __wint_thread_data
+123f:174a*     __compiled_under_generic
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mem.c)
+0000:ba70      __MemAllocator
+0000:bb36      __MemFree
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(growseg.c)
+0000:bcad      __GrowSeg_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(allocseg.c)
+0000:bd7c      __AllocSeg_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fmemneed.c)
+0000:be1b      __fmemneed_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(heapgrow.c)
+0000:be1e*     _heapgrow_
+0000:be1e*     _fheapgrow_
+0000:be1f      _nheapgrow_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(nfree.c)
+0000:be96      _nfree_
+123f:174c+     ___MiniHeapFreeRover
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(dointr)
+0000:bf94      _DoINTR_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(segread.c)
+0000:c309      segread_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fputc.c)
+0000:c329      fputc_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(ioalloc.c)
+0000:c3f6      __ioalloc_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fgetc.c)
+0000:c48e+     __fill_buffer_
+0000:c57a      fgetc_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(stricmp.c)
+0000:c61f      _stricmp_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(lseek.c)
+0000:c65a      lseek_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(tell.c)
+0000:c685      _tell_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(heapwalk.c)
+0000:c6d6      __HeapWalk_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(prtf.c)
+0000:d322      __prtf_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(nmemneed.c)
+0000:d556      __nmemneed_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(grownear.c)
+0000:d5d8      __LastFree_
+0000:d650      __ExpandDGROUP_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(setenvp.c)
+0000:d773      __setenvp_
+0000:d874      __freeenvp_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mbislead.c)
+0000:d8f8      _ismbblead_
+123f:1752      ___MBCSIsTable
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mbinit.c)
+0000:d97d      __mbinit_
+123f:09b2      ___MBCodePage
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mbdtoupp.c)
+0000:d9fa      _mbdtoupper_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(toupper.c)
+0000:da08      toupper_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(opendos.c)
+0000:da16      _dos_open_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(iomode.c)
+0000:da3a      __GetIOMode_
+0000:da5f      __SetIOMode_
+123f:09b4      ___NFiles
+123f:09b6      ___init_mode
+123f:09de      ___io_mode
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(isatt.c)
+0000:da82      isatty_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(doserrno.c)
+123f:1854      __doserrno
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(umaskval.c)
+123f:09e2      ___umaskval
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(creatdos.c)
+0000:daa8      _dos_creat_
+0000:daca*     _dos_creatnew_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(stiomode.c)
+0000:dae9+     __grow_iomode_
+0000:dbd5      __SetIOMode_grow_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(dosret.c)
+0000:dc2d      __set_errno_dos_
+0000:dc87*     __set_errno_dos_reterr_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(qwrit.c)
+0000:dc91      __qwrite_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fsync.c)
+0000:dced      fsync_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mbtowc.c)
+0000:dcf2      mbtowc_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(bits.c)
+123f:05b4      __Bits
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fdfs086)
+0000:dd94      __FDFS
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(noefgfmt.c)
+123f:09f8      ___EFG_printf
+123f:09fc      ___EFG_scanf
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(i8m086)
+0000:de05*     __I8M
+0000:de05      __U8M
+0000:ddea*     __I8ME
+0000:ddea*     __U8ME
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(locmktim.c)
+0000:df4f      __local_mktime_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(gmtime.c)
+0000:e157      __brktime_
+0000:e2b6+     _gmtime_
+0000:e2d9*     gmtime_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(tzset.c)
+123f:0a00      ___start_dst
+123f:0a12      ___end_dst
+123f:0b26*     _tzname
+123f:0b2e      _timezone
+123f:0b32      _daylight
+123f:0b34      ___dst_adjust
+0000:e2eb*     __DontCacheOSTZ_
+0000:e304*     __CacheOSTZ_
+0000:e84e+     __parse_tz_
+0000:e99a      tzset_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(timeutil.c)
+0000:eaf7      __isindst_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(enterdb.c)
+0000:ede4      __EnterWVIDEO_
+123f:0b5c+     __WD_Present
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(___argc.c)
+123f:186a      ____Argv
+123f:186e      ____Argc
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(exit.c)
+0000:ee08+     __null_int23_exit_
+0000:ee09      exit_
+0000:ee34*     _exit_
+123f:0b5e+     ___int23_exit
+123f:0b60+     ___FPE_handler_exit
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(sgdef086)
+123f:0b68      __Start_XI
+123f:0b8c      __End_XI
+123f:0b8c      __Start_YI
+123f:0ba4      __End_YI
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(histsplt.c)
+123f:1870      ___historical_splitparms
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(heapen.c)
+123f:0b62      ___heap_enabled
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(amblksiz.c)
+123f:0b64      __amblksiz
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(gtche.c)
+0000:ee4d      getche_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(qread.c)
+0000:ee67      __qread_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(wctomb.c)
+0000:ee85      wctomb_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(itoa.c)
+0000:eeae+     utoa_
+0000:ef0b      itoa_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(lltoa.c)
+0000:ef2f      ulltoa_
+0000:f013*     lltoa_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(strupr.c)
+0000:f075      _strupr_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(ltoa.c)
+0000:f097      ultoa_
+0000:f106*     ltoa_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(sbrk.c)
+0000:f135      __brk_
+0000:f19a*     sbrk_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(clearenv.c)
+0000:f1aa      clearenv_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(mbisdbcs.c)
+123f:0b66      ___IsDBCS
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(getltdos.c)
+0000:f2f3      dos_get_dbcs_lead_table_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(getcpdos.c)
+0000:f31c      dos_get_code_page_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(doserror)
+0000:f32c      __doserror_
+0000:f338*     __doserror1_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(frealloc.c)
+0000:f342*     _frealloc_
+0000:f342      realloc_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(iomodtty.c)
+0000:f406      __ChkTTYIOMode_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(filedos.c)
+0000:f444*     _dos_close_
+0000:f450      _dos_commit_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(leapyear.c)
+0000:f45d      ___diyr
+0000:f477      ___dilyr
+0000:f491      __leapyear_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(alphabet.c)
+123f:05bc      ___Alphabet
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fmsize.c)
+0000:f4bb*     _msize_
+0000:f4bb      _fmsize_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(nexpand.c)
+0000:f4cc      _nexpand_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fmemcpy.c)
+0000:f51c      _fmemcpy_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(fexpand.c)
+0000:f541      _fexpand_
+0000:f541*     _expand_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(_expand.c)
+0000:f576      __HeapManager_expand_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(bexpand.c)
+0000:f6f6      _bexpand_
+モジュール: C:\WATCOM\lib286\dos\clibl.lib(bfree.c)
+0000:f74f      _bfree_
+
+
+                        +--------------------+
+                        |   使用ライブラリ   |
+                        +--------------------+
+
+C:\WATCOM\lib286\plibl.lib
+C:\WATCOM\lib286\dos\clibl.lib
+
+
+                        +-----------------------+
+                        |     リンカー統計      |
+                        +-----------------------+
+
+スタック サイズ:  2000 (8192.)
+メモリ サイズ:  00015c70 (89200.)
+エントリアドレス: 0000:8f1e
+リンク時間: 00:00.16

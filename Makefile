@@ -8,7 +8,7 @@ LD = wlink
 AR = wlib
 
 # Compiler flags
-# -mm: Medium memory model (changed from -ms for 64KB code segment limit)
+# -ml: Large memory model (for mTCP compatibility and Tcp::drivePackets() support)
 # -0: 8086 instructions
 # -w4: Warning level 4
 # -zq: Quiet mode
@@ -27,8 +27,10 @@ MTCP_TCP_C_DIR = C:\mTCP\src\TCPLIB
 MTCP_COMMON_H_DIR = C:\mTCP\src\INCLUDE
 MTCP_CFG_DIR = tests\network
 # Use doscurl-style compile options: optimizations + mTCP config
-# Changed to -mm (medium model) to avoid 64KB code segment limit
-MTCP_CXXFLAGS = -0 -mm -DCFG_H="sample.cfg" -oh -ok -ot -s -oa -ei -zp2 -zpw -ob -ol+ -oi+ -i=$(MTCP_TCP_H_DIR) -i=$(MTCP_COMMON_H_DIR) -i=$(MTCP_CFG_DIR)
+# Using -mm (medium model) for djvm.exe and sockhelp.exe (same as doscurl)
+MTCP_CXXFLAGS = -0 -mm -DCFG_H="doscurl.cfg" -oh -ok -ot -s -oa -ei -zp2 -zpw -ob -ol+ -oi+ -i=$(MTCP_TCP_H_DIR) -i=$(MTCP_COMMON_H_DIR) -i=../doscurl/cpp
+# Large model flags for sockhelp.exe
+MTCP_CXXFLAGS_LARGE = -0 -ml -DCFG_H="doscurl.cfg" -oh -ok -ot -s -oa -ei -zp2 -zpw -ob -ol+ -oi+ -i=$(MTCP_TCP_H_DIR) -i=$(MTCP_COMMON_H_DIR) -i=../doscurl/cpp
 
 # Linker flags
 LDFLAGS = system dos
@@ -103,13 +105,16 @@ java2djc: $(BIN_DIR)/java2djc.exe
 # DOS Java Virtual Machine
 djvm: $(BIN_DIR)/djvm.exe
 
-$(BIN_DIR)/test_mem.exe: $(TEST_OBJS) $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS)
-	@echo Linking test_mem.exe...
-	$(LD) $(LDFLAGS) name $@ file { $(TEST_OBJS) $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS) }
+# Socket Helper Program
+sockhelp: $(BIN_DIR)/sockhelp.exe
 
-$(BIN_DIR)/test_int.exe: $(OBJ_DIR)/test_interpreter.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS)
+$(BIN_DIR)/test_mem.exe: $(TEST_OBJS) $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS)
+	@echo Linking test_mem.exe...
+	$(LD) $(LDFLAGS) name $@ file { $(TEST_OBJS) $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) }
+
+$(BIN_DIR)/test_int.exe: $(OBJ_DIR)/test_interpreter.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS)
 	@echo Linking test_int.exe...
-	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_interpreter.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS) }
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/test_interpreter.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) }
 
 $(BIN_DIR)/tstrm.exe: $(OBJ_DIR)/test_stream.obj $(RUNTIME_OBJS) $(OBJ_DIR)/memory.obj
 	@echo Linking tstrm.exe...
@@ -140,13 +145,13 @@ $(BIN_DIR)/mkdjc.exe: $(OBJ_DIR)/mkdjc.obj
 	@echo Linking mkdjc.exe...
 	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/mkdjc.obj }
 
-$(BIN_DIR)/java2djc.exe: $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS)
+$(BIN_DIR)/java2djc.exe: $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS)
 	@echo Linking java2djc.exe...
-	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS) }
+	$(LD) $(LDFLAGS) name $@ file { $(OBJ_DIR)/java2djc.obj $(OBJ_DIR)/classfile.obj $(FORMAT_OBJS) $(VM_OBJS) $(RUNTIME_OBJS) }
 
-$(BIN_DIR)/djvm.exe: $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS)
+$(BIN_DIR)/djvm.exe: $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS)
 	@echo Linking djvm.exe...
-	$(LD) $(LDFLAGS) option stack=16384 name $@ file { $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) $(RUNTIME_SOCKET_OBJS) $(NETWORK_OBJS) $(MTCP_OBJS) }
+	$(LD) $(LDFLAGS) option stack=16384 name $@ file { $(OBJ_DIR)/djvm.obj $(VM_OBJS) $(FORMAT_OBJS) $(RUNTIME_OBJS) }
 
 # Compile rules - VM
 $(OBJ_DIR)/memory.obj: $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/memory.h
@@ -444,6 +449,53 @@ $(OBJ_DIR)/trace.obj: $(MTCP_TCP_C_DIR)/trace.cpp
 # Compile mTCP assembly file
 $(OBJ_DIR)/ipasm.obj: $(MTCP_TCP_C_DIR)/ipasm.asm
 	wasm -0 -ms -fo=$@ $(MTCP_TCP_C_DIR)/ipasm.asm
+
+# Socket Helper Program (Phase 4.2 Day 22-24)
+# Use Large memory model (-ml) for sufficient buffer space
+# Note: sockhelp needs its own set of mTCP objects compiled with -ml
+MTCP_OBJS_LARGE = $(OBJ_DIR)/packet_l.obj $(OBJ_DIR)/arp_l.obj $(OBJ_DIR)/eth_l.obj $(OBJ_DIR)/ip_l.obj $(OBJ_DIR)/tcp_l.obj $(OBJ_DIR)/tcpsockm_l.obj $(OBJ_DIR)/udp_l.obj $(OBJ_DIR)/utils_l.obj $(OBJ_DIR)/dns_l.obj $(OBJ_DIR)/timer_l.obj $(OBJ_DIR)/ipasm.obj $(OBJ_DIR)/trace_l.obj
+
+$(BIN_DIR)/sockhelp.exe: $(OBJ_DIR)/sockhelp.obj $(MTCP_OBJS_LARGE)
+	@echo Linking sockhelp.exe with Large model mTCP objects...
+	$(LD) $(LDFLAGS) option stack=8192 name $@ file { $(OBJ_DIR)/sockhelp.obj $(MTCP_OBJS_LARGE) }
+
+$(OBJ_DIR)/sockhelp.obj: tools/sockhelp.c
+	@echo Compiling sockhelp.c with Large memory model...
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ tools/sockhelp.c
+
+# Compile mTCP objects with Large model for sockhelp
+$(OBJ_DIR)/packet_l.obj: $(MTCP_TCP_C_DIR)/packet.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/packet.cpp
+
+$(OBJ_DIR)/arp_l.obj: $(MTCP_TCP_C_DIR)/arp.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/arp.cpp
+
+$(OBJ_DIR)/eth_l.obj: $(MTCP_TCP_C_DIR)/eth.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/eth.cpp
+
+$(OBJ_DIR)/ip_l.obj: $(MTCP_TCP_C_DIR)/ip.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/ip.cpp
+
+$(OBJ_DIR)/tcp_l.obj: $(MTCP_TCP_C_DIR)/tcp.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/tcp.cpp
+
+$(OBJ_DIR)/tcpsockm_l.obj: $(MTCP_TCP_C_DIR)/tcpsockm.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/tcpsockm.cpp
+
+$(OBJ_DIR)/udp_l.obj: $(MTCP_TCP_C_DIR)/udp.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/udp.cpp
+
+$(OBJ_DIR)/utils_l.obj: $(MTCP_TCP_C_DIR)/utils.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/utils.cpp
+
+$(OBJ_DIR)/dns_l.obj: $(MTCP_TCP_C_DIR)/dns.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/dns.cpp
+
+$(OBJ_DIR)/timer_l.obj: $(MTCP_TCP_C_DIR)/timer.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/timer.cpp
+
+$(OBJ_DIR)/trace_l.obj: $(MTCP_TCP_C_DIR)/trace.cpp
+	$(CXX) $(MTCP_CXXFLAGS_LARGE) -fo=$@ $(MTCP_TCP_C_DIR)/trace.cpp
 
 # Link everything together
 $(BIN_DIR)/tmtcp.exe: $(OBJ_DIR)/test_mtcp_init.obj $(MTCP_OBJS)

@@ -1,0 +1,13 @@
+Initializing mTCP...
+mTCP initialized successfully
+Connecting to server...
+DEBUG: CONNECT_TIMEOUT constant = -5536
+DEBUG: CONNECT_TIMEOUT as unsigned long = 60000
+DEBUG: Local port = 13281
+DEBUG: start ticks = 3
+DEBUG: timeout_ticks = 1090
+DEBUG: Expected timeout at ~1092 ticks (60000ms * 18.2 / 1000)
+DEBUG: Loop 0 - elapsed=0, timeout=1090, complete=0, closed=0
+DEBUG: Loop 1000 - elapsed=990, timeout=1090, complete=0, closed=0
+connection timeout after 60000 ms (elapsed ticks=1091, timeout ticks=1090)
+Connection failed

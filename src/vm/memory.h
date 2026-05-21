@@ -11,7 +11,7 @@
  */
 
 /* Default heap size (in bytes) */
-#define DEFAULT_HEAP_SIZE 4096  /* ~4KB for heap - minimal size for mTCP compatibility */
+#define DEFAULT_HEAP_SIZE 2048  /* ~2KB for heap - reduced to leave more memory for mTCP */
 
 /* Minimum allocation size */
 #define MIN_ALLOC_SIZE 4

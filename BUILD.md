@@ -110,7 +110,7 @@ wmake help         # Show help
 
 ### Current Flags (for debugging)
 
-- `-ms` - Small memory model (64KB code + 64KB data)
+- `-ml` - Large memory model (multiple segments for code and data)
 - `-0` - Generate 8086 instructions
 - `-w4` - Warning level 4 (all warnings)
 - `-zq` - Quiet mode (less verbose output)

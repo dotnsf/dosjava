@@ -443,8 +443,7 @@ int native_register_builtins(void) {
 /* ===== Socket Native Methods ===== */
 
 /**
- * Socket.init() - Initialize socket subsystem
- * Called automatically on first socket operation
+ * Socket.init() - Initialize socket subsystem (no-op with external helper)
  */
 static int native_socket_init(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
     (void)ctx;
@@ -452,67 +451,26 @@ static int native_socket_init(ExecutionContext* ctx, uint16_t* args, uint8_t arg
     (void)arg_count;
     (void)result;
     
-    if (!socket_subsystem_is_initialized()) {
-        if (socket_subsystem_init() != 0) {
-            return -1;
-        }
-    }
-    
+    /* Socket initialization is now handled by sockhelp.exe */
     return 0;
 }
 
 /**
  * Socket.create(String host, int port) - Create and connect socket
- * Returns socket handle (object reference)
+ * Returns socket handle (int)
  */
-
-/* Global socket table to map int handles to Socket objects */
-#define MAX_SOCKETS 4
-static Socket* g_socket_table[MAX_SOCKETS] = { NULL, NULL, NULL, NULL };
-
-/* Find free socket slot and return handle (0-3), or -1 if full */
-static int socket_table_add(Socket* sock) {
-    int i;
-    for (i = 0; i < MAX_SOCKETS; i++) {
-        if (g_socket_table[i] == NULL) {
-            g_socket_table[i] = sock;
-            return i;
-        }
-    }
-    return -1;  /* Table full */
-}
-
-/* Get Socket object from handle */
-static Socket* socket_table_get(int handle) {
-    if (handle < 0 || handle >= MAX_SOCKETS) {
-        return NULL;
-    }
-    return g_socket_table[handle];
-}
-
-/* Remove socket from table */
-static void socket_table_remove(int handle) {
-    if (handle >= 0 && handle < MAX_SOCKETS) {
-        g_socket_table[handle] = NULL;
-    }
-}
 
 static int native_socket_create(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
     uint16_t host_idx;
     uint16_t port;
     const char* host_str;
-    String* host;
-    Socket* sock;
-    int handle;
+    char command[256];
+    FILE* fp;
+    char line[256];
+    char status[32];
+    int handle_value;
     
     (void)arg_count;
-    
-    /* Initialize socket subsystem if needed */
-    if (!socket_subsystem_is_initialized()) {
-        if (socket_subsystem_init() != 0) {
-            return -1;
-        }
-    }
     
     /* Get arguments: host (String constant index), port (int) */
     host_idx = args[0];
@@ -527,32 +485,64 @@ static int native_socket_create(ExecutionContext* ctx, uint16_t* args, uint8_t a
     }
     
     if (!host_str) {
+        printf("ERROR: Invalid host string\n");
         return -1;
     }
     
-    /* Create String object for host */
-    host = string_new(host_str);
-    if (!host) {
+    printf("Connecting to %s:%u...\n", host_str, port);
+    
+    /* Build command to execute sockhelp.exe */
+    sprintf(command, "sockhelp.exe connect %s %u", host_str, port);
+    
+    /* Execute sockhelp.exe */
+    {
+        int ret = system(command);
+        if (ret != 0) {
+            printf("ERROR: Failed to execute sockhelp.exe (return code: %d)\n", ret);
+            return -1;
+        }
+    }
+    
+    /* Read result from SOCK.OUT */
+    fp = fopen("SOCK.OUT", "r");
+    if (!fp) {
+        printf("ERROR: Failed to read SOCK.OUT\n");
         return -1;
     }
     
-    /* Create and connect socket */
-    sock = socket_runtime_new_connected(host, port);
-    if (!sock) {
-        string_delete(host);
+    /* Parse result */
+    status[0] = '\0';
+    handle_value = -1;
+    
+    while (fgets(line, sizeof(line), fp)) {
+        char* msg;
+        
+        if (strncmp(line, "STATUS:", 7) == 0) {
+            sscanf(line + 7, "%s", status);
+        }
+        else if (strncmp(line, "HANDLE:", 7) == 0) {
+            sscanf(line + 7, "%d", &handle_value);
+        }
+        else if (strncmp(line, "MESSAGE:", 8) == 0) {
+            /* Print message (strip newline) */
+            msg = line + 8;
+            while (*msg == ' ') msg++;
+            printf("%s", msg);
+        }
+    }
+    
+    fclose(fp);
+    
+    /* Check if successful */
+    if (strcmp(status, "OK") != 0 || handle_value < 0) {
+        printf("ERROR: Socket connection failed\n");
         return -1;
     }
     
-    /* Add socket to global table and get handle (0-3) */
-    handle = socket_table_add(sock);
-    if (handle < 0) {
-        socket_runtime_delete(sock);
-        string_delete(host);
-        return -1;
-    }
+    printf("Connected successfully!\n");
     
-    /* Return socket table handle as int */
-    *result = (uint16_t)handle;
+    /* Return socket handle */
+    *result = (uint16_t)handle_value;
     return 0;
 }
 
@@ -563,21 +553,18 @@ static int native_socket_create(ExecutionContext* ctx, uint16_t* args, uint8_t a
 static int native_socket_send(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
     int handle;
     uint16_t data_idx;
-    Socket* sock;
     const char* data_str;
-    int sent;
+    char command[512];
+    FILE* fp;
+    char line[256];
+    char status[32];
+    int bytes_sent;
     
     (void)arg_count;
     
     /* Get arguments: socket handle (int), data (String constant index) */
     handle = (int)args[0];
     data_idx = args[1];
-    
-    /* Get socket object from table */
-    sock = socket_table_get(handle);
-    if (!sock) {
-        return -1;
-    }
     
     /* Get data string from constant pool */
     data_str = NULL;
@@ -588,16 +575,59 @@ static int native_socket_send(ExecutionContext* ctx, uint16_t* args, uint8_t arg
     }
     
     if (!data_str) {
+        printf("ERROR: Invalid data string\n");
         return -1;
     }
     
-    /* Send data */
-    sent = socket_runtime_send(sock, (const uint8_t*)data_str, (uint16_t)strlen(data_str));
-    if (sent < 0) {
+    printf("Sending data...\n");
+    
+    /* Build command to execute sockhelp.exe */
+    sprintf(command, "sockhelp.exe send %d \"%s\"", handle, data_str);
+    
+    /* Execute sockhelp.exe */
+    if (system(command) != 0) {
+        printf("ERROR: Failed to execute sockhelp.exe\n");
         return -1;
     }
     
-    *result = (uint16_t)sent;
+    /* Read result from SOCK.OUT */
+    fp = fopen("SOCK.OUT", "r");
+    if (!fp) {
+        printf("ERROR: Failed to read SOCK.OUT\n");
+        return -1;
+    }
+    
+    /* Parse result */
+    status[0] = '\0';
+    bytes_sent = -1;
+    
+    while (fgets(line, sizeof(line), fp)) {
+        char* msg;
+        
+        if (strncmp(line, "STATUS:", 7) == 0) {
+            sscanf(line + 7, "%s", status);
+        }
+        else if (strncmp(line, "BYTES:", 6) == 0) {
+            sscanf(line + 6, "%d", &bytes_sent);
+        }
+        else if (strncmp(line, "MESSAGE:", 8) == 0) {
+            msg = line + 8;
+            while (*msg == ' ') msg++;
+            printf("%s", msg);
+        }
+    }
+    
+    fclose(fp);
+    
+    /* Check if successful */
+    if (strcmp(status, "OK") != 0 || bytes_sent < 0) {
+        printf("ERROR: Socket send failed\n");
+        return -1;
+    }
+    
+    printf("Sent %d bytes\n", bytes_sent);
+    
+    *result = (uint16_t)bytes_sent;
     return 0;
 }
 
@@ -607,9 +637,11 @@ static int native_socket_send(ExecutionContext* ctx, uint16_t* args, uint8_t arg
  */
 static int native_socket_recv(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
     int handle;
-    Socket* sock;
-    uint8_t buffer[256];
-    int received;
+    char command[256];
+    FILE* fp;
+    char line[256];
+    char status[32];
+    char data[256];
     uint16_t const_idx;
     
     (void)arg_count;
@@ -617,23 +649,65 @@ static int native_socket_recv(ExecutionContext* ctx, uint16_t* args, uint8_t arg
     /* Get argument: socket handle (int) */
     handle = (int)args[0];
     
-    /* Get socket object from table */
-    sock = socket_table_get(handle);
-    if (!sock) {
+    printf("Receiving data...\n");
+    
+    /* Build command to execute sockhelp.exe */
+    sprintf(command, "sockhelp.exe recv %d", handle);
+    
+    /* Execute sockhelp.exe */
+    if (system(command) != 0) {
+        printf("ERROR: Failed to execute sockhelp.exe\n");
         return -1;
     }
     
-    /* Receive data (use full buffer size) */
-    received = socket_runtime_recv(sock, buffer, sizeof(buffer) - 1);
-    if (received < 0) {
+    /* Read result from SOCK.OUT */
+    fp = fopen("SOCK.OUT", "r");
+    if (!fp) {
+        printf("ERROR: Failed to read SOCK.OUT\n");
         return -1;
     }
     
-    /* Null-terminate received data */
-    buffer[received] = '\0';
+    /* Parse result */
+    status[0] = '\0';
+    data[0] = '\0';
+    
+    while (fgets(line, sizeof(line), fp)) {
+        char* d;
+        char* nl;
+        char* msg;
+        
+        if (strncmp(line, "STATUS:", 7) == 0) {
+            sscanf(line + 7, "%s", status);
+        }
+        else if (strncmp(line, "DATA:", 5) == 0) {
+            /* Copy data (strip newline) */
+            d = line + 5;
+            while (*d == ' ') d++;
+            strncpy(data, d, sizeof(data) - 1);
+            data[sizeof(data) - 1] = '\0';
+            /* Remove trailing newline */
+            nl = strchr(data, '\n');
+            if (nl) *nl = '\0';
+        }
+        else if (strncmp(line, "MESSAGE:", 8) == 0) {
+            msg = line + 8;
+            while (*msg == ' ') msg++;
+            printf("%s", msg);
+        }
+    }
+    
+    fclose(fp);
+    
+    /* Check if successful */
+    if (strcmp(status, "OK") != 0) {
+        printf("ERROR: Socket recv failed\n");
+        return -1;
+    }
+    
+    printf("Received: %s\n", data);
     
     /* Add received data to constant pool */
-    const_idx = djc_add_string(ctx->djc_file, (const char*)buffer);
+    const_idx = djc_add_string(ctx->djc_file, data);
     if (const_idx == 0) {
         return -1;
     }
@@ -647,7 +721,10 @@ static int native_socket_recv(ExecutionContext* ctx, uint16_t* args, uint8_t arg
  */
 static int native_socket_close(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
     int handle;
-    Socket* sock;
+    char command[256];
+    FILE* fp;
+    char line[256];
+    char status[32];
     
     (void)ctx;
     (void)arg_count;
@@ -656,20 +733,49 @@ static int native_socket_close(ExecutionContext* ctx, uint16_t* args, uint8_t ar
     /* Get argument: socket handle (int) */
     handle = (int)args[0];
     
-    /* Get socket object from table */
-    sock = socket_table_get(handle);
-    if (!sock) {
+    printf("Closing socket...\n");
+    
+    /* Build command to execute sockhelp.exe */
+    sprintf(command, "sockhelp.exe close %d", handle);
+    
+    /* Execute sockhelp.exe */
+    if (system(command) != 0) {
+        printf("ERROR: Failed to execute sockhelp.exe\n");
         return -1;
     }
     
-    /* Close socket */
-    if (socket_runtime_close(sock) != 0) {
+    /* Read result from SOCK.OUT */
+    fp = fopen("SOCK.OUT", "r");
+    if (!fp) {
+        printf("ERROR: Failed to read SOCK.OUT\n");
         return -1;
     }
     
-    /* Remove from socket table and delete */
-    socket_table_remove(handle);
-    socket_runtime_delete(sock);
+    /* Parse result */
+    status[0] = '\0';
+    
+    while (fgets(line, sizeof(line), fp)) {
+        char* msg;
+        
+        if (strncmp(line, "STATUS:", 7) == 0) {
+            sscanf(line + 7, "%s", status);
+        }
+        else if (strncmp(line, "MESSAGE:", 8) == 0) {
+            msg = line + 8;
+            while (*msg == ' ') msg++;
+            printf("%s", msg);
+        }
+    }
+    
+    fclose(fp);
+    
+    /* Check if successful */
+    if (strcmp(status, "OK") != 0) {
+        printf("ERROR: Socket close failed\n");
+        return -1;
+    }
+    
+    printf("Socket closed\n");
     
     return 0;
 }
@@ -680,7 +786,11 @@ static int native_socket_close(ExecutionContext* ctx, uint16_t* args, uint8_t ar
  */
 static int native_socket_is_connected(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
     int handle;
-    Socket* sock;
+    char command[256];
+    FILE* fp;
+    char line[256];
+    char status[32];
+    int connected;
     
     (void)ctx;
     (void)arg_count;
@@ -688,13 +798,38 @@ static int native_socket_is_connected(ExecutionContext* ctx, uint16_t* args, uin
     /* Get argument: socket handle (int) */
     handle = (int)args[0];
     
-    /* Get socket object from table */
-    sock = socket_table_get(handle);
-    if (!sock) {
-        return -1;
+    /* Build command to execute sockhelp.exe */
+    sprintf(command, "sockhelp.exe status %d", handle);
+    
+    /* Execute sockhelp.exe */
+    if (system(command) != 0) {
+        *result = 0;
+        return 0;
     }
     
-    *result = socket_runtime_is_connected(sock);
+    /* Read result from SOCK.OUT */
+    fp = fopen("SOCK.OUT", "r");
+    if (!fp) {
+        *result = 0;
+        return 0;
+    }
+    
+    /* Parse result */
+    status[0] = '\0';
+    connected = 0;
+    
+    while (fgets(line, sizeof(line), fp)) {
+        if (strncmp(line, "STATUS:", 7) == 0) {
+            sscanf(line + 7, "%s", status);
+        }
+        else if (strncmp(line, "CONNECTED:", 10) == 0) {
+            sscanf(line + 10, "%d", &connected);
+        }
+    }
+    
+    fclose(fp);
+    
+    *result = (strcmp(status, "OK") == 0 && connected) ? 1 : 0;
     return 0;
 }
 

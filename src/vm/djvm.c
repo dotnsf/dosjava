@@ -310,10 +310,7 @@ int main(int argc, char* argv[]) {
     /* Cleanup */
     djc_close(djc_file);
     
-    /* Shutdown socket subsystem if it was initialized */
-    if (socket_subsystem_is_initialized()) {
-        socket_subsystem_shutdown();
-    }
+    /* Socket subsystem cleanup not needed - using external helper */
     
     native_shutdown();
     system_shutdown();
