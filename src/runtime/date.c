@@ -9,17 +9,26 @@
 
 /**
  * Ensure cached date/time values are valid
- * Recalculates from time_sec if cache is invalid
+ * Recalculates from time_ms if cache is invalid
  */
 static void ensure_cache(Date* date) {
     DOSDateTime dt;
+    uint32_t time_sec;
     
-    if (!date || date->cache_valid) {
+    if (!date) {
         return;
     }
     
+    if (date->cache_valid) {
+        return;
+    }
+    
+    /* IMPORTANT: time_ms_low stores SECONDS (not milliseconds) for 32-bit compatibility
+     * We use it directly as seconds for date/time calculation */
+    time_sec = date->time_ms_low;
+    
     /* Convert timestamp to date/time components */
-    if (dos_timestamp_to_datetime(date->time_sec, &dt) == 0) {
+    if (dos_timestamp_to_datetime(time_sec, &dt) == 0) {
         date->cached_year = dt.year;
         date->cached_month = dt.month - 1;  /* Convert to 0-based */
         date->cached_day = dt.day;
@@ -34,18 +43,24 @@ static void ensure_cache(Date* date) {
  * Create a new Date with current time
  */
 Date* date_new(void) {
-    uint32_t current_time;
+    uint32_t current_time_sec;
+    uint32_t time_ms_high, time_ms_low;
     
-    /* Get current timestamp */
-    current_time = dos_get_timestamp();
+    /* Get current timestamp in seconds */
+    current_time_sec = dos_get_timestamp();
     
-    return date_new_with_time(current_time);
+    /* IMPORTANT: Due to 32-bit limitations, we store SECONDS (not milliseconds)
+     * This allows dates up to year 2106 without overflow
+     * Modern dates like 2026 = 1779468303 seconds would overflow if multiplied by 1000 */
+    time_ms_high = 0;
+    time_ms_low = current_time_sec;  /* Store seconds directly */
+    
+    return date_new_with_time(time_ms_high, time_ms_low);
 }
-
 /**
  * Create a new Date with specified time
  */
-Date* date_new_with_time(uint32_t time_sec) {
+Date* date_new_with_time(uint32_t time_ms_high, uint32_t time_ms_low) {
     Date* date;
     
     /* Allocate Date structure */
@@ -58,8 +73,11 @@ Date* date_new_with_time(uint32_t time_sec) {
     date->base.class_id = CLASS_ID_DATE;
     date->base.ref_count = 1;
     
-    /* Initialize Date fields */
-    date->time_sec = time_sec;
+    /* Initialize Date fields
+     * IMPORTANT: Due to 32-bit limitations, we treat time_ms_low as SECONDS
+     * This allows dates up to year 2106 */
+    date->time_ms_high = 0;
+    date->time_ms_low = time_ms_low;  /* Store as-is (seconds) */
     date->cache_valid = 0;
     
     return date;
@@ -77,25 +95,43 @@ void date_delete(Date* date) {
 }
 
 /**
- * Get time value in seconds
+ * Get time value in milliseconds (high 32 bits)
  */
-uint32_t date_get_time(Date* date) {
+uint32_t date_get_time_high(Date* date) {
     if (!date) {
         return 0;
     }
     
-    return date->time_sec;
+    return date->time_ms_high;
 }
 
 /**
- * Set time value in seconds
+ * Get time value in milliseconds (low 32 bits)
  */
-void date_set_time(Date* date, uint32_t time_sec) {
+uint32_t date_get_time_low(Date* date) {
+    if (!date) {
+        return 0;
+    }
+    
+    /* IMPORTANT: Due to 32-bit limitations, we return SECONDS (not milliseconds)
+     * Multiplying by 1000 would overflow for modern dates (2026 = 1779468192 seconds)
+     * 1779468192 * 1000 = 1779468192000 > 4294967295 (32-bit max)
+     * So we return seconds directly */
+    return date->time_ms_low;
+}
+
+/**
+ * Set time value in milliseconds
+ */
+void date_set_time(Date* date, uint32_t time_ms_high, uint32_t time_ms_low) {
     if (!date) {
         return;
     }
     
-    date->time_sec = time_sec;
+    /* IMPORTANT: Due to 32-bit limitations, we treat time_ms_low as SECONDS
+     * not milliseconds. This allows dates up to year 2106 */
+    date->time_ms_high = 0;
+    date->time_ms_low = time_ms_low;  /* Store as-is (seconds) */
     date->cache_valid = 0;  /* Invalidate cache */
 }
 

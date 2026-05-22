@@ -2634,15 +2634,15 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         
         /* Validate argument counts and set return types */
         if (strcmp(method_name, "getTime") == 0) {
-            /* int getTime() - returns timestamp as int (uint32_t truncated to int) */
+            /* long getTime() - returns timestamp as long (milliseconds) */
             if (arg_count != 0) {
                 semantic_error_node(analyzer, call_node, "getTime() takes no arguments");
                 return -1;
             }
-            result_type->kind = TYPE_INT;
+            result_type->kind = TYPE_LONG;
             result_type->class_name = 0;
         } else if (strcmp(method_name, "setTime") == 0) {
-            /* void setTime(int timestamp) */
+            /* void setTime(long timestamp) */
             if (arg_count != 1) {
                 semantic_error_node(analyzer, call_node, "setTime() requires 1 argument");
                 return -1;

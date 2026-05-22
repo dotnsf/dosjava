@@ -36,13 +36,19 @@ typedef struct {
     uint16_t free_count;     /* Number of frees */
 } MemoryManager;
 
-/* Array handle table for Large memory model compatibility */
+/* Handle table for Large memory model compatibility */
 #define MAX_ARRAY_HANDLES 256
+#define MAX_OBJECT_HANDLES 256
 
 typedef struct {
     void* array_ptr;         /* Pointer to array data */
     uint8_t in_use;          /* 1 if handle is active, 0 if free */
 } ArrayHandle;
+
+typedef struct {
+    void* object_ptr;        /* Pointer to object data */
+    uint8_t in_use;          /* 1 if handle is active, 0 if free */
+} ObjectHandle;
 
 /**
  * Initialize memory manager
@@ -137,6 +143,26 @@ void* memory_get_array_ptr(uint16_t handle);
  * @param handle Array handle to free
  */
 void memory_free_array_handle(uint16_t handle);
+
+/**
+ * Allocate object handle for pointer
+ * @param object_ptr Pointer to object data
+ * @return Handle (1-255), or 0 on error
+ */
+uint16_t memory_alloc_object_handle(void* object_ptr);
+
+/**
+ * Get object pointer from handle
+ * @param handle Object handle (1-255)
+ * @return Pointer to object data, or NULL if invalid
+ */
+void* memory_get_object_ptr(uint16_t handle);
+
+/**
+ * Free object handle
+ * @param handle Object handle to free
+ */
+void memory_free_object_handle(uint16_t handle);
 
 #endif /* MEMORY_H */
 

@@ -57,19 +57,21 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 - 配列要素代入
 - `array.length`
 
-### Dateクラス（Phase 3.5で追加）
+### Dateクラス（Phase 3.5で追加、Phase 5.5でlong型対応）
 DOS環境で日付・時刻を扱うためのクラス
 
 #### コンストラクタ
 - `Date()` - 現在のシステム時刻でDateオブジェクトを作成
-- `Date(int timestamp)` - 指定したUnixタイムスタンプでDateオブジェクトを作成
-  - **注意**: 16ビット整数制限により、-32768～32767の範囲のみ使用可能
-  - 大きなタイムスタンプは`Date()`コンストラクタ（現在時刻）の使用を推奨
+- `Date(long timestamp)` - 指定したUnixタイムスタンプ（**秒単位**）でDateオブジェクトを作成
+  - **重要**: `timestamp`は**秒単位**です（Javaの標準APIはミリ秒ですが、dosjavaでは秒を使用）
+  - 32ビットlong型により、1970年～2106年の範囲をサポート
 
 #### メソッド
-- `int getTime()` - Unixタイムスタンプ（秒）を返す
-- `void setTime(int timestamp)` - 指定したタイムスタンプに設定
-- `int getFullYear()` - 年を返す（1980-2099）
+- `long getTime()` - Unixタイムスタンプ（**秒単位**）を返す
+  - **重要**: 戻り値は**秒単位**です（Javaの標準APIはミリ秒ですが、dosjavaでは秒を使用）
+- `void setTime(long timestamp)` - 指定したタイムスタンプ（**秒単位**）に設定
+  - **重要**: `timestamp`は**秒単位**です（Javaの標準APIはミリ秒ですが、dosjavaでは秒を使用）
+- `int getFullYear()` - 年を返す（1970-2106）
 - `int getMonth()` - 月を返す（0-11、0=1月）
 - `int getDate()` - 日を返す（1-31）
 - `int getHours()` - 時を返す（0-23）
@@ -80,8 +82,10 @@ DOS環境で日付・時刻を扱うためのクラス
 ```java
 class DateDemo {
     public static void main() {
+        // 現在時刻のDateオブジェクトを作成
         Date now = new Date();
         
+        // 年月日を取得
         int year = now.getFullYear();
         int month = now.getMonth() + 1;  // 1-12で表示
         int day = now.getDate();
@@ -93,17 +97,52 @@ class DateDemo {
         System.out.println("-");
         System.out.println(day);
         
+        // タイムスタンプを取得（秒単位）
+        long timestamp = now.getTime();
+        System.out.println("Timestamp (seconds): ");
+        System.out.println(timestamp);
+        
+        // 特定のタイムスタンプでDateオブジェクトを作成（秒単位）
+        long oneDay = 86400L;  // 24 * 60 * 60 秒
+        Date tomorrow = new Date(timestamp + oneDay);
+        
         return;
     }
 }
 ```
 
-#### 制限事項
-- **16ビット整数制限**: タイムスタンプは-32768～32767の範囲のみ
+#### 重要な制約事項
+
+##### ⚠️ タイムスタンプは秒単位（ミリ秒ではない）
+dosjavaのDateクラスは、32ビットlong型の制限により、**秒単位**でタイムスタンプを扱います。
+これは標準JavaのDate APIとは異なります：
+
+| API | dosjava | 標準Java |
+|-----|---------|----------|
+| `Date(long)` | **秒単位** | ミリ秒単位 |
+| `getTime()` | **秒単位** | ミリ秒単位 |
+| `setTime(long)` | **秒単位** | ミリ秒単位 |
+
+**理由**:
+- 32ビットlong型の最大値: 4,294,967,295
+- 2026年のミリ秒タイムスタンプ: 約1,779,468,000,000（32ビットを超える）
+- 2026年の秒タイムスタンプ: 約1,779,468,000（32ビット範囲内）
+
+**例**:
+```java
+// dosjava（秒単位）
+long timestamp = 1779468000L;  // 2026年5月22日（秒）
+Date d = new Date(timestamp);
+
+// 標準Java（ミリ秒単位）の場合
+// long timestamp = 1779468000000L;  // 2026年5月22日（ミリ秒）
+```
+
+##### その他の制限事項
+- **32ビットlong型**: タイムスタンプは0～4,294,967,295の範囲（1970年～2106年）
 - **月の規約**: 0ベース（0=1月、11=12月）、JavaScript Date APIと同じ
-- **日付範囲**: 1980年1月1日～2099年12月31日（DOS制限）
 - **タイムゾーン**: ローカル時刻のみ（タイムゾーン変換なし）
-- **精度**: 秒単位（ミリ秒なし）
+- **精度**: 秒単位（ミリ秒精度なし）
 
 ### 制限事項
 - インスタンスメソッド不可（Dateクラスを除く）

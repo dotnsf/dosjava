@@ -40,5 +40,3 @@ class TestLong {
         System.println("Long test complete!");
     }
 }
-
-// Made with Bob

@@ -968,9 +968,34 @@ int interpreter_step(ExecutionContext* ctx) {
                 
                 /* Find native method in registry */
                 native_method = native_find(NULL, method_name, descriptor);
-                
-                
                 if (native_method != NULL) {
+                    /* Special handling for println/print with potential long values */
+                    if ((strcmp(method_name, "println") == 0 || strcmp(method_name, "print") == 0) &&
+                        strcmp(descriptor, "(I)V") == 0 && arg_count == 1) {
+                        /* Check if there are 2 words on stack (indicating a long value) */
+                        if (ctx->stack_pointer >= 2) {
+                            uint16_t low, high;
+                            uint32_t long_value;
+                            
+                            /* Pop 2 words as long */
+                            low = stack_pop_shared(ctx);
+                            high = stack_pop_shared(ctx);
+                            long_value = ((uint32_t)high << 16) | low;
+                            
+                            /* Print the long value as unsigned 32-bit integer */
+                            /* Note: Java long is 64-bit signed, but we only support 32-bit for now */
+                            /* We print as unsigned to avoid negative values for large positive numbers */
+                            if (strcmp(method_name, "println") == 0) {
+                                printf("%lu\n", (unsigned long)long_value);
+                            } else {
+                                printf("%lu", (unsigned long)long_value);
+                            }
+                            
+                            break;  /* Skip normal native method invocation */
+                        }
+                    }
+                    
+                    
                     /* Pop arguments from stack (in reverse order) */
                     if (arg_count > 8) {
                         printf("ERROR: Too many arguments for native method: %u\n", arg_count);
@@ -1012,7 +1037,6 @@ int interpreter_step(ExecutionContext* ctx) {
                         int is_println;
                         
                         is_println = (strcmp(method_name, "println") == 0);
-                        value = stack_pop_shared(ctx);
                         
                         /* Get method descriptor to determine parameter type */
                         descriptor = djc_get_utf8(ctx->djc_file, method->descriptor_index);
@@ -1020,8 +1044,24 @@ int interpreter_step(ExecutionContext* ctx) {
                         /* Check descriptor for parameter type:
                          * (Ljava/lang/String;)V - String parameter
                          * (I)V - int parameter
+                         * (J)V - long parameter
                          */
-                        if (descriptor && strcmp(descriptor, "(Ljava/lang/String;)V") == 0) {
+                        if (descriptor && strcmp(descriptor, "(J)V") == 0) {
+                            /* Long parameter - pop 2 words [low, high] */
+                            uint16_t low, high;
+                            uint32_t long_value;
+                            
+                            low = stack_pop_shared(ctx);
+                            high = stack_pop_shared(ctx);
+                            long_value = ((uint32_t)high << 16) | low;
+                            
+                            if (is_println) {
+                                printf("%ld\n", (long)long_value);
+                            } else {
+                                printf("%ld", (long)long_value);
+                            }
+                        } else if (descriptor && strcmp(descriptor, "(Ljava/lang/String;)V") == 0) {
+                            value = stack_pop_shared(ctx);
                             /* String parameter - value is direct UTF8 constant index */
                             str = NULL;
                             if (value < ctx->djc_file->header.constant_pool_count) {
@@ -1041,6 +1081,7 @@ int interpreter_step(ExecutionContext* ctx) {
                             }
                         } else {
                             /* Native print/println(int) and any non-string fallback */
+                            value = stack_pop_shared(ctx);
                             if (is_println) {
                                 system_println_int((int16_t)value);
                             } else {
@@ -2127,13 +2168,22 @@ int interpreter_step(ExecutionContext* ctx) {
                     return -1;
                 }
                 
-                /* In Small memory model, pointer is already 16-bit offset */
-                object_handle = (uint16_t)(uintptr_t)fos;
+                /* Allocate object handle */
+                object_handle = memory_alloc_object_handle((void*)fos);
+                if (object_handle == 0) {
+                    printf("ERROR: Failed to allocate object handle for FileOutputStream\n");
+                    return -1;
+                }
             }
             else if (strcmp(class_name, "BufferedWriter") == 0 && arg_count == 1) {
                 /* BufferedWriter(OutputStream os) */
-                FileOutputStream* fos = (FileOutputStream*)(uintptr_t)args[0];
+                FileOutputStream* fos = (FileOutputStream*)memory_get_object_ptr(args[0]);
                 BufferedWriter* bw;
+                
+                if (fos == NULL) {
+                    printf("ERROR: Invalid FileOutputStream handle\n");
+                    return -1;
+                }
                 
                 bw = bufferedwriter_new(fos, 256);
                 if (bw == NULL) {
@@ -2141,8 +2191,12 @@ int interpreter_step(ExecutionContext* ctx) {
                     return -1;
                 }
                 
-                /* In Small memory model, pointer is already 16-bit offset */
-                object_handle = (uint16_t)(uintptr_t)bw;
+                /* Allocate object handle */
+                object_handle = memory_alloc_object_handle((void*)bw);
+                if (object_handle == 0) {
+                    printf("ERROR: Failed to allocate object handle for BufferedWriter\n");
+                    return -1;
+                }
             }
             else if (strcmp(class_name, "FileInputStream") == 0 && arg_count == 1) {
                 /* FileInputStream(String filename) */
@@ -2160,13 +2214,22 @@ int interpreter_step(ExecutionContext* ctx) {
                     return -1;
                 }
                 
-                /* In Small memory model, pointer is already 16-bit offset */
-                object_handle = (uint16_t)(uintptr_t)fis;
+                /* Allocate object handle */
+                object_handle = memory_alloc_object_handle((void*)fis);
+                if (object_handle == 0) {
+                    printf("ERROR: Failed to allocate object handle for FileInputStream\n");
+                    return -1;
+                }
             }
             else if (strcmp(class_name, "BufferedReader") == 0 && arg_count == 1) {
                 /* BufferedReader(InputStream is) */
-                FileInputStream* fis = (FileInputStream*)(uintptr_t)args[0];
+                FileInputStream* fis = (FileInputStream*)memory_get_object_ptr(args[0]);
                 BufferedReader* br;
+                
+                if (fis == NULL) {
+                    printf("ERROR: Invalid FileInputStream handle\n");
+                    return -1;
+                }
                 
                 br = bufferedreader_new(fis, 256);
                 if (br == NULL) {
@@ -2174,8 +2237,12 @@ int interpreter_step(ExecutionContext* ctx) {
                     return -1;
                 }
                 
-                /* In Small memory model, pointer is already 16-bit offset */
-                object_handle = (uint16_t)(uintptr_t)br;
+                /* Allocate object handle */
+                object_handle = memory_alloc_object_handle((void*)br);
+                if (object_handle == 0) {
+                    printf("ERROR: Failed to allocate object handle for BufferedReader\n");
+                    return -1;
+                }
             }
             else if (strcmp(class_name, "Date") == 0) {
                 /* Date() or Date(long timestamp) */
@@ -2184,16 +2251,18 @@ int interpreter_step(ExecutionContext* ctx) {
                 if (arg_count == 0) {
                     /* Date() - current time */
                     date_obj = date_new();
-                    if (g_debug_mode) {
-                        printf("DEBUG: Created Date with current time\n");
-                    }
                 } else if (arg_count == 1) {
-                    /* Date(long timestamp) */
-                    uint32_t timestamp = (uint32_t)args[0];
-                    date_obj = date_new_with_time(timestamp);
-                    if (g_debug_mode) {
-                        printf("DEBUG: Created Date with timestamp: %lu\n", (unsigned long)timestamp);
-                    }
+                    /* Date(int timestamp) - int is passed as 1 word, treat as milliseconds */
+                    uint32_t time_ms_low = (uint32_t)args[0];
+                    date_obj = date_new_with_time(0, time_ms_low);
+                } else if (arg_count == 2) {
+                    /* Date(long timestamp) - long is passed as 2 words [high, low] */
+                    /* Stack layout: args[0]=high, args[1]=low */
+                    uint32_t time_ms_low;
+                    uint16_t high = args[0];
+                    uint16_t low = args[1];
+                    time_ms_low = ((uint32_t)high << 16) | low;
+                    date_obj = date_new_with_time(0, time_ms_low);
                 } else {
                     printf("ERROR: Invalid argument count for Date constructor: %u\n", arg_count);
                     return -1;
@@ -2204,17 +2273,16 @@ int interpreter_step(ExecutionContext* ctx) {
                     return -1;
                 }
                 
-                /* In Small memory model, pointer is already 16-bit offset */
-                object_handle = (uint16_t)(uintptr_t)date_obj;
+                /* Allocate object handle for Date object */
+                object_handle = memory_alloc_object_handle((void*)date_obj);
+                if (object_handle == 0) {
+                    printf("ERROR: Failed to allocate object handle for Date\n");
+                    return -1;
+                }
             }
             else {
                 /* Generic object creation (no constructor logic yet) */
                 object_handle = class_name_idx + 1;
-                
-                if (g_debug_mode) {
-                    printf("DEBUG: OP_NEW created object of class '%s' (handle=%u, args=%u)\n",
-                           class_name, object_handle, arg_count);
-                }
             }
             
             /* Push object handle onto stack */
@@ -2354,7 +2422,7 @@ int interpreter_step(ExecutionContext* ctx) {
                     /* Pop argument */
                     arg_value = stack_pop_shared(ctx);
                     
-                    /* Pop object reference */
+                    /* Pop object reference (handle) */
                     object_handle = stack_pop_shared(ctx);
                     
                     /* Try to determine object type by checking if arg is a string index */
@@ -2370,13 +2438,25 @@ int interpreter_step(ExecutionContext* ctx) {
                             return -1;
                         }
                         
-                        bw = (BufferedWriter*)(uintptr_t)object_handle;
+                        /* Resolve handle to pointer */
+                        bw = (BufferedWriter*)memory_get_object_ptr(object_handle);
+                        if (bw == NULL) {
+                            printf("ERROR: Invalid BufferedWriter handle in write()\n");
+                            return -1;
+                        }
+                        
                         bufferedwriter_write_string(bw, str_value);
                     } else {
                         /* FileOutputStream.write(int) */
                         FileOutputStream* fos;
                         
-                        fos = (FileOutputStream*)(uintptr_t)object_handle;
+                        /* Resolve handle to pointer */
+                        fos = (FileOutputStream*)memory_get_object_ptr(object_handle);
+                        if (fos == NULL) {
+                            printf("ERROR: Invalid FileOutputStream handle in write()\n");
+                            return -1;
+                        }
+                        
                         fileoutputstream_write(fos, (uint8_t)arg_value);
                     }
                     break;
@@ -2386,11 +2466,17 @@ int interpreter_step(ExecutionContext* ctx) {
                     FileInputStream* fis;
                     int byte_value;
                     
-                    /* Pop object reference */
+                    /* Pop object reference (handle) */
                     object_handle = stack_pop_shared(ctx);
                     
+                    /* Resolve handle to pointer */
+                    fis = (FileInputStream*)memory_get_object_ptr(object_handle);
+                    if (fis == NULL) {
+                        printf("ERROR: Invalid FileInputStream handle in read()\n");
+                        return -1;
+                    }
+                    
                     /* Call native method */
-                    fis = (FileInputStream*)(uintptr_t)object_handle;
                     byte_value = fileinputstream_read(fis);
                     
                     /* Push result (-1 for EOF, or 0-255 for byte value) */
@@ -2405,11 +2491,17 @@ int interpreter_step(ExecutionContext* ctx) {
                     /* BufferedWriter.newLine() */
                     BufferedWriter* bw;
                     
-                    /* Pop object reference */
+                    /* Pop object reference (handle) */
                     object_handle = stack_pop_shared(ctx);
                     
+                    /* Resolve handle to pointer */
+                    bw = (BufferedWriter*)memory_get_object_ptr(object_handle);
+                    if (bw == NULL) {
+                        printf("ERROR: Invalid BufferedWriter handle in newLine()\n");
+                        return -1;
+                    }
+                    
                     /* Call native method */
-                    bw = (BufferedWriter*)(uintptr_t)object_handle;
                     bufferedwriter_new_line(bw);
                     break;
                 }
@@ -2422,8 +2514,14 @@ int interpreter_step(ExecutionContext* ctx) {
                     /* Pop object reference */
                     object_handle = stack_pop_shared(ctx);
                     
+                    /* Resolve handle to pointer */
+                    br = (BufferedReader*)memory_get_object_ptr(object_handle);
+                    if (br == NULL) {
+                        printf("ERROR: Invalid BufferedReader handle\n");
+                        return -1;
+                    }
+                    
                     /* Call native method */
-                    br = (BufferedReader*)(uintptr_t)object_handle;
                     line = bufferedreader_read_line(br);
                     
                     if (line == NULL) {
@@ -2455,81 +2553,145 @@ int interpreter_step(ExecutionContext* ctx) {
                         return -1;
                     }
                     
+                    /* Resolve handle to pointer */
+                    bw = (BufferedWriter*)memory_get_object_ptr(object_handle);
+                    if (bw == NULL) {
+                        printf("ERROR: Invalid BufferedWriter handle\n");
+                        return -1;
+                    }
+                    
                     /* Call native method */
-                    bw = (BufferedWriter*)(uintptr_t)object_handle;
                     bufferedwriter_write_line(bw, str_value);
                     break;
                 }
                 else if (strcmp(method_name, "close") == 0) {
                     /* close() for various stream types */
                     void* stream_obj;
+                    BufferedWriter* bw;
+                    FileOutputStream* fos;
+                    FileInputStream* fis;
                     
                     /* Pop object reference */
                     object_handle = stack_pop_shared(ctx);
-                    stream_obj = (void*)(uintptr_t)object_handle;
                     
-                    /* Call appropriate close function
-                     * Note: All stream types have close() as their last virtual function,
-                     * so we can safely cast to any stream type and call close().
-                     * The actual implementation will be called via the vtable.
+                    /* Resolve handle to pointer */
+                    stream_obj = memory_get_object_ptr(object_handle);
+                    if (stream_obj == NULL) {
+                        printf("ERROR: Invalid stream handle in close()\n");
+                        return -1;
+                    }
+                    
+                    /* Determine object type by checking structure
+                     * BufferedWriter has output_stream as first field (non-NULL pointer)
+                     * FileOutputStream has OutputStream base as first field (is_open flag)
+                     * We check if first word looks like a valid pointer (> 256)
                      */
-                    if (stream_obj) {
-                        /* Try FileOutputStream first */
-                        FileOutputStream* fos = (FileOutputStream*)stream_obj;
+                    bw = (BufferedWriter*)stream_obj;
+                    if (bw->output_stream != NULL && (uintptr_t)bw->output_stream > 256) {
+                        /* Looks like BufferedWriter - has valid output_stream pointer */
+                        bufferedwriter_close(bw);
+                    } else {
+                        /* Try FileOutputStream or FileInputStream */
+                        fos = (FileOutputStream*)stream_obj;
                         if (fos->base.is_open) {
                             fileoutputstream_close(fos);
                         } else {
                             /* Try FileInputStream */
-                            FileInputStream* fis = (FileInputStream*)stream_obj;
-                            if (fis->base.is_open) {
-                                fileinputstream_close(fis);
-                            } else {
-                                /* Try BufferedWriter/BufferedReader */
-                                BufferedWriter* bw = (BufferedWriter*)stream_obj;
-                                bufferedwriter_close(bw);
-                            }
+                            fis = (FileInputStream*)stream_obj;
+                            fileinputstream_close(fis);
                         }
                     }
                     break;
                 }
                 else if (strcmp(method_name, "getTime") == 0) {
-                    /* Date.getTime() - returns long (as uint16_t for now) */
+                    /* Date.getTime() - returns long (milliseconds as 64-bit value) */
                     Date* date_obj;
-                    uint32_t timestamp;
+                    uint32_t time_ms_low;
                     
-                    /* Pop object reference */
+                    /* Pop object reference (1 word: handle) */
                     object_handle = stack_pop_shared(ctx);
                     
-                    /* Call native method */
-                    date_obj = (Date*)(uintptr_t)object_handle;
-                    timestamp = date_get_time(date_obj);
-                    
-                    /* Push result (truncated to 16-bit for now) */
-                    stack_push_shared(ctx, (uint16_t)timestamp);
-                    
-                    if (g_debug_mode) {
-                        printf("DEBUG: Date.getTime() = %lu\n", (unsigned long)timestamp);
+                    /* Resolve handle to pointer */
+                    date_obj = (Date*)memory_get_object_ptr(object_handle);
+                    if (date_obj == NULL) {
+                        printf("ERROR: Invalid Date handle in getTime(), handle=%u\n", object_handle);
+                        return -1;
                     }
+                    
+                    time_ms_low = date_get_time_low(date_obj);
+                    
+                    /* Push result as long (32-bit value, high word is always 0 for now) */
+                    /* For dates until year 2106, high 32 bits are 0 */
+                    if (stack_push_long(ctx, time_ms_low) != 0) {
+                        printf("ERROR: Stack overflow\n");
+                        return -1;
+                    }
+                    
                     break;
                 }
                 else if (strcmp(method_name, "setTime") == 0) {
-                    /* Date.setTime(long) */
+                    /* Date.setTime(int/long timestamp) - set time in seconds
+                     * Supports both int (1 word) and long (2 words) arguments
+                     * Stack layout: [object_handle, arg_low] or [object_handle, arg_high, arg_low]
+                     */
                     Date* date_obj;
-                    uint32_t timestamp;
+                    uint32_t time_sec;
+                    uint16_t arg_low, arg_high;
+                    uint16_t saved_object_handle;
                     
-                    /* Pop timestamp argument */
-                    timestamp = (uint32_t)stack_pop_shared(ctx);
-                    
-                    /* Pop object reference */
-                    object_handle = stack_pop_shared(ctx);
-                    
-                    /* Call native method */
-                    date_obj = (Date*)(uintptr_t)object_handle;
-                    date_set_time(date_obj, timestamp);
-                    
-                    if (g_debug_mode) {
-                        printf("DEBUG: Date.setTime(%lu)\n", (unsigned long)timestamp);
+                    /* Determine argument count by checking stack depth
+                     * We need at least 2 words (object + 1 arg) or 3 words (object + 2 args)
+                     */
+                    if (ctx->stack_pointer < 2) {
+                        printf("ERROR: Not enough arguments for setTime()\n");
+                        return -1;
                     }
+                    
+                    /* Pop first argument word (low word for both int and long) */
+                    arg_low = stack_pop_shared(ctx);
+                    
+                    /* Peek at next word to determine if it's object handle or high word */
+                    if (ctx->stack_pointer > 0) {
+                        /* Check if next word looks like an object handle (1-255)
+                         * or like a high word of a long value (could be 0 or any value)
+                         * For int literals like 20000 (0x4E20), we have just [object, 0x4E20]
+                         * For long values, we have [object, high, low]
+                         */
+                        if (ctx->stack_pointer >= 2) {
+                            /* We have at least 2 more words, check if it's long format */
+                            uint16_t potential_object = ctx->shared_stack[ctx->stack_pointer - 2];
+                            
+                            /* If potential_object looks like a valid handle (1-255) and
+                             * we have 3 words total, treat as long */
+                            if (potential_object > 0 && potential_object < 256) {
+                                /* setTime(long) - 3 words: [object, high, low] */
+                                arg_high = stack_pop_shared(ctx);
+                                saved_object_handle = stack_pop_shared(ctx);
+                                time_sec = ((uint32_t)arg_high << 16) | arg_low;
+                            } else {
+                                /* setTime(int) - 2 words: [object, value] */
+                                saved_object_handle = stack_pop_shared(ctx);
+                                time_sec = (uint32_t)arg_low;
+                            }
+                        } else {
+                            /* Only 1 word left, must be object handle - setTime(int) */
+                            saved_object_handle = stack_pop_shared(ctx);
+                            time_sec = (uint32_t)arg_low;
+                        }
+                    } else {
+                        printf("ERROR: Missing object reference for setTime()\n");
+                        return -1;
+                    }
+                    
+                    /* Resolve handle to pointer */
+                    date_obj = (Date*)memory_get_object_ptr(saved_object_handle);
+                    if (date_obj == NULL) {
+                        printf("ERROR: Invalid Date handle in setTime(), handle=%u\n", saved_object_handle);
+                        return -1;
+                    }
+                    
+                    /* Call native method (time_sec is in seconds) */
+                    date_set_time(date_obj, 0, time_sec);
                     break;
                 }
                 else if (strcmp(method_name, "getFullYear") == 0) {
@@ -2537,19 +2699,21 @@ int interpreter_step(ExecutionContext* ctx) {
                     Date* date_obj;
                     uint16_t year;
                     
-                    /* Pop object reference */
+                    /* Pop object reference (1 word: handle) */
                     object_handle = stack_pop_shared(ctx);
                     
+                    /* Resolve handle to pointer */
+                    date_obj = (Date*)memory_get_object_ptr(object_handle);
+                    if (date_obj == NULL) {
+                        printf("ERROR: Invalid Date handle in getFullYear()\n");
+                        return -1;
+                    }
+                    
                     /* Call native method */
-                    date_obj = (Date*)(uintptr_t)object_handle;
                     year = date_get_full_year(date_obj);
                     
                     /* Push result */
                     stack_push_shared(ctx, year);
-                    
-                    if (g_debug_mode) {
-                        printf("DEBUG: Date.getFullYear() = %u\n", year);
-                    }
                     break;
                 }
                 else if (strcmp(method_name, "getMonth") == 0) {
@@ -2557,19 +2721,21 @@ int interpreter_step(ExecutionContext* ctx) {
                     Date* date_obj;
                     uint8_t month;
                     
-                    /* Pop object reference */
+                    /* Pop object reference (1 word: handle) */
                     object_handle = stack_pop_shared(ctx);
                     
+                    /* Resolve handle to pointer */
+                    date_obj = (Date*)memory_get_object_ptr(object_handle);
+                    if (date_obj == NULL) {
+                        printf("ERROR: Invalid Date handle in getMonth()\n");
+                        return -1;
+                    }
+                    
                     /* Call native method */
-                    date_obj = (Date*)(uintptr_t)object_handle;
                     month = date_get_month(date_obj);
                     
                     /* Push result */
                     stack_push_shared(ctx, (uint16_t)month);
-                    
-                    if (g_debug_mode) {
-                        printf("DEBUG: Date.getMonth() = %u\n", month);
-                    }
                     break;
                 }
                 else if (strcmp(method_name, "getDate") == 0) {
@@ -2577,19 +2743,21 @@ int interpreter_step(ExecutionContext* ctx) {
                     Date* date_obj;
                     uint8_t day;
                     
-                    /* Pop object reference */
+                    /* Pop object reference (1 word: handle) */
                     object_handle = stack_pop_shared(ctx);
                     
+                    /* Resolve handle to pointer */
+                    date_obj = (Date*)memory_get_object_ptr(object_handle);
+                    if (date_obj == NULL) {
+                        printf("ERROR: Invalid Date handle in getDate()\n");
+                        return -1;
+                    }
+                    
                     /* Call native method */
-                    date_obj = (Date*)(uintptr_t)object_handle;
                     day = date_get_date(date_obj);
                     
                     /* Push result */
                     stack_push_shared(ctx, (uint16_t)day);
-                    
-                    if (g_debug_mode) {
-                        printf("DEBUG: Date.getDate() = %u\n", day);
-                    }
                     break;
                 }
                 else if (strcmp(method_name, "getHours") == 0) {
@@ -2597,19 +2765,21 @@ int interpreter_step(ExecutionContext* ctx) {
                     Date* date_obj;
                     uint8_t hours;
                     
-                    /* Pop object reference */
+                    /* Pop object reference (1 word: handle) */
                     object_handle = stack_pop_shared(ctx);
                     
+                    /* Resolve handle to pointer */
+                    date_obj = (Date*)memory_get_object_ptr(object_handle);
+                    if (date_obj == NULL) {
+                        printf("ERROR: Invalid Date handle in getHours()\n");
+                        return -1;
+                    }
+                    
                     /* Call native method */
-                    date_obj = (Date*)(uintptr_t)object_handle;
                     hours = date_get_hours(date_obj);
                     
                     /* Push result */
                     stack_push_shared(ctx, (uint16_t)hours);
-                    
-                    if (g_debug_mode) {
-                        printf("DEBUG: Date.getHours() = %u\n", hours);
-                    }
                     break;
                 }
                 else if (strcmp(method_name, "getMinutes") == 0) {
@@ -2617,19 +2787,21 @@ int interpreter_step(ExecutionContext* ctx) {
                     Date* date_obj;
                     uint8_t minutes;
                     
-                    /* Pop object reference */
+                    /* Pop object reference (1 word: handle) */
                     object_handle = stack_pop_shared(ctx);
                     
+                    /* Resolve handle to pointer */
+                    date_obj = (Date*)memory_get_object_ptr(object_handle);
+                    if (date_obj == NULL) {
+                        printf("ERROR: Invalid Date handle in getMinutes()\n");
+                        return -1;
+                    }
+                    
                     /* Call native method */
-                    date_obj = (Date*)(uintptr_t)object_handle;
                     minutes = date_get_minutes(date_obj);
                     
                     /* Push result */
                     stack_push_shared(ctx, (uint16_t)minutes);
-                    
-                    if (g_debug_mode) {
-                        printf("DEBUG: Date.getMinutes() = %u\n", minutes);
-                    }
                     break;
                 }
                 else if (strcmp(method_name, "getSeconds") == 0) {
@@ -2637,19 +2809,21 @@ int interpreter_step(ExecutionContext* ctx) {
                     Date* date_obj;
                     uint8_t seconds;
                     
-                    /* Pop object reference */
+                    /* Pop object reference (1 word: handle) */
                     object_handle = stack_pop_shared(ctx);
                     
+                    /* Resolve handle to pointer */
+                    date_obj = (Date*)memory_get_object_ptr(object_handle);
+                    if (date_obj == NULL) {
+                        printf("ERROR: Invalid Date handle in getSeconds()\n");
+                        return -1;
+                    }
+                    
                     /* Call native method */
-                    date_obj = (Date*)(uintptr_t)object_handle;
                     seconds = date_get_seconds(date_obj);
                     
                     /* Push result */
                     stack_push_shared(ctx, (uint16_t)seconds);
-                    
-                    if (g_debug_mode) {
-                        printf("DEBUG: Date.getSeconds() = %u\n", seconds);
-                    }
                     break;
                 }
             }

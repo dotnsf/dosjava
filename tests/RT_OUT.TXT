@@ -1,29 +1,31 @@
-Test 1: Date(10000)
-Year: 
-1970
-Month: 
-0
-Day: 
-1
-Hours: 
-0
-Minutes: 
-0
-Seconds: 
-0
-Test 2: setTime(20000)
-Year: 
-1970
-Month: 
-0
-Day: 
-1
-Hours: 
-5
-Minutes: 
-33
-Seconds: 
-20
-Test 3: getTime()
-Time: 
-20000
+=== Date Long Type Test ===
+Note: getTime()/setTime() use SECONDS (not milliseconds)
+
+Test 1: Date with current time
+Current time (seconds): 1779470031
+Year: 2026
+Month: 4
+Day: 22
+
+Test 2: Date with specific timestamp
+Set time (seconds): 3567587
+Year: 1970
+Month: 1
+Day: 11
+
+Test 3: setTime() method
+After setTime (seconds): 1791994
+Year: 1970
+Month: 0
+Day: 21
+
+Test 4: Second precision
+Original: 1912276
+Retrieved: 1912276
+Second precision: OK
+
+Test 5: Date arithmetic
+Today (seconds): 1779470031
+Tomorrow (seconds): 1779556431
+
+=== All tests completed ===

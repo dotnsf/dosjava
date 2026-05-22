@@ -125,6 +125,29 @@ static int native_system_println_int(ExecutionContext* ctx, uint16_t* args, uint
 }
 
 /**
+ * System.out.println(long)
+ */
+static int native_system_println_long(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint32_t long_value;
+    uint16_t high, low;
+    
+    (void)ctx;
+    (void)result;
+    
+    /* Long is passed as 2 words: args[0]=high, args[1]=low */
+    if (arg_count >= 2) {
+        high = args[0];
+        low = args[1];
+        long_value = ((uint32_t)high << 16) | low;
+        printf("%ld\n", (long)long_value);
+    } else {
+        printf("ERROR: println(long) requires 2 arguments\n");
+    }
+    
+    return 0;
+}
+
+/**
  * System.out.println(String)
  */
 static int native_system_println_string(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
@@ -356,6 +379,19 @@ int native_register_builtins(void) {
         native_system_println_int,
         1,
         param_int,
+        NATIVE_RETURN_VOID
+    ) != 0) {
+        return -1;
+    }
+    
+    /* System.out.println(long) */
+    if (native_register(
+        "java/lang/System",
+        "println",
+        "(J)V",
+        native_system_println_long,
+        2,
+        NULL,  /* No param types needed for now */
         NATIVE_RETURN_VOID
     ) != 0) {
         return -1;

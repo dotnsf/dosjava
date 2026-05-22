@@ -7,13 +7,15 @@
 
 /**
  * Date structure - C representation of java.util.Date
- * 
+ *
  * Represents a specific instant in time with millisecond precision
- * Internally stores time as Unix timestamp (seconds since 1970-01-01)
+ * Internally stores time as Unix timestamp (milliseconds since 1970-01-01)
+ * Uses 64-bit long type to match Java's Date.getTime()/setTime()
  */
 typedef struct Date {
     Object base;             /* Base Object structure */
-    uint32_t time_sec;       /* Time in seconds since Unix epoch */
+    uint32_t time_ms_high;   /* High 32 bits of milliseconds since Unix epoch */
+    uint32_t time_ms_low;    /* Low 32 bits of milliseconds since Unix epoch */
     uint8_t cache_valid;     /* 1 if cached values are valid */
     uint16_t cached_year;    /* Cached year */
     uint8_t cached_month;    /* Cached month (0-11) */
@@ -31,10 +33,11 @@ Date* date_new(void);
 
 /**
  * Create a new Date with specified time
- * @param time_sec Time in seconds since Unix epoch
+ * @param time_ms_high High 32 bits of milliseconds since Unix epoch
+ * @param time_ms_low Low 32 bits of milliseconds since Unix epoch
  * @return Pointer to new Date, or NULL on error
  */
-Date* date_new_with_time(uint32_t time_sec);
+Date* date_new_with_time(uint32_t time_ms_high, uint32_t time_ms_low);
 
 /**
  * Delete a Date instance
@@ -43,18 +46,26 @@ Date* date_new_with_time(uint32_t time_sec);
 void date_delete(Date* date);
 
 /**
- * Get time value in seconds
+ * Get time value in milliseconds (high 32 bits)
  * @param date Date object
- * @return Time in seconds since Unix epoch
+ * @return High 32 bits of milliseconds since Unix epoch
  */
-uint32_t date_get_time(Date* date);
+uint32_t date_get_time_high(Date* date);
 
 /**
- * Set time value in seconds
+ * Get time value in milliseconds (low 32 bits)
  * @param date Date object
- * @param time_sec Time in seconds since Unix epoch
+ * @return Low 32 bits of milliseconds since Unix epoch
  */
-void date_set_time(Date* date, uint32_t time_sec);
+uint32_t date_get_time_low(Date* date);
+
+/**
+ * Set time value in milliseconds
+ * @param date Date object
+ * @param time_ms_high High 32 bits of milliseconds since Unix epoch
+ * @param time_ms_low Low 32 bits of milliseconds since Unix epoch
+ */
+void date_set_time(Date* date, uint32_t time_ms_high, uint32_t time_ms_low);
 
 /**
  * Get full year (e.g., 2026)

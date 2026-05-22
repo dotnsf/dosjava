@@ -64,5 +64,3 @@ class TestLongArray {
         System.println("Long array test complete!");
     }
 }
-
-// Made with Bob

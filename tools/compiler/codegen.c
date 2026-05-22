@@ -12,6 +12,7 @@
 static int read_ast_header(CodeGenerator* codegen);
 static int load_string_pool(CodeGenerator* codegen);
 static int load_symbol_table(CodeGenerator* codegen, const char* symbol_file);
+static uint16_t get_expression_type(CodeGenerator* codegen, ASTNode* expr_node);
 static uint16_t get_array_element_type(CodeGenerator* codegen, ASTNode* array_node);
 
 /* Initialize code generator */
@@ -1219,25 +1220,52 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
                 arg_count = expr_node->data.new_expr.arg_count;
                 arg_idx = expr_node->data.new_expr.first_arg;
                 
-                while (arg_idx != 0) {
-                    arg_node = codegen_get_node(codegen, arg_idx);
-                    if (!arg_node) {
-                        codegen_error(codegen, "Invalid constructor argument");
-                        return -1;
+                /* Count actual words needed (long types need 2 words) */
+                {
+                    uint16_t word_count = 0;
+                    uint16_t temp_idx = arg_idx;
+                    uint16_t arg_type;
+                    ASTNode* temp_node;
+                    
+                    while (temp_idx != 0) {
+                        temp_node = codegen_get_node(codegen, temp_idx);
+                        if (!temp_node) {
+                            codegen_error(codegen, "Invalid constructor argument");
+                            return -1;
+                        }
+                        
+                        /* Check if argument is long type using type detection */
+                        arg_type = get_expression_type(codegen, temp_node);
+                        if (arg_type == TYPE_LONG) {
+                            word_count += 2;  /* Long needs 2 words */
+                        } else {
+                            word_count += 1;  /* Other types need 1 word */
+                        }
+                        
+                        temp_idx = temp_node->next_sibling;
                     }
                     
-                    if (generate_expression(codegen, arg_node) != 0) {
-                        return -1;
+                    /* Generate code for each argument */
+                    while (arg_idx != 0) {
+                        arg_node = codegen_get_node(codegen, arg_idx);
+                        if (!arg_node) {
+                            codegen_error(codegen, "Invalid constructor argument");
+                            return -1;
+                        }
+                        
+                        if (generate_expression(codegen, arg_node) != 0) {
+                            return -1;
+                        }
+                        
+                        arg_idx = arg_node->next_sibling;
                     }
                     
-                    arg_idx = arg_node->next_sibling;
+                    /* Emit OP_NEW with class index and word count */
+                    emit_opcode(codegen, OP_NEW);
+                    emit_u2(codegen, class_idx);
+                    emit_u1(codegen, (uint8_t)word_count);
+                    update_stack(codegen, 1 - word_count);  /* Args consumed, object pushed */
                 }
-                
-                /* Emit OP_NEW with class index and argument count */
-                emit_opcode(codegen, OP_NEW);
-                emit_u2(codegen, class_idx);
-                emit_u1(codegen, (uint8_t)arg_count);
-                update_stack(codegen, 1 - arg_count);  /* Args consumed, object pushed */
                 return 0;
             }
         }
@@ -3396,6 +3424,51 @@ int backpatch_labels(CodeGenerator* codegen) {
     }
     
     return 0;
+}
+
+/* Get expression type */
+static uint16_t get_expression_type(CodeGenerator* codegen, ASTNode* expr_node) {
+    Symbol* sym;
+    const char* var_name;
+    uint16_t i;
+    
+    if (!codegen || !expr_node) {
+        return (uint16_t)TYPE_INT;  /* Default to int */
+    }
+    
+    /* Check node type */
+    switch (expr_node->type) {
+        case NODE_LITERAL_LONG:
+            return (uint16_t)TYPE_LONG;
+            
+        case NODE_LITERAL_INT:
+        case NODE_LITERAL_BOOL:
+            return (uint16_t)TYPE_INT;
+            
+        case NODE_IDENTIFIER:
+            var_name = codegen_get_string(codegen, expr_node->data.identifier.name);
+            if (var_name && codegen->symtable) {
+                /* Find the symbol */
+                for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                    sym = &codegen->symtable->symbols[i];
+                    if (sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) {
+                        const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if (sym_name && strcmp(sym_name, var_name) == 0) {
+                            return (uint16_t)sym->type.kind;
+                        }
+                    }
+                }
+            }
+            break;
+            
+        case NODE_ARRAY_ACCESS:
+            return get_array_element_type(codegen, expr_node);
+            
+        default:
+            break;
+    }
+    
+    return (uint16_t)TYPE_INT;  /* Default to int if not found */
 }
 
 /* Get array element type from array expression */

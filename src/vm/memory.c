@@ -7,9 +7,12 @@
 static MemoryManager g_memory_manager;
 static uint8_t g_memory_initialized = 0;
 
-/* Array handle table for Large memory model compatibility */
+/* Handle tables for Large memory model compatibility */
 static ArrayHandle g_array_handles[MAX_ARRAY_HANDLES];
 static uint8_t g_array_handles_initialized = 0;
+
+static ObjectHandle g_object_handles[MAX_OBJECT_HANDLES];
+static uint8_t g_object_handles_initialized = 0;
 
 /**
  * Align size to 2-byte boundary for 16-bit efficiency
@@ -392,5 +395,55 @@ void memory_free_array_handle(uint16_t handle) {
     if (handle > 0 && handle < MAX_ARRAY_HANDLES) {
         g_array_handles[handle].in_use = 0;
         g_array_handles[handle].array_ptr = NULL;
+    }
+}
+
+/**
+ * Allocate object handle for pointer
+ */
+uint16_t memory_alloc_object_handle(void* object_ptr) {
+    uint16_t i;
+    
+    /* Initialize handle table on first use */
+    if (!g_object_handles_initialized) {
+        memset(g_object_handles, 0, sizeof(g_object_handles));
+        g_object_handles_initialized = 1;
+    }
+    
+    /* Find free handle (skip 0, use 1-255) */
+    for (i = 1; i < MAX_OBJECT_HANDLES; i++) {
+        if (!g_object_handles[i].in_use) {
+            g_object_handles[i].object_ptr = object_ptr;
+            g_object_handles[i].in_use = 1;
+            return i;
+        }
+    }
+    
+    /* No free handles */
+    return 0;
+}
+
+/**
+ * Get object pointer from handle
+ */
+void* memory_get_object_ptr(uint16_t handle) {
+    if (handle == 0 || handle >= MAX_OBJECT_HANDLES) {
+        return NULL;
+    }
+    
+    if (!g_object_handles[handle].in_use) {
+        return NULL;
+    }
+    
+    return g_object_handles[handle].object_ptr;
+}
+
+/**
+ * Free object handle
+ */
+void memory_free_object_handle(uint16_t handle) {
+    if (handle > 0 && handle < MAX_OBJECT_HANDLES) {
+        g_object_handles[handle].in_use = 0;
+        g_object_handles[handle].object_ptr = NULL;
     }
 }

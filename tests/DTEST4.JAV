@@ -48,7 +48,7 @@
         System.out.println(seconds);
         
         System.out.println("Test 3: getTime()");
-        int time = d.getTime();
+        long time = d.getTime();
         System.out.println("Time: ");
         System.out.println(time);
         

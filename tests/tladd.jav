@@ -25,5 +25,3 @@ class TestLongAdd {
         System.print("Expected: 3000000\n");
     }
 }
-
-// Made with Bob

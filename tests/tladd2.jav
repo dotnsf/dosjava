@@ -21,5 +21,3 @@ class TestLongAdd2 {
         System.print("\n");
     }
 }
-
-// Made with Bob

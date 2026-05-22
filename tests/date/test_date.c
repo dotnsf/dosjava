@@ -36,11 +36,12 @@ void test_date_new(void) {
     TEST_ASSERT(date != NULL, "Date created successfully");
     
     if (date) {
-        /* Get time from Date */
-        time2 = date_get_time(date);
+        /* Get time from Date (in milliseconds) */
+        uint32_t time2_low = date_get_time_low(date);
+        time2 = time2_low / 1000;  /* Convert ms to seconds for comparison */
         
         /* Time should be close to current time (within 2 seconds) */
-        TEST_ASSERT(time2 >= time1 && time2 <= time1 + 2, 
+        TEST_ASSERT(time2 >= time1 && time2 <= time1 + 2,
                    "Date time is current time");
         
         date_delete(date);
@@ -53,18 +54,20 @@ void test_date_new(void) {
 void test_date_new_with_time(void) {
     Date* date;
     uint32_t test_time = 946684800;  /* 2000-01-01 00:00:00 */
-    uint32_t retrieved_time;
+    uint32_t test_time_ms_high = 0;
+    uint32_t test_time_ms_low = test_time * 1000;  /* Convert to milliseconds */
+    uint32_t retrieved_time_low;
     
     printf("\nTest 2: date_new_with_time()\n");
     
     /* Create Date with specific time */
-    date = date_new_with_time(test_time);
+    date = date_new_with_time(test_time_ms_high, test_time_ms_low);
     TEST_ASSERT(date != NULL, "Date created with specific time");
     
     if (date) {
         /* Verify time */
-        retrieved_time = date_get_time(date);
-        TEST_ASSERT(retrieved_time == test_time, "Time matches");
+        retrieved_time_low = date_get_time_low(date);
+        TEST_ASSERT(retrieved_time_low == test_time_ms_low, "Time matches");
         
         date_delete(date);
     }
@@ -76,13 +79,15 @@ void test_date_new_with_time(void) {
 void test_date_getters(void) {
     Date* date;
     uint32_t test_time = 946684800;  /* 2000-01-01 00:00:00 */
+    uint32_t test_time_ms_high = 0;
+    uint32_t test_time_ms_low = test_time * 1000;
     uint16_t year;
     uint8_t month, day, hour, minute, second;
     
     printf("\nTest 3: Date component getters\n");
     
     /* Create Date with known time */
-    date = date_new_with_time(test_time);
+    date = date_new_with_time(test_time_ms_high, test_time_ms_low);
     TEST_ASSERT(date != NULL, "Date created");
     
     if (date) {
@@ -119,11 +124,15 @@ void test_date_set_time(void) {
     uint32_t time2 = 1704110400; /* 2024-01-01 12:00:00 */
     uint16_t year;
     uint8_t month, day, hour;
+    uint32_t time1_ms_high = 0;
+    uint32_t time1_ms_low = time1 * 1000;
+    uint32_t time2_ms_high = 0;
+    uint32_t time2_ms_low = time2 * 1000;
     
     printf("\nTest 4: date_set_time()\n");
     
     /* Create Date with initial time */
-    date = date_new_with_time(time1);
+    date = date_new_with_time(time1_ms_high, time1_ms_low);
     TEST_ASSERT(date != NULL, "Date created");
     
     if (date) {
@@ -132,7 +141,7 @@ void test_date_set_time(void) {
         TEST_ASSERT(year == 2000, "Initial year is 2000");
         
         /* Change time */
-        date_set_time(date, time2);
+        date_set_time(date, time2_ms_high, time2_ms_low);
         
         /* Verify new time */
         year = date_get_full_year(date);
@@ -159,12 +168,14 @@ void test_date_set_time(void) {
 void test_date_to_string(void) {
     Date* date;
     uint32_t test_time = 946684800;  /* 2000-01-01 00:00:00 */
+    uint32_t test_time_ms_high = 0;
+    uint32_t test_time_ms_low = test_time * 1000;
     char* str;
     
     printf("\nTest 5: date_to_string()\n");
     
     /* Create Date */
-    date = date_new_with_time(test_time);
+    date = date_new_with_time(test_time_ms_high, test_time_ms_low);
     TEST_ASSERT(date != NULL, "Date created");
     
     if (date) {

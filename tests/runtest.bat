@@ -1073,7 +1073,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "20000"
 echo.
 
-goto :completed
+goto :test25
 
 :test24_fail
 echo FAILED: Compilation error
@@ -1090,6 +1090,102 @@ goto :end
 :test24_badout
 echo FAILED: Output mismatch for Test 24
 echo Expected: "20000"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test25
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 25: Long
+echo ------------------------------
+..\build\bin\djc.exe tlonarr.jav
+if errorlevel 1 goto :test25_fail
+if not exist tlonarr.DJC goto :test25_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe tlonarr.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test25_runfail
+linechk RT_OUT.TXT 5 "arr[0] = 1000000" > nul
+if errorlevel 1 goto :test25_badout
+linechk RT_OUT.TXT 10 "Sum = 15000000" > nul
+if errorlevel 1 goto :test25_badout
+linechk RT_OUT.TXT 11 "Array length: 5" > nul
+if errorlevel 1 goto :test25_badout
+linechk RT_OUT.TXT 12 "Modified arr[2] = 9999999" > nul
+if errorlevel 1 goto :test25_badout
+linechk RT_OUT.TXT 13 "arr[0] + arr[1] = 3000000" > nul
+if errorlevel 1 goto :test25_badout
+linechk RT_OUT.TXT 14 "arr[4] - arr[3] = 1000000" > nul
+if errorlevel 1 goto :test25_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "arr[4] - arr[3] = 1000000"
+echo.
+
+goto :test26
+
+:test25_fail
+echo FAILED: Compilation error
+goto :end
+
+:test25_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test25_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test25_badout
+echo FAILED: Output mismatch for Test 25
+echo Expected: "arr[4] - arr[3] = 1000000"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test26
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 26: Date setTime/getTime
+echo ------------------------------
+..\build\bin\djc.exe tdatlong.jav
+if errorlevel 1 goto :test26_fail
+if not exist tdatlong.DJC goto :test26_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe tdatlong.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test26_runfail
+linechk RT_OUT.TXT 1 "=== Date Long Type Test ===" > nul
+if errorlevel 1 goto :test26_badout
+linechk RT_OUT.TXT 6 "YEAR: 2026" > nul
+if errorlevel 1 goto :test26_badout
+linechk RT_OUT.TXT 25 "Second precision: OK" > nul
+if errorlevel 1 goto :test26_badout
+linechk RT_OUT.TXT 31 "=== All tests completed ===" > nul
+if errorlevel 1 goto :test26_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "=== All tests completed ==="
+echo.
+
+goto :completed
+
+:test26_fail
+echo FAILED: Compilation error
+goto :end
+
+:test26_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test26_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test26_badout
+echo FAILED: Output mismatch for Test 26
+echo Expected: "=== All tests completed ==="
 echo Actual:
 type RT_OUT.TXT
 goto :end
