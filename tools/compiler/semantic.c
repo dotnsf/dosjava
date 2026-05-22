@@ -763,6 +763,46 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
                     return -1;
                 }
             }
+            
+            /* Add printLong(long) static method */
+            method_offset = semantic_add_string(analyzer, "printLong");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_VOID;
+            method_sym.data.method_data.param_count = 1;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameter for printLong(long value) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset;
+                
+                param_offset = semantic_add_string(analyzer, "value");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_LONG;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
         }
     }
     
@@ -1661,7 +1701,14 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
         return -1;
     }
     var_sym.type = var_type;  /* Use saved copy */
-    var_sym.data.local_data.index = analyzer->next_local_index++;
+    var_sym.data.local_data.index = analyzer->next_local_index;
+    
+    /* Long type variables occupy 2 slots */
+    if (var_type.kind == TYPE_LONG) {
+        analyzer->next_local_index += 2;
+    } else {
+        analyzer->next_local_index++;
+    }
     
     /* Add variable to symbol table */
     if (symtable_add_symbol(analyzer->symtable, &var_sym) == 0xFFFF) {
@@ -1959,9 +2006,9 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             class_name = NULL;
             class_sym = NULL;
             
-            /* Check if it's an array (class_name is TYPE_INT or TYPE_BOOLEAN) */
-            if (class_name_value == TYPE_INT || class_name_value == TYPE_BOOLEAN) {
-                /* Array creation: new int[size] or new boolean[size] */
+            /* Check if it's an array (class_name is TYPE_INT, TYPE_LONG, or TYPE_BOOLEAN) */
+            if (class_name_value == TYPE_INT || class_name_value == TYPE_LONG || class_name_value == TYPE_BOOLEAN) {
+                /* Array creation: new int[size], new long[size], or new boolean[size] */
                 ASTNode* size_node;
                 TypeInfo size_type;
                 
@@ -1975,7 +2022,7 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
                 }
                 
                 result_type->kind = TYPE_ARRAY;
-                result_type->class_name = 0;
+                result_type->class_name = class_name_value;  /* Store element type */
                 return 0;
             }
             
@@ -2028,7 +2075,14 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
                 return -1;
             }
             
-            result_type->kind = TYPE_INT;
+            /* Return element type from array's class_name field */
+            if (array_type.class_name == TYPE_LONG) {
+                result_type->kind = TYPE_LONG;
+            } else if (array_type.class_name == TYPE_BOOLEAN) {
+                result_type->kind = TYPE_BOOLEAN;
+            } else {
+                result_type->kind = TYPE_INT;
+            }
             result_type->class_name = 0;
             return 0;
         }

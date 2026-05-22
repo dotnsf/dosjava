@@ -126,6 +126,9 @@ const char* opcode_name(uint8_t opcode) {
         case OP_LCMP:          return "LCMP";
         case OP_LOAD_LONG:     return "LOAD_LONG";
         case OP_STORE_LONG:    return "STORE_LONG";
+        case OP_NEW_LONG_ARRAY: return "NEW_LONG_ARRAY";
+        case OP_LARRAY_LOAD:   return "LARRAY_LOAD";
+        case OP_LARRAY_STORE:  return "LARRAY_STORE";
         case OP_HALT:          return "HALT";
         default:               return "UNKNOWN";
     }
@@ -180,6 +183,9 @@ uint8_t opcode_length(uint8_t opcode) {
         case OP_I2L:
         case OP_L2I:
         case OP_LCMP:
+        case OP_NEW_LONG_ARRAY:
+        case OP_LARRAY_LOAD:
+        case OP_LARRAY_STORE:
         case OP_HALT:
             return 1;
         

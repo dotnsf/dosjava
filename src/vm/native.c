@@ -166,6 +166,22 @@ static int native_system_print_int(ExecutionContext* ctx, uint16_t* args, uint8_
 }
 
 /**
+ * System.out.print(long)
+ */
+static int native_system_print_long(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    int32_t value;
+    
+    (void)ctx;
+    (void)arg_count;
+    (void)result;
+    
+    /* Long value is passed as two 16-bit words: args[0]=high, args[1]=low */
+    value = ((int32_t)args[0] << 16) | args[1];
+    system_print_long(value);
+    return 0;
+}
+
+/**
  * System.out.print(String)
  */
 static int native_system_print_string(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
@@ -358,7 +374,20 @@ int native_register_builtins(void) {
         return -1;
     }
     
-    /* System.out.print(int) */
+    /* System.printInt(int) */
+    if (native_register(
+        "java/lang/System",
+        "printInt",
+        "(I)V",
+        native_system_print_int,
+        1,
+        param_int,
+        NATIVE_RETURN_VOID
+    ) != 0) {
+        return -1;
+    }
+    
+    /* System.out.print(int) - legacy alias */
     if (native_register(
         "java/lang/System",
         "print",
@@ -366,6 +395,19 @@ int native_register_builtins(void) {
         native_system_print_int,
         1,
         param_int,
+        NATIVE_RETURN_VOID
+    ) != 0) {
+        return -1;
+    }
+    
+    /* System.out.print(long) */
+    if (native_register(
+        "java/lang/System",
+        "printLong",
+        "(J)V",
+        native_system_print_long,
+        2,  /* Long takes 2 words */
+        NULL,
         NATIVE_RETURN_VOID
     ) != 0) {
         return -1;

@@ -292,5 +292,3 @@ int main(void) {
     
     return (g_test_passed == g_test_count) ? 0 : 1;
 }
-
-// Made with Bob

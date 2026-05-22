@@ -94,7 +94,7 @@ typedef enum {
 #pragma pack(push, 1)
 typedef struct {
     uint16_t kind;          /* TypeKind as uint16_t for consistent size */
-    uint16_t class_name;    /* Offset in string pool for TYPE_CLASS */
+    uint16_t class_name;    /* Offset in string pool for TYPE_CLASS, or element type for TYPE_ARRAY */
 } TypeInfo;
 #pragma pack(pop)
 

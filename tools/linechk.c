@@ -89,5 +89,3 @@ int main(int argc, char *argv[]) {
     /* Success - line matches */
     return 0;
 }
-
-// Made with Bob

@@ -86,6 +86,20 @@ void system_println_int(int16_t value) {
 }
 
 /**
+ * Print a long integer to standard output
+ */
+void system_print_long(int32_t value) {
+    printf("%ld", value);
+}
+
+/**
+ * Print a long integer to standard output with newline
+ */
+void system_println_long(int32_t value) {
+    printf("%ld\n", value);
+}
+
+/**
  * Print a character to standard output
  */
 void system_print_char(char c) {

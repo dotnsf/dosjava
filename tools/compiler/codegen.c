@@ -12,6 +12,7 @@
 static int read_ast_header(CodeGenerator* codegen);
 static int load_string_pool(CodeGenerator* codegen);
 static int load_symbol_table(CodeGenerator* codegen, const char* symbol_file);
+static uint16_t get_array_element_type(CodeGenerator* codegen, ASTNode* array_node);
 
 /* Initialize code generator */
 int codegen_init(CodeGenerator* codegen, const char* ast_file, const char* symbol_file, const char* output_file) {
@@ -574,9 +575,33 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
             if (expr_node) {
                 ASTNode expr_copy;
                 uint16_t expr_type;
+                int is_long_assign = 0;
                 
                 memcpy(&expr_copy, expr_node, sizeof(ASTNode));
                 expr_type = expr_copy.type;
+                
+                /* Check if this is a long assignment */
+                if (expr_type == NODE_ASSIGN) {
+                    ASTNode* target_node = codegen_get_node(codegen, expr_copy.data.assign.target);
+                    if (target_node && target_node->type == NODE_IDENTIFIER) {
+                        const char* var_name = codegen_get_string(codegen, target_node->data.identifier.name);
+                        if (var_name) {
+                            uint16_t i;
+                            for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                                Symbol* sym = &codegen->symtable->symbols[i];
+                                const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                                if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                                    sym_name && strcmp(sym_name, var_name) == 0) {
+                                    if (sym->type.kind == TYPE_LONG) {
+                                        is_long_assign = 1;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 generate_expression(codegen, &expr_copy);
 
                 if (expr_type == NODE_BINARY_OP ||
@@ -589,8 +614,16 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
                     expr_type == NODE_ARRAY_ACCESS ||
                     expr_type == NODE_FIELD_ACCESS ||
                     expr_type == NODE_ASSIGN) {
-                    emit_opcode(codegen, OP_POP);
-                    update_stack(codegen, -1);
+                    if (is_long_assign) {
+                        /* Long assignment leaves 2 words on stack, pop both */
+                        emit_opcode(codegen, OP_POP);
+                        update_stack(codegen, -1);
+                        emit_opcode(codegen, OP_POP);
+                        update_stack(codegen, -1);
+                    } else {
+                        emit_opcode(codegen, OP_POP);
+                        update_stack(codegen, -1);
+                    }
                 }
             }
             return 0;
@@ -1137,9 +1170,10 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             class_name_value = expr_node->data.new_expr.class_name;
             size_idx = expr_node->next_sibling;
             
-            /* Check if it's an array (class_name is TYPE_INT or TYPE_BOOLEAN) */
-            if (class_name_value == TYPE_INT || class_name_value == TYPE_BOOLEAN) {
-                /* Array creation: new int[size] or new boolean[size] */
+            /* Check if it's an array (class_name stores element type) */
+            if (class_name_value == TYPE_INT || class_name_value == TYPE_BOOLEAN ||
+                class_name_value == TYPE_LONG) {
+                /* Array creation: new int[size], new boolean[size], or new long[size] */
                 ASTNode* size_node;
                 uint8_t elem_type = (uint8_t)class_name_value;
                 
@@ -1149,8 +1183,14 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
                     return -1;
                 }
                 generate_expression(codegen, size_node);
-                emit_opcode(codegen, OP_NEW_ARRAY);
-                emit_u1(codegen, elem_type);
+                
+                /* Emit appropriate opcode based on element type */
+                if (elem_type == TYPE_LONG) {
+                    emit_opcode(codegen, OP_NEW_LONG_ARRAY);
+                } else {
+                    emit_opcode(codegen, OP_NEW_ARRAY);
+                    emit_u1(codegen, elem_type);
+                }
                 return 0;
             }
             
@@ -1203,26 +1243,45 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
         }
         
         case NODE_ARRAY_ACCESS: {
-            ASTNode* array_node;
-            ASTNode* index_node;
+            ASTNode array_expr_copy;
+            ASTNode index_expr_copy;
             uint16_t array_idx = expr_node->data.array_access.array;
             uint16_t index_idx = expr_node->data.array_access.index;
+            uint16_t elem_type;
             
-            array_node = codegen_get_node(codegen, array_idx);
-            if (!array_node) {
-                codegen_error(codegen, "Invalid array access");
-                return -1;
+            /* Copy array node before any codegen_get_node calls */
+            {
+                ASTNode* array_src = codegen_get_node(codegen, array_idx);
+                if (!array_src) {
+                    codegen_error(codegen, "Invalid array access");
+                    return -1;
+                }
+                memcpy(&array_expr_copy, array_src, sizeof(ASTNode));
             }
-            generate_expression(codegen, array_node);
             
-            index_node = codegen_get_node(codegen, index_idx);
-            if (!index_node) {
-                codegen_error(codegen, "Invalid array access");
-                return -1;
+            /* Copy index node */
+            {
+                ASTNode* index_src = codegen_get_node(codegen, index_idx);
+                if (!index_src) {
+                    codegen_error(codegen, "Invalid array access");
+                    return -1;
+                }
+                memcpy(&index_expr_copy, index_src, sizeof(ASTNode));
             }
-            generate_expression(codegen, index_node);
-            emit_opcode(codegen, OP_ARRAY_LOAD);
-            update_stack(codegen, -1);
+            
+            /* Generate array and index expressions */
+            generate_expression(codegen, &array_expr_copy);
+            generate_expression(codegen, &index_expr_copy);
+            
+            /* Determine element type and emit appropriate load opcode */
+            elem_type = get_array_element_type(codegen, &array_expr_copy);
+            if (elem_type == TYPE_LONG) {
+                emit_opcode(codegen, OP_LARRAY_LOAD);
+                update_stack(codegen, 0);  /* Pops 2 (array, index), pushes 2 (high, low) */
+            } else {
+                emit_opcode(codegen, OP_ARRAY_LOAD);
+                update_stack(codegen, -1);  /* Pops 2 (array, index), pushes 1 (value) */
+            }
             return 0;
         }
         
@@ -1694,34 +1753,50 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
             const char* var_name = codegen_get_string(codegen, check_left->data.identifier.name);
             if (var_name) {
                 uint16_t i;
-                for (i = 0; i < codegen->symtable->symbol_count; i++) {
-                    Symbol* sym = &codegen->symtable->symbols[i];
+                /* Search in reverse order to find innermost scope first */
+                for (i = codegen->symtable->symbol_count; i > 0; i--) {
+                    Symbol* sym = &codegen->symtable->symbols[i - 1];
                     const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
                     if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                         sym_name && strcmp(sym_name, var_name) == 0) {
                         if (sym->type.kind == TYPE_LONG) {
                             use_long_ops = 1;
-                            break;
                         }
+                        break;
                     }
                 }
+            }
+        }
+        /* Check if left operand is array access with long element type */
+        if (check_left && check_left->type == NODE_ARRAY_ACCESS) {
+            uint16_t elem_type = get_array_element_type(codegen, check_left);
+            if (elem_type == TYPE_LONG) {
+                use_long_ops = 1;
             }
         }
         if (check_right && check_right->type == NODE_IDENTIFIER) {
             const char* var_name = codegen_get_string(codegen, check_right->data.identifier.name);
             if (var_name) {
                 uint16_t i;
-                for (i = 0; i < codegen->symtable->symbol_count; i++) {
-                    Symbol* sym = &codegen->symtable->symbols[i];
+                /* Search in reverse order to find innermost scope first */
+                for (i = codegen->symtable->symbol_count; i > 0; i--) {
+                    Symbol* sym = &codegen->symtable->symbols[i - 1];
                     const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
                     if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                         sym_name && strcmp(sym_name, var_name) == 0) {
                         if (sym->type.kind == TYPE_LONG) {
                             use_long_ops = 1;
-                            break;
                         }
+                        break;
                     }
                 }
+            }
+        }
+        /* Check if right operand is array access with long element type */
+        if (check_right && check_right->type == NODE_ARRAY_ACCESS) {
+            uint16_t elem_type = get_array_element_type(codegen, check_right);
+            if (elem_type == TYPE_LONG) {
+                use_long_ops = 1;
             }
         }
         
@@ -2082,6 +2157,7 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
         if (assign_op == 0) {
             ASTNode array_expr_copy;
             ASTNode index_expr_copy;
+            uint16_t elem_type;
             
             {
                 ASTNode* array_src = codegen_get_node(codegen, array_idx);
@@ -2111,8 +2187,15 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
                 return -1;
             }
             
-            emit_opcode(codegen, OP_ARRAY_STORE);
-            update_stack(codegen, -3);
+            /* Determine element type and emit appropriate store opcode */
+            elem_type = get_array_element_type(codegen, &array_expr_copy);
+            if (elem_type == TYPE_LONG) {
+                emit_opcode(codegen, OP_LARRAY_STORE);
+                update_stack(codegen, -2);  /* Pops 4 (array, index, high, low), pushes 2 (high, low) */
+            } else {
+                emit_opcode(codegen, OP_ARRAY_STORE);
+                update_stack(codegen, -3);  /* Pops 3 (array, index, value), pushes 1 (value) */
+            }
             return 0;
         }
         
@@ -2199,9 +2282,10 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     
     if (assign_op == 0) {
         /* Check if target is long type */
+        /* Search in reverse order to find innermost scope first */
         int is_long = 0;
-        for (i = 0; i < codegen->symtable->symbol_count; i++) {
-            Symbol* sym = &codegen->symtable->symbols[i];
+        for (i = codegen->symtable->symbol_count; i > 0; i--) {
+            Symbol* sym = &codegen->symtable->symbols[i - 1];
             const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
             if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                 sym_name && strcmp(sym_name, var_name) == 0) {
@@ -2398,7 +2482,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     is_string_indexof = 0;
     is_string_lastindexof = 0;
     is_string_substr = 0;
-    if (strcmp(method_name, "println") == 0 || strcmp(method_name, "print") == 0) {
+    if (strcmp(method_name, "println") == 0 || strcmp(method_name, "print") == 0 ||
+        strcmp(method_name, "printInt") == 0 || strcmp(method_name, "printLong") == 0) {
         is_native = 1;
     } else if (strcmp(method_name, "concat") == 0 && object_idx == 0) {
         is_native = 1;
@@ -2650,6 +2735,13 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     }
     
     invoke_arg_count = arg_count;
+    
+    /* Adjust arg_count for long parameters (each long takes 2 words) */
+    if (strcmp(method_name, "printLong") == 0) {
+        /* printLong(long) takes 1 long argument = 2 words on stack */
+        invoke_arg_count = 2;
+    }
+    
     method_idx = find_method_index(codegen, method_name, is_native);
     if (method_idx == 0xFFFF) {
         codegen_error(codegen, "Failed to add method reference");
@@ -2720,6 +2812,12 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         } else if (strcmp(method_name, "isConnected") == 0) {
             /* Socket.isConnected(int sock) returns int */
             strcpy(descriptor, "(I)I");
+        } else if (strcmp(method_name, "printInt") == 0) {
+            /* System.printInt(int) */
+            strcpy(descriptor, "(I)V");
+        } else if (strcmp(method_name, "printLong") == 0) {
+            /* System.printLong(long) */
+            strcpy(descriptor, "(J)V");
         } else if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
             strcpy(descriptor, "(Ljava/lang/String;)V");
         } else {
@@ -2814,9 +2912,10 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
     /* If found as local variable, load it */
     if (local_idx != 0xFFFF) {
         /* Check if this is a long variable */
+        /* Search in reverse order to find innermost scope first */
         int is_long = 0;
-        for (i = 0; i < codegen->symtable->symbol_count; i++) {
-            Symbol* sym = &codegen->symtable->symbols[i];
+        for (i = codegen->symtable->symbol_count; i > 0; i--) {
+            Symbol* sym = &codegen->symtable->symbols[i - 1];
             const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
             if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                 sym_name && strcmp(sym_name, var_name) == 0) {
@@ -3297,6 +3396,53 @@ int backpatch_labels(CodeGenerator* codegen) {
     }
     
     return 0;
+}
+
+/* Get array element type from array expression */
+static uint16_t get_array_element_type(CodeGenerator* codegen, ASTNode* array_node) {
+    Symbol* sym;
+    const char* var_name;
+    uint16_t i;
+    uint16_t result;
+    ASTNode* base_array;
+    
+    if (!codegen || !array_node) {
+        return (uint16_t)TYPE_INT;  /* Default to int */
+    }
+    
+    /* If array node is NODE_ARRAY_ACCESS, get the base array identifier */
+    if (array_node->type == NODE_ARRAY_ACCESS) {
+        base_array = codegen_get_node(codegen, array_node->data.array_access.array);
+        if (base_array) {
+            /* Recursively get element type from base array */
+            return get_array_element_type(codegen, base_array);
+        }
+    }
+    
+    /* If array node is an identifier, look up its type in symbol table */
+    if (array_node->type == NODE_IDENTIFIER) {
+        var_name = codegen_get_string(codegen, array_node->data.identifier.name);
+        if (var_name && codegen->symtable) {
+            /* Find the symbol */
+            for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                sym = &codegen->symtable->symbols[i];
+                if (sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) {
+                    const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                    if (sym_name && strcmp(sym_name, var_name) == 0) {
+                        /* Found the symbol - check if it's an array */
+                        if (sym->type.kind == TYPE_ARRAY) {
+                            /* Return element type stored in class_name field */
+                            result = sym->type.class_name;
+                            return result;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    return (uint16_t)TYPE_INT;  /* Default to int if not found */
 }
 
 /* Get local variable index */

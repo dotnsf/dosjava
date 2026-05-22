@@ -28,5 +28,3 @@ echo Build failed!
 exit /b 1
 
 :end
-
-@REM Made with Bob

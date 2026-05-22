@@ -232,6 +232,7 @@ static inline uint32_t load_local_long(ExecutionContext* ctx, uint8_t index) {
     uint16_t base;
     uint16_t high;
     uint16_t low;
+    uint32_t result;
     
     base = get_local_base(ctx);
     if (base + index + 1 >= SHARED_LOCALS_SIZE) {
@@ -239,7 +240,9 @@ static inline uint32_t load_local_long(ExecutionContext* ctx, uint8_t index) {
     }
     high = ctx->shared_locals[base + index];
     low = ctx->shared_locals[base + index + 1];
-    return ((uint32_t)high << 16) | low;
+    result = ((uint32_t)high << 16) | low;
+    
+    return result;
 }
 
 /**
@@ -252,11 +255,16 @@ static inline uint32_t load_local_long(ExecutionContext* ctx, uint8_t index) {
  */
 static inline void store_local_long(ExecutionContext* ctx, uint8_t index, uint32_t value) {
     uint16_t base;
+    uint16_t high;
+    uint16_t low;
     
     base = get_local_base(ctx);
+    high = (uint16_t)(value >> 16);
+    low = (uint16_t)(value & 0xFFFF);
+    
     if (base + index + 1 < SHARED_LOCALS_SIZE) {
-        ctx->shared_locals[base + index] = (uint16_t)(value >> 16);      /* High word */
-        ctx->shared_locals[base + index + 1] = (uint16_t)(value & 0xFFFF); /* Low word */
+        ctx->shared_locals[base + index] = high;      /* High word */
+        ctx->shared_locals[base + index + 1] = low;   /* Low word */
     }
 }
 
@@ -431,11 +439,6 @@ int interpreter_step(ExecutionContext* ctx) {
     /* Fetch opcode */
     opcode = interpreter_read_u8(ctx);
     
-    /* Debug output for opcode execution */
-    if (g_debug_mode) {
-        printf("DEBUG VM: Executing opcode 0x%02X at PC offset %u\n",
-               opcode, (unsigned)(ctx->pc - ctx->code_start - 1));
-    }
     
     /* Decode and execute */
     switch (opcode) {
@@ -927,6 +930,7 @@ int interpreter_step(ExecutionContext* ctx) {
             method_index = interpreter_read_u16(ctx);
             arg_count = interpreter_read_u8(ctx);
             
+            
             /* Look up method */
             method = djc_find_method(ctx->djc_file, method_index);
             if (method == NULL) {
@@ -964,6 +968,7 @@ int interpreter_step(ExecutionContext* ctx) {
                 
                 /* Find native method in registry */
                 native_method = native_find(NULL, method_name, descriptor);
+                
                 
                 if (native_method != NULL) {
                     /* Pop arguments from stack (in reverse order) */
@@ -2849,6 +2854,7 @@ int interpreter_step(ExecutionContext* ctx) {
             
             index = interpreter_read_u8(ctx);
             value = stack_pop_long(ctx);
+            
             store_local_long(ctx, index, value);
             break;
         }
@@ -3044,6 +3050,149 @@ int interpreter_step(ExecutionContext* ctx) {
             }
             
             if (stack_push_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        /* ===== Long Array Operations ===== */
+        
+        case OP_NEW_LONG_ARRAY: {
+            /* Create new long[] array
+             * Stack: [size] -> [array_ref]
+             * Memory layout: [length:2][elem0_high:2][elem0_low:2]...
+             * Each long element uses 2 words (4 bytes)
+             */
+            uint16_t size;
+            uint16_t total_size;
+            uint16_t* array_data;
+            uint16_t array_handle;
+            
+            size = stack_pop_shared(ctx);
+            
+            /* Validate size */
+            if (size > 8192) {  /* Reasonable limit for DOS */
+                printf("ERROR: Array size too large: %u\n", size);
+                return -1;
+            }
+            
+            /* Calculate total size: (size * 2 + 1) * 2 bytes
+             * size * 2 = number of words for all long elements
+             * + 1 = length field
+             * * 2 = convert words to bytes
+             */
+            total_size = (uint16_t)((size * 2 + 1) * sizeof(uint16_t));
+            array_data = (uint16_t*)memory_alloc(total_size);
+            if (array_data == NULL) {
+                printf("ERROR: Out of memory allocating long array\n");
+                return -1;
+            }
+            
+            /* Initialize array: length + all elements to 0 */
+            memset(array_data, 0, total_size);
+            array_data[0] = size;  /* Store element count (not word count) */
+            
+            /* Allocate handle for array pointer */
+            array_handle = memory_alloc_array_handle(array_data);
+            if (array_handle == 0) {
+                printf("ERROR: Out of array handles\n");
+                memory_free(array_data);
+                return -1;
+            }
+            
+            if (stack_push_shared(ctx, array_handle) != 0) {
+                printf("ERROR: Stack overflow\n");
+                memory_free_array_handle(array_handle);
+                memory_free(array_data);
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LARRAY_LOAD: {
+            /* Load long element from array
+             * Stack: [array_ref, index] -> [high, low]
+             * Pushes 2 words: high word first, then low word
+             */
+            uint16_t index;
+            uint16_t array_handle;
+            uint16_t* array_data;
+            uint16_t length;
+            uint16_t offset;
+            uint16_t high;
+            uint16_t low;
+            
+            index = stack_pop_shared(ctx);
+            array_handle = stack_pop_shared(ctx);
+            array_data = (uint16_t*)memory_get_array_ptr(array_handle);
+            
+            if (array_data == NULL) {
+                printf("ERROR: Null array reference (LARRAY_LOAD)\n");
+                return -1;
+            }
+            
+            length = array_data[0];
+            if (index >= length) {
+                printf("ERROR: Array index out of bounds (index=%u, length=%u)\n",
+                       index, length);
+                return -1;
+            }
+            
+            /* Calculate offset: 1 (length) + index * 2 (each long = 2 words) */
+            offset = 1 + (index * 2);
+            high = array_data[offset];
+            low = array_data[offset + 1];
+            
+            /* Push high word first, then low word */
+            if (stack_push_shared(ctx, high) != 0 ||
+                stack_push_shared(ctx, low) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LARRAY_STORE: {
+            /* Store long element into array
+             * Stack: [array_ref, index, high, low] -> [high, low]
+             * Pops 4 values, stores long, pushes value back for assignment result
+             */
+            uint16_t low;
+            uint16_t high;
+            uint16_t index;
+            uint16_t array_handle;
+            uint16_t* array_data;
+            uint16_t length;
+            uint16_t offset;
+            
+            low = stack_pop_shared(ctx);
+            high = stack_pop_shared(ctx);
+            index = stack_pop_shared(ctx);
+            array_handle = stack_pop_shared(ctx);
+            
+            array_data = (uint16_t*)memory_get_array_ptr(array_handle);
+            
+            if (array_data == NULL) {
+                printf("ERROR: Null array reference (LARRAY_STORE)\n");
+                return -1;
+            }
+            
+            length = array_data[0];
+            if (index >= length) {
+                printf("ERROR: Array index out of bounds (index=%u, length=%u)\n",
+                       index, length);
+                return -1;
+            }
+            
+            /* Calculate offset: 1 (length) + index * 2 (each long = 2 words) */
+            offset = 1 + (index * 2);
+            array_data[offset] = high;
+            array_data[offset + 1] = low;
+            
+            /* Push value back for assignment expression result */
+            if (stack_push_shared(ctx, high) != 0 ||
+                stack_push_shared(ctx, low) != 0) {
                 printf("ERROR: Stack overflow\n");
                 return -1;
             }

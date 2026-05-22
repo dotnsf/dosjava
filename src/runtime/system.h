@@ -57,6 +57,18 @@ void system_print_int(int16_t value);
 void system_println_int(int16_t value);
 
 /**
+ * Print a long integer to standard output
+ * @param value Long integer value to print
+ */
+void system_print_long(int32_t value);
+
+/**
+ * Print a long integer to standard output with newline
+ * @param value Long integer value to print
+ */
+void system_println_long(int32_t value);
+
+/**
  * Print a character to standard output
  * @param c Character to print
  */

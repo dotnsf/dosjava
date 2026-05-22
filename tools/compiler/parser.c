@@ -661,6 +661,7 @@ uint16_t parse_arg_list(Parser* parser, uint16_t* arg_count) {
  */
 int parse_type(Parser* parser, TypeInfo* type) {
     uint16_t base_kind = 0;
+    uint16_t class_name_or_element = 0;
     
     if (parser_consume(parser, TOK_VOID)) {
         type->kind = TYPE_VOID;
@@ -670,17 +671,17 @@ int parse_type(Parser* parser, TypeInfo* type) {
     
     if (parser_consume(parser, TOK_INT)) {
         base_kind = TYPE_INT;
-        type->class_name = 0;
+        class_name_or_element = 0;
     } else if (parser_consume(parser, TOK_LONG)) {
         base_kind = TYPE_LONG;
-        type->class_name = 0;
+        class_name_or_element = 0;
     } else if (parser_consume(parser, TOK_BOOLEAN)) {
         base_kind = TYPE_BOOLEAN;
-        type->class_name = 0;
+        class_name_or_element = 0;
     } else if (parser_match(parser, TOK_IDENTIFIER)) {
         /* Accept any identifier as a class type (String, TestObj1, etc.) */
         base_kind = TYPE_CLASS;
-        type->class_name = parser->current.value.str_offset;
+        class_name_or_element = parser->current.value.str_offset;
         parser_next_token(parser);
     } else {
         parser_error(parser, "Expected type");
@@ -688,13 +689,16 @@ int parse_type(Parser* parser, TypeInfo* type) {
     }
     
     type->kind = base_kind;
+    type->class_name = class_name_or_element;
     
+    /* Check for array syntax [] */
     if (parser_consume(parser, TOK_LBRACKET)) {
         if (parser_expect(parser, TOK_RBRACKET) < 0) {
             return -1;
         }
+        /* Convert to array type, store element type in class_name field */
         type->kind = TYPE_ARRAY;
-        type->class_name = 0;
+        type->class_name = base_kind;  /* Store element type (TYPE_INT, TYPE_LONG, etc.) */
     }
     
     return 0;
@@ -1854,13 +1858,15 @@ uint16_t parse_primary(Parser* parser) {
     
     /* Object/Array creation: new ClassName() or new Type[size] */
     if (parser_consume(parser, TOK_NEW)) {
-        /* Check if it's an array creation (int[] or boolean[]) */
-        if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN)) {
+        /* Check if it's an array creation (int[], long[], or boolean[]) */
+        if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_LONG) || parser_match(parser, TOK_BOOLEAN)) {
             uint16_t base_kind;
             uint16_t size_expr;
             
             if (parser_consume(parser, TOK_INT)) {
                 base_kind = TYPE_INT;
+            } else if (parser_consume(parser, TOK_LONG)) {
+                base_kind = TYPE_LONG;
             } else {
                 base_kind = TYPE_BOOLEAN;
                 parser_next_token(parser);

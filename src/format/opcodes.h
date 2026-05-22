@@ -103,6 +103,12 @@
 #define OP_LOAD_LONG     0xAA  /* Load long from locals [idx:1] (2 slots) */
 #define OP_STORE_LONG    0xAB  /* Store long to locals [idx:1] (2 slots) */
 
+/* Long Array Operations (0xB0-0xBF) */
+/* Long arrays store 32-bit values: [length:2][elem0_high:2][elem0_low:2]... */
+#define OP_NEW_LONG_ARRAY  0xB0  /* Create long array: [size] -> [array_ref] */
+#define OP_LARRAY_LOAD     0xB1  /* Load long from array: [arr,idx] -> [high,low] */
+#define OP_LARRAY_STORE    0xB2  /* Store long to array: [arr,idx,high,low] -> [high,low] */
+
 #define OP_HALT          0xFF  /* Halt execution */
 
 /**

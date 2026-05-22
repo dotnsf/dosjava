@@ -142,5 +142,3 @@ int native_register_builtins(void);
 int native_register_socket_methods(void);
 
 #endif /* NATIVE_H */
-
-// Made with Bob
