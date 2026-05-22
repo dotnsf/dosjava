@@ -131,6 +131,29 @@ uint16_t interpreter_read_u16(ExecutionContext* ctx);
  */
 void interpreter_print_state(ExecutionContext* ctx);
 
+/**
+ * Push float value onto shared stack
+ * @param ctx Execution context
+ * @param value Float value to push
+ * @return 0 on success, -1 on stack overflow
+ */
+int stack_push_float_shared(ExecutionContext* ctx, float value);
+
+/**
+ * Pop float value from shared stack
+ * @param ctx Execution context
+ * @return Popped float value, or 0.0f if stack underflow
+ */
+float stack_pop_float_shared(ExecutionContext* ctx);
+
+/**
+ * Peek at float value on shared stack without popping
+ * @param ctx Execution context
+ * @param offset Offset in float units (0 = top, 1 = second, etc.)
+ * @return Float value at offset, or 0.0f if out of bounds
+ */
+float stack_peek_float_shared(ExecutionContext* ctx, uint16_t offset);
+
 #endif /* INTERPRETER_H */
 
 

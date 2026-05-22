@@ -10,6 +10,7 @@
 #include "../runtime/date.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 /* Global debug flag (set by djvm.c or default to 0) */
 /* Declared in djvm.c */
@@ -175,6 +176,102 @@ static inline uint32_t stack_peek_long(ExecutionContext* ctx) {
     low = ctx->shared_stack[ctx->stack_pointer - 1];
     high = ctx->shared_stack[ctx->stack_pointer - 2];
     return ((uint32_t)high << 16) | low;
+}
+
+/* ===== Float Type Stack Helper Functions ===== */
+
+/**
+ * Push float value onto shared stack as two 16-bit words
+ * Float is stored as IEEE 754 32-bit: [high 16 bits] [low 16 bits]
+ * Stack layout: [... | high | low | ...] (low is top)
+ *
+ * @param ctx Execution context
+ * @param value Float value
+ * @return 0 on success, -1 on stack overflow
+ */
+int stack_push_float_shared(ExecutionContext* ctx, float value) {
+    uint32_t bits;
+    uint16_t high, low;
+    
+    /* Convert float to 32-bit representation */
+    memcpy(&bits, &value, sizeof(float));
+    
+    /* Split into high and low 16-bit words */
+    high = (uint16_t)(bits >> 16);
+    low = (uint16_t)(bits & 0xFFFF);
+    
+    /* Push high word first, then low word */
+    if (stack_push_shared(ctx, high) != 0) {
+        return -1;  /* Stack overflow */
+    }
+    if (stack_push_shared(ctx, low) != 0) {
+        /* Rollback: pop the high word we just pushed */
+        ctx->stack_pointer--;
+        return -1;  /* Stack overflow */
+    }
+    return 0;
+}
+
+/**
+ * Pop float value from shared stack (two 16-bit words)
+ * Float is stored as IEEE 754 32-bit: [high 16 bits] [low 16 bits]
+ * Stack layout: [... | high | low | ...] (low is top)
+ *
+ * @param ctx Execution context
+ * @return Float value
+ */
+float stack_pop_float_shared(ExecutionContext* ctx) {
+    uint16_t low, high;
+    uint32_t bits;
+    float value;
+    
+    /* Pop low word first, then high word */
+    low = stack_pop_shared(ctx);
+    high = stack_pop_shared(ctx);
+    
+    /* Combine into 32-bit value */
+    bits = ((uint32_t)high << 16) | low;
+    
+    /* Convert to float */
+    memcpy(&value, &bits, sizeof(float));
+    
+    return value;
+}
+
+/**
+ * Peek at float value on top of shared stack (without popping)
+ * Float is stored as IEEE 754 32-bit: [high 16 bits] [low 16 bits]
+ * Stack layout: [... | high | low | ...] (low is top)
+ *
+ * @param ctx Execution context
+ * @param offset Offset in float units (0 = top, 1 = second, etc.)
+ * @return Float value
+ */
+float stack_peek_float_shared(ExecutionContext* ctx, uint16_t offset) {
+    uint16_t low, high;
+    uint32_t bits;
+    float value;
+    uint16_t word_offset;
+    
+    /* Calculate word offset (each float is 2 words) */
+    word_offset = offset * 2;
+    
+    /* Check bounds */
+    if (ctx->stack_pointer < word_offset + 2) {
+        return 0.0f;  /* Stack underflow */
+    }
+    
+    /* Read low and high words without modifying SP */
+    low = ctx->shared_stack[ctx->stack_pointer - 1 - word_offset];
+    high = ctx->shared_stack[ctx->stack_pointer - 2 - word_offset];
+    
+    /* Combine into 32-bit value */
+    bits = ((uint32_t)high << 16) | low;
+    
+    /* Convert to float */
+    memcpy(&value, &bits, sizeof(float));
+    
+    return value;
 }
 
 /* ===== Local Variable Helper Functions ===== */
@@ -969,31 +1066,10 @@ int interpreter_step(ExecutionContext* ctx) {
                 /* Find native method in registry */
                 native_method = native_find(NULL, method_name, descriptor);
                 if (native_method != NULL) {
-                    /* Special handling for println/print with potential long values */
-                    if ((strcmp(method_name, "println") == 0 || strcmp(method_name, "print") == 0) &&
-                        strcmp(descriptor, "(I)V") == 0 && arg_count == 1) {
-                        /* Check if there are 2 words on stack (indicating a long value) */
-                        if (ctx->stack_pointer >= 2) {
-                            uint16_t low, high;
-                            uint32_t long_value;
-                            
-                            /* Pop 2 words as long */
-                            low = stack_pop_shared(ctx);
-                            high = stack_pop_shared(ctx);
-                            long_value = ((uint32_t)high << 16) | low;
-                            
-                            /* Print the long value as unsigned 32-bit integer */
-                            /* Note: Java long is 64-bit signed, but we only support 32-bit for now */
-                            /* We print as unsigned to avoid negative values for large positive numbers */
-                            if (strcmp(method_name, "println") == 0) {
-                                printf("%lu\n", (unsigned long)long_value);
-                            } else {
-                                printf("%lu", (unsigned long)long_value);
-                            }
-                            
-                            break;  /* Skip normal native method invocation */
-                        }
-                    }
+                    /* Removed special handling for println(int) with 2 words on stack
+                     * This was causing issues when float variables were used before println(int)
+                     * Long values should use println(long) with descriptor (J)V instead
+                     */
                     
                     
                     /* Pop arguments from stack (in reverse order) */
@@ -3370,6 +3446,383 @@ int interpreter_step(ExecutionContext* ctx) {
                 printf("ERROR: Stack overflow\n");
                 return -1;
             }
+            break;
+        }
+        
+        /* ===== Float Operations ===== */
+        
+        case OP_FCONST_0: {
+            /* Push float constant 0.0f */
+            if (stack_push_float_shared(ctx, 0.0f) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FCONST_1: {
+            /* Push float constant 1.0f */
+            if (stack_push_float_shared(ctx, 1.0f) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FCONST_2: {
+            /* Push float constant 2.0f */
+            if (stack_push_float_shared(ctx, 2.0f) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FCONST: {
+            /* Push float constant from bytecode
+             * Format: [opcode:1] [high:2] [low:2]
+             * Note: Compiler emits in little-endian format
+             */
+            uint16_t high;
+            uint16_t low;
+            uint32_t bits;
+            float value;
+            
+            /* Read little-endian (low byte first) */
+            high = (uint16_t)(ctx->pc[0]) | ((uint16_t)(ctx->pc[1]) << 8);
+            low = (uint16_t)(ctx->pc[2]) | ((uint16_t)(ctx->pc[3]) << 8);
+            ctx->pc += 4;
+            
+            bits = ((uint32_t)high << 16) | low;
+            memcpy(&value, &bits, sizeof(float));
+            
+            if (stack_push_float_shared(ctx, value) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FADD: {
+            /* Float addition */
+            float value2;
+            float value1;
+            float result;
+            
+            value2 = stack_pop_float_shared(ctx);
+            value1 = stack_pop_float_shared(ctx);
+            result = value1 + value2;
+            
+            if (stack_push_float_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FSUB: {
+            /* Float subtraction */
+            float value2;
+            float value1;
+            float result;
+            
+            value2 = stack_pop_float_shared(ctx);
+            value1 = stack_pop_float_shared(ctx);
+            result = value1 - value2;
+            
+            if (stack_push_float_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FMUL: {
+            /* Float multiplication */
+            float value2;
+            float value1;
+            float result;
+            
+            value2 = stack_pop_float_shared(ctx);
+            value1 = stack_pop_float_shared(ctx);
+            result = value1 * value2;
+            
+            if (stack_push_float_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FDIV: {
+            /* Float division */
+            float value2;
+            float value1;
+            float result;
+            
+            value2 = stack_pop_float_shared(ctx);
+            value1 = stack_pop_float_shared(ctx);
+            
+            /* IEEE 754 handles division by zero (returns Infinity or NaN) */
+            result = value1 / value2;
+            
+            if (stack_push_float_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FREM: {
+            /* Float remainder (modulo)
+             * Uses fmod() from math.h for IEEE 754 compliance
+             */
+            float value2;
+            float value1;
+            float result;
+            
+            value2 = stack_pop_float_shared(ctx);
+            value1 = stack_pop_float_shared(ctx);
+            
+            /* Use fmod for proper IEEE 754 remainder */
+            result = (float)fmod((double)value1, (double)value2);
+            
+            if (stack_push_float_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FNEG: {
+            /* Float negation */
+            float value;
+            float result;
+            
+            value = stack_pop_float_shared(ctx);
+            result = -value;
+            
+            if (stack_push_float_shared(ctx, result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FCMPG: {
+            /* Float compare (NaN returns 1)
+             * Returns: -1 if value1 < value2
+             *           0 if value1 == value2
+             *           1 if value1 > value2 or either is NaN
+             */
+            float value2;
+            float value1;
+            int16_t result;
+            
+            value2 = stack_pop_float_shared(ctx);
+            value1 = stack_pop_float_shared(ctx);
+            
+            /* Check for NaN (NaN != NaN is true) */
+            if (value1 != value1 || value2 != value2) {
+                result = 1;  /* NaN bias: return 1 */
+            } else if (value1 < value2) {
+                result = -1;
+            } else if (value1 > value2) {
+                result = 1;
+            } else {
+                result = 0;
+            }
+            
+            if (stack_push_shared(ctx, (uint16_t)result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FCMPL: {
+            /* Float compare (NaN returns -1)
+             * Returns: -1 if value1 < value2 or either is NaN
+             *           0 if value1 == value2
+             *           1 if value1 > value2
+             */
+            float value2;
+            float value1;
+            int16_t result;
+            
+            value2 = stack_pop_float_shared(ctx);
+            value1 = stack_pop_float_shared(ctx);
+            
+            /* Check for NaN (NaN != NaN is true) */
+            if (value1 != value1 || value2 != value2) {
+                result = -1;  /* NaN bias: return -1 */
+            } else if (value1 < value2) {
+                result = -1;
+            } else if (value1 > value2) {
+                result = 1;
+            } else {
+                result = 0;
+            }
+            
+            if (stack_push_shared(ctx, (uint16_t)result) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_I2F: {
+            /* Convert int to float */
+            int16_t int_val;
+            float float_val;
+            
+            int_val = (int16_t)stack_pop_shared(ctx);
+            float_val = (float)int_val;
+            
+            if (stack_push_float_shared(ctx, float_val) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_L2F: {
+            /* Convert long to float */
+            uint32_t long_val;
+            int32_t signed_long;
+            float float_val;
+            
+            long_val = stack_pop_long(ctx);
+            signed_long = (int32_t)long_val;
+            float_val = (float)signed_long;
+            
+            if (stack_push_float_shared(ctx, float_val) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_F2I: {
+            /* Convert float to int (truncate towards zero) */
+            float float_val;
+            int16_t int_val;
+            
+            float_val = stack_pop_float_shared(ctx);
+            
+            /* Truncate towards zero */
+            if (float_val >= 32767.0f) {
+                int_val = 32767;  /* Max int16_t */
+            } else if (float_val <= -32768.0f) {
+                int_val = -32768;  /* Min int16_t */
+            } else if (float_val != float_val) {
+                int_val = 0;  /* NaN -> 0 */
+            } else {
+                int_val = (int16_t)float_val;
+            }
+            
+            if (stack_push_shared(ctx, (uint16_t)int_val) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_F2L: {
+            /* Convert float to long (truncate towards zero) */
+            float float_val;
+            int32_t long_val;
+            
+            float_val = stack_pop_float_shared(ctx);
+            
+            /* Truncate towards zero */
+            if (float_val >= 2147483647.0f) {
+                long_val = 2147483647L;  /* Max int32_t */
+            } else if (float_val <= -2147483648.0f) {
+                long_val = -2147483648L;  /* Min int32_t */
+            } else if (float_val != float_val) {
+                long_val = 0;  /* NaN -> 0 */
+            } else {
+                long_val = (int32_t)float_val;
+            }
+            
+            if (stack_push_long(ctx, (uint32_t)long_val) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_LOAD_FLOAT: {
+            /* Load float from local variable (2 slots)
+             * Format: [opcode:1] [idx:1]
+             * Loads from shared_locals[local_base + idx] and [local_base + idx + 1]
+             */
+            uint8_t idx;
+            uint16_t local_base;
+            uint8_t local_count;
+            uint16_t high;
+            uint16_t low;
+            
+            idx = *ctx->pc++;
+            
+            /* Get current frame's local base and count */
+            if (ctx->call_depth > 0) {
+                local_base = ctx->call_frames[ctx->call_depth - 1].local_base;
+                local_count = ctx->call_frames[ctx->call_depth - 1].local_count;
+            } else {
+                local_base = 0;
+                local_count = ctx->local_pointer;
+            }
+            
+            if (idx + 1 >= local_count) {
+                printf("ERROR: Local variable index out of bounds: %u\n", idx);
+                return -1;
+            }
+            
+            high = ctx->shared_locals[local_base + idx];
+            low = ctx->shared_locals[local_base + idx + 1];
+            
+            if (stack_push_shared(ctx, high) != 0 ||
+                stack_push_shared(ctx, low) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_STORE_FLOAT: {
+            /* Store float to local variable (2 slots)
+             * Format: [opcode:1] [idx:1]
+             * Stores to shared_locals[local_base + idx] and [local_base + idx + 1]
+             */
+            uint8_t idx;
+            uint16_t local_base;
+            uint8_t local_count;
+            uint16_t low;
+            uint16_t high;
+            
+            idx = *ctx->pc++;
+            
+            /* Get current frame's local base and count */
+            if (ctx->call_depth > 0) {
+                local_base = ctx->call_frames[ctx->call_depth - 1].local_base;
+                local_count = ctx->call_frames[ctx->call_depth - 1].local_count;
+            } else {
+                local_base = 0;
+                local_count = ctx->local_pointer;
+            }
+            
+            if (idx + 1 >= local_count) {
+                printf("ERROR: Local variable index out of bounds: %u\n", idx);
+                return -1;
+            }
+            
+            low = stack_pop_shared(ctx);
+            high = stack_pop_shared(ctx);
+            
+            ctx->shared_locals[local_base + idx] = high;
+            ctx->shared_locals[local_base + idx + 1] = low;
             break;
         }
         

@@ -21,6 +21,7 @@ static const struct {
     {"void", TOK_VOID},
     {"int", TOK_INT},
     {"long", TOK_LONG},
+    {"float", TOK_FLOAT},
     {"boolean", TOK_BOOLEAN},
     {"if", TOK_IF},
     {"else", TOK_ELSE},
@@ -243,28 +244,73 @@ static int lexer_read_identifier(Lexer* lexer, Token* token) {
 }
 
 /**
- * Read integer or long literal
+ * Read number literal (integer, long, or float)
  */
 static int lexer_read_number(Lexer* lexer, Token* token) {
-    long value;
+    char buffer[64];
+    int len;
+    int has_dot;
+    long int_value;
+    float float_value;
     
-    value = 0;
+    len = 0;
+    has_dot = 0;
+    int_value = 0;
     
+    /* Read integer part */
     while (lexer->current_char != '\0' && isdigit(lexer->current_char)) {
-        value = value * 10 + (lexer->current_char - '0');
+        if (len < 63) {
+            buffer[len++] = lexer->current_char;
+        }
+        int_value = int_value * 10 + (lexer->current_char - '0');
         lexer->column++;
         lexer_read_char(lexer);
     }
     
-    /* Check for 'L' or 'l' suffix for long literal */
-    if (lexer->current_char == 'L' || lexer->current_char == 'l') {
-        token->type = TOK_LONG_LITERAL;
-        token->value.long_value = (int32_t)value;
+    /* Check for decimal point (float literal) */
+    if (lexer->current_char == '.') {
+        has_dot = 1;
+        if (len < 63) {
+            buffer[len++] = '.';
+        }
         lexer->column++;
         lexer_read_char(lexer);
+        
+        /* Read fractional part */
+        while (lexer->current_char != '\0' && isdigit(lexer->current_char)) {
+            if (len < 63) {
+                buffer[len++] = lexer->current_char;
+            }
+            lexer->column++;
+            lexer_read_char(lexer);
+        }
+    }
+    
+    buffer[len] = '\0';
+    
+    /* Check for type suffix */
+    if (lexer->current_char == 'f' || lexer->current_char == 'F') {
+        /* Float literal */
+        token->type = TOK_FLOAT_LITERAL;
+        float_value = (float)atof(buffer);
+        token->value.float_value = float_value;
+        lexer->column++;
+        lexer_read_char(lexer);
+    } else if (lexer->current_char == 'L' || lexer->current_char == 'l') {
+        /* Long literal */
+        token->type = TOK_LONG_LITERAL;
+        token->value.long_value = (int32_t)int_value;
+        lexer->column++;
+        lexer_read_char(lexer);
+    } else if (has_dot) {
+        /* Float literal without suffix (e.g., 3.14) */
+        token->type = TOK_FLOAT_LITERAL;
+        float_value = (float)atof(buffer);
+        token->value.float_value = float_value;
     } else {
+        /* Integer literal */
         token->type = TOK_INTEGER;
-        token->value.int_value = (int16_t)value;
+        token->value.int_value = (int16_t)int_value;
     }
     
     return 0;
@@ -646,6 +692,7 @@ const char* token_type_name(TokenType type) {
         case TOK_VOID: return "void";
         case TOK_INT: return "int";
         case TOK_LONG: return "long";
+        case TOK_FLOAT: return "float";
         case TOK_BOOLEAN: return "boolean";
         case TOK_IF: return "if";
         case TOK_ELSE: return "else";
@@ -661,6 +708,7 @@ const char* token_type_name(TokenType type) {
         case TOK_IDENTIFIER: return "IDENTIFIER";
         case TOK_INTEGER: return "INTEGER";
         case TOK_LONG_LITERAL: return "LONG_LITERAL";
+        case TOK_FLOAT_LITERAL: return "FLOAT_LITERAL";
         case TOK_STRING: return "STRING";
         case TOK_TRUE: return "true";
         case TOK_FALSE: return "false";

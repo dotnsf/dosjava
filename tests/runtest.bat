@@ -1169,7 +1169,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "=== All tests completed ==="
 echo.
 
-goto :completed
+goto :test27
 
 :test26_fail
 echo FAILED: Compilation error
@@ -1186,6 +1186,98 @@ goto :end
 :test26_badout
 echo FAILED: Output mismatch for Test 26
 echo Expected: "=== All tests completed ==="
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test27
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 27: Date
+echo ------------------------------
+..\build\bin\djc.exe ftst1.jav
+if errorlevel 1 goto :test27_fail
+if not exist ftst1.DJC goto :test27_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe ftst1.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test27_runfail
+linechk RT_OUT.TXT 1 "5.14" > nul
+if errorlevel 1 goto :test27_badout
+linechk RT_OUT.TXT 2 "1.14" > nul
+if errorlevel 1 goto :test27_badout
+linechk RT_OUT.TXT 3 "6.28" > nul
+if errorlevel 1 goto :test27_badout
+linechk RT_OUT.TXT 4 "1.57" > nul
+if errorlevel 1 goto :test27_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "1.57"
+echo.
+
+goto :test28
+
+:test27_fail
+echo FAILED: Compilation error
+goto :end
+
+:test27_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test27_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test27_badout
+echo FAILED: Output mismatch for Test 27
+echo Expected: "1.57"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test28
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 28: Date
+echo ------------------------------
+..\build\bin\djc.exe ftst2.jav
+if errorlevel 1 goto :test28_fail
+if not exist ftst2.DJC goto :test28_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe ftst2.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test28_runfail
+linechk RT_OUT.TXT 1 "1.50" > nul
+if errorlevel 1 goto :test27_badout
+linechk RT_OUT.TXT 2 "10.00" > nul
+if errorlevel 1 goto :test27_badout
+linechk RT_OUT.TXT 3 "3.70" > nul
+if errorlevel 1 goto :test27_badout
+linechk RT_OUT.TXT 4 "1" > nul
+if errorlevel 1 goto :test27_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "1"
+echo.
+
+goto :completed
+
+:test28_fail
+echo FAILED: Compilation error
+goto :end
+
+:test28_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test28_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test28_badout
+echo FAILED: Output mismatch for Test 28
+echo Expected: "1"
 echo Actual:
 type RT_OUT.TXT
 goto :end

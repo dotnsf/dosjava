@@ -129,6 +129,27 @@ const char* opcode_name(uint8_t opcode) {
         case OP_NEW_LONG_ARRAY: return "NEW_LONG_ARRAY";
         case OP_LARRAY_LOAD:   return "LARRAY_LOAD";
         case OP_LARRAY_STORE:  return "LARRAY_STORE";
+        case OP_FCONST_0:      return "FCONST_0";
+        case OP_FCONST_1:      return "FCONST_1";
+        case OP_FCONST_2:      return "FCONST_2";
+        case OP_FCONST:        return "FCONST";
+        case OP_FADD:          return "FADD";
+        case OP_FSUB:          return "FSUB";
+        case OP_FMUL:          return "FMUL";
+        case OP_FDIV:          return "FDIV";
+        case OP_FREM:          return "FREM";
+        case OP_FNEG:          return "FNEG";
+        case OP_FCMPG:         return "FCMPG";
+        case OP_FCMPL:         return "FCMPL";
+        case OP_I2F:           return "I2F";
+        case OP_L2F:           return "L2F";
+        case OP_F2I:           return "F2I";
+        case OP_F2L:           return "F2L";
+        case OP_LOAD_FLOAT:    return "LOAD_FLOAT";
+        case OP_STORE_FLOAT:   return "STORE_FLOAT";
+        case OP_NEW_FLOAT_ARRAY: return "NEW_FLOAT_ARRAY";
+        case OP_FARRAY_LOAD:   return "FARRAY_LOAD";
+        case OP_FARRAY_STORE:  return "FARRAY_STORE";
         case OP_HALT:          return "HALT";
         default:               return "UNKNOWN";
     }
@@ -186,6 +207,24 @@ uint8_t opcode_length(uint8_t opcode) {
         case OP_NEW_LONG_ARRAY:
         case OP_LARRAY_LOAD:
         case OP_LARRAY_STORE:
+        case OP_FCONST_0:
+        case OP_FCONST_1:
+        case OP_FCONST_2:
+        case OP_FADD:
+        case OP_FSUB:
+        case OP_FMUL:
+        case OP_FDIV:
+        case OP_FREM:
+        case OP_FNEG:
+        case OP_FCMPG:
+        case OP_FCMPL:
+        case OP_I2F:
+        case OP_L2F:
+        case OP_F2I:
+        case OP_F2L:
+        case OP_NEW_FLOAT_ARRAY:
+        case OP_FARRAY_LOAD:
+        case OP_FARRAY_STORE:
         case OP_HALT:
             return 1;
         
@@ -195,6 +234,8 @@ uint8_t opcode_length(uint8_t opcode) {
         case OP_NEW_ARRAY:
         case OP_LOAD_LONG:
         case OP_STORE_LONG:
+        case OP_LOAD_FLOAT:
+        case OP_STORE_FLOAT:
             return 2;
         
         /* Instructions with 2-byte operand (3 bytes) */
@@ -230,6 +271,7 @@ uint8_t opcode_length(uint8_t opcode) {
         
         /* Instructions with 4-byte operand (5 bytes) */
         case OP_PUSH_LONG:  /* [opcode:1] [high:2] [low:2] */
+        case OP_FCONST:     /* [opcode:1] [high:2] [low:2] */
             return 5;
         
         /* Unknown instruction */

@@ -117,4 +117,34 @@ void stack_print(Stack* stack);
  */
 void stack_stats(Stack* stack, uint16_t* current_depth, uint16_t* max_depth);
 
+/**
+ * Push a float value onto the stack (as 2 words)
+ * @param stack Stack
+ * @param value Float value to push
+ * @return 0 on success, -1 on stack overflow
+ */
+int stack_push_float(Stack* stack, float value);
+
+/**
+ * Pop a float value from the stack (2 words)
+ * @param stack Stack
+ * @return Popped float value, or 0.0f if stack underflow
+ */
+float stack_pop_float(Stack* stack);
+
+/**
+ * Peek at float value at top of stack without popping (2 words)
+ * @param stack Stack
+ * @return Float value at top, or 0.0f if stack is empty
+ */
+float stack_peek_float(Stack* stack);
+
+/**
+ * Peek at float value at offset from top (2 words per float)
+ * @param stack Stack
+ * @param offset Offset in float units (0 = top float, 1 = second float, etc.)
+ * @return Float value at offset, or 0.0f if out of bounds
+ */
+float stack_peek_float_at(Stack* stack, uint16_t offset);
+
 #endif /* STACK_H */

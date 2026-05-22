@@ -675,6 +675,9 @@ int parse_type(Parser* parser, TypeInfo* type) {
     } else if (parser_consume(parser, TOK_LONG)) {
         base_kind = TYPE_LONG;
         class_name_or_element = 0;
+    } else if (parser_consume(parser, TOK_FLOAT)) {
+        base_kind = TYPE_FLOAT;
+        class_name_or_element = 0;
     } else if (parser_consume(parser, TOK_BOOLEAN)) {
         base_kind = TYPE_BOOLEAN;
         class_name_or_element = 0;
@@ -785,7 +788,8 @@ uint16_t parse_statement(Parser* parser) {
      * Check if this looks like a type declaration by looking ahead.
      * If identifier is followed by another identifier, it's likely a variable declaration.
      */
-    if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN) || parser_match(parser, TOK_LONG)) {
+    if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_BOOLEAN) ||
+        parser_match(parser, TOK_LONG) || parser_match(parser, TOK_FLOAT)) {
         return parse_var_decl(parser);
     }
     
@@ -1838,6 +1842,19 @@ uint16_t parse_primary(Parser* parser) {
         }
         
         parser->nodes[node - parser->total_nodes - 1].data.literal_long.long_value = parser->current.value.long_value;
+        parser_next_token(parser);
+        
+        return node;
+    }
+    
+    /* Float literal */
+    if (parser_match(parser, TOK_FLOAT_LITERAL)) {
+        node = parser_alloc_node(parser, NODE_LITERAL_FLOAT);
+        if (node == 0) {
+            return 0;
+        }
+        
+        parser->nodes[node - parser->total_nodes - 1].data.literal_float.float_value = parser->current.value.float_value;
         parser_next_token(parser);
         
         return node;

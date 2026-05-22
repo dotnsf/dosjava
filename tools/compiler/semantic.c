@@ -1703,8 +1703,8 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     var_sym.type = var_type;  /* Use saved copy */
     var_sym.data.local_data.index = analyzer->next_local_index;
     
-    /* Long type variables occupy 2 slots */
-    if (var_type.kind == TYPE_LONG) {
+    /* Long and float type variables occupy 2 slots */
+    if (var_type.kind == TYPE_LONG || var_type.kind == TYPE_FLOAT) {
         analyzer->next_local_index += 2;
     } else {
         analyzer->next_local_index++;
@@ -1945,6 +1945,11 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
         
         case NODE_LITERAL_LONG:
             result_type->kind = TYPE_LONG;
+            result_type->class_name = 0;
+            return 0;
+        
+        case NODE_LITERAL_FLOAT:
+            result_type->kind = TYPE_FLOAT;
             result_type->class_name = 0;
             return 0;
         
@@ -2989,7 +2994,7 @@ int is_boolean_type(TypeInfo type) {
 }
 
 int is_numeric_type(TypeInfo type) {
-    return type.kind == TYPE_INT || type.kind == TYPE_LONG;
+    return type.kind == TYPE_INT || type.kind == TYPE_LONG || type.kind == TYPE_FLOAT;
 }
 
 int is_void_type(TypeInfo type) {
@@ -3008,8 +3013,10 @@ int get_binary_op_result_type(BinaryOp op, TypeInfo left_type, TypeInfo right_ty
      */
     if (op == BINOP_ADD || op == BINOP_SUB || op == BINOP_MUL || op == BINOP_DIV || op == BINOP_MOD) {
         if (is_numeric_type(left_type) && is_numeric_type(right_type)) {
-            /* If either operand is long, result is long */
-            if (left_type.kind == TYPE_LONG || right_type.kind == TYPE_LONG) {
+            /* Type promotion: float > long > int */
+            if (left_type.kind == TYPE_FLOAT || right_type.kind == TYPE_FLOAT) {
+                result_type->kind = TYPE_FLOAT;
+            } else if (left_type.kind == TYPE_LONG || right_type.kind == TYPE_LONG) {
                 result_type->kind = TYPE_LONG;
             } else {
                 result_type->kind = TYPE_INT;

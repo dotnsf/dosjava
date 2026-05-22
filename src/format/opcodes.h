@@ -109,6 +109,36 @@
 #define OP_LARRAY_LOAD     0xB1  /* Load long from array: [arr,idx] -> [high,low] */
 #define OP_LARRAY_STORE    0xB2  /* Store long to array: [arr,idx,high,low] -> [high,low] */
 
+/* Float Operations (0xC0-0xCF) */
+/* Float values are stored as two 16-bit words on stack: [high:2] [low:2] */
+/* IEEE 754 single precision format */
+#define OP_FCONST_0      0xC0  /* Push float constant 0.0f */
+#define OP_FCONST_1      0xC1  /* Push float constant 1.0f */
+#define OP_FCONST_2      0xC2  /* Push float constant 2.0f */
+#define OP_FCONST        0xC3  /* Push float constant [high:2] [low:2] */
+#define OP_FADD          0xC4  /* Float addition: pop F2, pop F1, push (F1+F2) */
+#define OP_FSUB          0xC5  /* Float subtraction: pop F2, pop F1, push (F1-F2) */
+#define OP_FMUL          0xC6  /* Float multiplication: pop F2, pop F1, push (F1*F2) */
+#define OP_FDIV          0xC7  /* Float division: pop F2, pop F1, push (F1/F2) */
+#define OP_FREM          0xC8  /* Float remainder: pop F2, pop F1, push (F1%F2) */
+#define OP_FNEG          0xC9  /* Float negation: pop F, push (-F) */
+#define OP_FCMPG         0xCA  /* Float compare (NaN -> 1): pop F2, pop F1, push (-1/0/1) */
+#define OP_FCMPL         0xCB  /* Float compare (NaN -> -1): pop F2, pop F1, push (-1/0/1) */
+#define OP_I2F           0xCC  /* int to float: pop int, push float */
+#define OP_L2F           0xCD  /* long to float: pop long, push float */
+#define OP_F2I           0xCE  /* float to int: pop float, push int (truncate) */
+#define OP_F2L           0xCF  /* float to long: pop float, push long (truncate) */
+
+/* Float Local Variable Operations (0xD0-0xDF) */
+#define OP_LOAD_FLOAT    0xD0  /* Load float from locals [idx:1] (2 slots) */
+#define OP_STORE_FLOAT   0xD1  /* Store float to locals [idx:1] (2 slots) */
+
+/* Float Array Operations (0xE0-0xEF) */
+/* Float arrays store 32-bit values: [length:2][elem0_high:2][elem0_low:2]... */
+#define OP_NEW_FLOAT_ARRAY  0xE0  /* Create float array: [size] -> [array_ref] */
+#define OP_FARRAY_LOAD      0xE1  /* Load float from array: [arr,idx] -> [high,low] */
+#define OP_FARRAY_STORE     0xE2  /* Store float to array: [arr,idx,high,low] -> [] */
+
 #define OP_HALT          0xFF  /* Halt execution */
 
 /**

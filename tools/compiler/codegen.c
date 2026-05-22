@@ -804,9 +804,10 @@ int generate_var_decl(CodeGenerator* codegen, ASTNode* var_node) {
     /* Get local index */
     local_idx = get_local_index(codegen, var_name);
 
-    /* Check if this is a long variable */
+    /* Check if this is a long or float variable (both use 2 slots) */
     {
         int is_long = 0;
+        int is_float = 0;
         uint16_t i;
         for (i = 0; i < codegen->symtable->symbol_count; i++) {
             Symbol* sym = &codegen->symtable->symbols[i];
@@ -815,13 +816,15 @@ int generate_var_decl(CodeGenerator* codegen, ASTNode* var_node) {
                 sym_name && strcmp(sym_name, var_name) == 0) {
                 if (sym->type.kind == TYPE_LONG) {
                     is_long = 1;
+                } else if (sym->type.kind == TYPE_FLOAT) {
+                    is_float = 1;
                 }
                 break;
             }
         }
 
-        /* Update max_locals (long variables use 2 slots) */
-        if (is_long) {
+        /* Update max_locals (long and float variables use 2 slots) */
+        if (is_long || is_float) {
             if (local_idx + 2 > codegen->context->max_locals) {
                 codegen->context->max_locals = local_idx + 2;
             }
@@ -840,6 +843,10 @@ int generate_var_decl(CodeGenerator* codegen, ASTNode* var_node) {
                 /* Store to local variable */
                 if (is_long) {
                     emit_opcode(codegen, OP_STORE_LONG);
+                    emit_u1(codegen, (uint8_t)local_idx);
+                    update_stack(codegen, -2);
+                } else if (is_float) {
+                    emit_opcode(codegen, OP_STORE_FLOAT);
                     emit_u1(codegen, (uint8_t)local_idx);
                     update_stack(codegen, -2);
                 } else {
@@ -1102,6 +1109,24 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             emit_u2(codegen, high);
             emit_u2(codegen, low);
             update_stack(codegen, 2);  /* Long takes 2 stack slots */
+            return 0;
+        }
+        
+        case NODE_LITERAL_FLOAT: {
+            /* Push 32-bit float constant [high:2] [low:2] */
+            float float_val = expr_node->data.literal_float.float_value;
+            uint32_t float_bits;
+            uint16_t high, low;
+            
+            /* Convert float to bits using memcpy for safe type punning */
+            memcpy(&float_bits, &float_val, sizeof(float));
+            high = (uint16_t)((float_bits >> 16) & 0xFFFF);
+            low = (uint16_t)(float_bits & 0xFFFF);
+            
+            emit_opcode(codegen, OP_FCONST);
+            emit_u2(codegen, high);
+            emit_u2(codegen, low);
+            update_stack(codegen, 2);  /* Float takes 2 stack slots */
             return 0;
         }
         
@@ -1759,21 +1784,33 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
     }
     
     /* Generate operation - map AST operators to VM opcodes */
-    /* Check if we need Long operations by examining operand types */
+    /* Check if we need Float or Long operations by examining operand types */
     {
+        int use_float_ops = 0;
         int use_long_ops = 0;
         ASTNode* check_left;
         ASTNode* check_right;
         
-        /* Check if either operand is a long type */
+        /* Check if either operand is a float or long type */
         check_left = codegen_get_node(codegen, left_index);
         check_right = codegen_get_node(codegen, right_index);
         
-        if (check_left && check_left->type == NODE_LITERAL_LONG) {
-            use_long_ops = 1;
+        /* Float has highest priority */
+        if (check_left && check_left->type == NODE_LITERAL_FLOAT) {
+            use_float_ops = 1;
         }
-        if (check_right && check_right->type == NODE_LITERAL_LONG) {
-            use_long_ops = 1;
+        if (check_right && check_right->type == NODE_LITERAL_FLOAT) {
+            use_float_ops = 1;
+        }
+        
+        /* Then check for long */
+        if (!use_float_ops) {
+            if (check_left && check_left->type == NODE_LITERAL_LONG) {
+                use_long_ops = 1;
+            }
+            if (check_right && check_right->type == NODE_LITERAL_LONG) {
+                use_long_ops = 1;
+            }
         }
         
         /* Check if operands are identifiers with long type */
@@ -1787,7 +1824,9 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                     const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
                     if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                         sym_name && strcmp(sym_name, var_name) == 0) {
-                        if (sym->type.kind == TYPE_LONG) {
+                        if (sym->type.kind == TYPE_FLOAT) {
+                            use_float_ops = 1;
+                        } else if (sym->type.kind == TYPE_LONG) {
                             use_long_ops = 1;
                         }
                         break;
@@ -1812,7 +1851,9 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                     const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
                     if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                         sym_name && strcmp(sym_name, var_name) == 0) {
-                        if (sym->type.kind == TYPE_LONG) {
+                        if (sym->type.kind == TYPE_FLOAT) {
+                            use_float_ops = 1;
+                        } else if (sym->type.kind == TYPE_LONG) {
                             use_long_ops = 1;
                         }
                         break;
@@ -1830,22 +1871,51 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
         
         switch (op) {
             case (uint16_t)BINOP_ADD:
-                emit_opcode(codegen, use_long_ops ? OP_LADD : OP_ADD);
+                if (use_float_ops) {
+                    emit_opcode(codegen, OP_FADD);
+                } else {
+                    emit_opcode(codegen, use_long_ops ? OP_LADD : OP_ADD);
+                }
                 break;
             case (uint16_t)BINOP_SUB:
-                emit_opcode(codegen, use_long_ops ? OP_LSUB : OP_SUB);
+                if (use_float_ops) {
+                    emit_opcode(codegen, OP_FSUB);
+                } else {
+                    emit_opcode(codegen, use_long_ops ? OP_LSUB : OP_SUB);
+                }
                 break;
             case (uint16_t)BINOP_MUL:
-                emit_opcode(codegen, use_long_ops ? OP_LMUL : OP_MUL);
+                if (use_float_ops) {
+                    emit_opcode(codegen, OP_FMUL);
+                } else {
+                    emit_opcode(codegen, use_long_ops ? OP_LMUL : OP_MUL);
+                }
                 break;
             case (uint16_t)BINOP_DIV:
-                emit_opcode(codegen, use_long_ops ? OP_LDIV : OP_DIV);
+                if (use_float_ops) {
+                    emit_opcode(codegen, OP_FDIV);
+                } else {
+                    emit_opcode(codegen, use_long_ops ? OP_LDIV : OP_DIV);
+                }
                 break;
             case (uint16_t)BINOP_MOD:
-                emit_opcode(codegen, use_long_ops ? OP_LMOD : OP_MOD);
+                if (use_float_ops) {
+                    emit_opcode(codegen, OP_FREM);
+                } else {
+                    emit_opcode(codegen, use_long_ops ? OP_LMOD : OP_MOD);
+                }
                 break;
             case (uint16_t)BINOP_EQ:
-                if (use_long_ops) {
+                if (use_float_ops) {
+                    /* For float comparison: FCMPG followed by CMP_EQ with 0 */
+                    emit_opcode(codegen, OP_FCMPG);
+                    update_stack(codegen, -3);  /* Consumes 2 floats (4 slots), pushes 1 int (1 slot) */
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_EQ);
+                    update_stack(codegen, -1);
+                } else if (use_long_ops) {
                     /* For long comparison: LCMP followed by CMP_EQ with 0 */
                     emit_opcode(codegen, OP_LCMP);
                     emit_opcode(codegen, OP_PUSH_INT);
@@ -1858,7 +1928,15 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                 }
                 break;
             case (uint16_t)BINOP_NE:
-                if (use_long_ops) {
+                if (use_float_ops) {
+                    emit_opcode(codegen, OP_FCMPG);
+                    update_stack(codegen, -3);  /* Consumes 2 floats (4 slots), pushes 1 int (1 slot) */
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_NE);
+                    update_stack(codegen, -1);
+                } else if (use_long_ops) {
                     emit_opcode(codegen, OP_LCMP);
                     emit_opcode(codegen, OP_PUSH_INT);
                     emit_u2(codegen, 0);
@@ -1870,7 +1948,15 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                 }
                 break;
             case (uint16_t)BINOP_LT:
-                if (use_long_ops) {
+                if (use_float_ops) {
+                    emit_opcode(codegen, OP_FCMPG);
+                    update_stack(codegen, -3);  /* Consumes 2 floats (4 slots), pushes 1 int (1 slot) */
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_LT);
+                    update_stack(codegen, -1);
+                } else if (use_long_ops) {
                     emit_opcode(codegen, OP_LCMP);
                     emit_opcode(codegen, OP_PUSH_INT);
                     emit_u2(codegen, 0);
@@ -1882,7 +1968,15 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                 }
                 break;
             case (uint16_t)BINOP_LE:
-                if (use_long_ops) {
+                if (use_float_ops) {
+                    emit_opcode(codegen, OP_FCMPG);
+                    update_stack(codegen, -3);  /* Consumes 2 floats (4 slots), pushes 1 int (1 slot) */
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_LE);
+                    update_stack(codegen, -1);
+                } else if (use_long_ops) {
                     emit_opcode(codegen, OP_LCMP);
                     emit_opcode(codegen, OP_PUSH_INT);
                     emit_u2(codegen, 0);
@@ -1894,7 +1988,15 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                 }
                 break;
             case (uint16_t)BINOP_GT:
-                if (use_long_ops) {
+                if (use_float_ops) {
+                    emit_opcode(codegen, OP_FCMPG);
+                    update_stack(codegen, -3);  /* Consumes 2 floats (4 slots), pushes 1 int (1 slot) */
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_GT);
+                    update_stack(codegen, -1);
+                } else if (use_long_ops) {
                     emit_opcode(codegen, OP_LCMP);
                     emit_opcode(codegen, OP_PUSH_INT);
                     emit_u2(codegen, 0);
@@ -1906,7 +2008,15 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                 }
                 break;
             case (uint16_t)BINOP_GE:
-                if (use_long_ops) {
+                if (use_float_ops) {
+                    emit_opcode(codegen, OP_FCMPG);
+                    update_stack(codegen, -3);  /* Consumes 2 floats (4 slots), pushes 1 int (1 slot) */
+                    emit_opcode(codegen, OP_PUSH_INT);
+                    emit_u2(codegen, 0);
+                    update_stack(codegen, 1);
+                    emit_opcode(codegen, OP_CMP_GE);
+                    update_stack(codegen, -1);
+                } else if (use_long_ops) {
                     emit_opcode(codegen, OP_LCMP);
                     emit_opcode(codegen, OP_PUSH_INT);
                     emit_u2(codegen, 0);
@@ -2309,15 +2419,18 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
     }
     
     if (assign_op == 0) {
-        /* Check if target is long type */
+        /* Check target type */
         /* Search in reverse order to find innermost scope first */
+        int is_float = 0;
         int is_long = 0;
         for (i = codegen->symtable->symbol_count; i > 0; i--) {
             Symbol* sym = &codegen->symtable->symbols[i - 1];
             const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
             if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                 sym_name && strcmp(sym_name, var_name) == 0) {
-                if (sym->type.kind == TYPE_LONG) {
+                if (sym->type.kind == TYPE_FLOAT) {
+                    is_float = 1;
+                } else if (sym->type.kind == TYPE_LONG) {
                     is_long = 1;
                 }
                 break;
@@ -2328,7 +2441,16 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
             return -1;
         }
         
-        if (is_long) {
+        if (is_float) {
+            /* Float assignment: duplicate 2-word value by storing and reloading */
+            emit_opcode(codegen, OP_STORE_FLOAT);
+            emit_u1(codegen, (uint8_t)local_idx);
+            update_stack(codegen, -2);
+            /* Reload for expression result */
+            emit_opcode(codegen, OP_LOAD_FLOAT);
+            emit_u1(codegen, (uint8_t)local_idx);
+            update_stack(codegen, 2);
+        } else if (is_long) {
             /* Long assignment: duplicate 2-word value by storing and reloading */
             emit_opcode(codegen, OP_STORE_LONG);
             emit_u1(codegen, (uint8_t)local_idx);
@@ -2688,8 +2810,13 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
                             }
                         }
                     }
-                    if (best_sym && best_sym->type.kind == TYPE_CLASS) {
-                        first_arg_is_string = 1;
+                    if (best_sym) {
+                        if (best_sym->type.kind == TYPE_CLASS) {
+                            first_arg_is_string = 1;
+                        } else if (best_sym->type.kind == TYPE_FLOAT) {
+                            /* Mark as float type for descriptor generation */
+                            arg_node_type = NODE_LITERAL_FLOAT;
+                        }
                     }
                 }
             }
@@ -2848,6 +2975,10 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             strcpy(descriptor, "(J)V");
         } else if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
             strcpy(descriptor, "(Ljava/lang/String;)V");
+        } else if (arg_node_type == NODE_LITERAL_FLOAT) {
+            /* System.out.println(float) */
+            strcpy(descriptor, "(F)V");
+            invoke_arg_count = 2;  /* Float takes 2 words on stack */
         } else {
             strcpy(descriptor, "(I)V");
         }
@@ -2939,22 +3070,30 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
     
     /* If found as local variable, load it */
     if (local_idx != 0xFFFF) {
-        /* Check if this is a long variable */
+        /* Check variable type */
         /* Search in reverse order to find innermost scope first */
+        int is_float = 0;
         int is_long = 0;
         for (i = codegen->symtable->symbol_count; i > 0; i--) {
             Symbol* sym = &codegen->symtable->symbols[i - 1];
             const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
             if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                 sym_name && strcmp(sym_name, var_name) == 0) {
-                if (sym->type.kind == TYPE_LONG) {
+                if (sym->type.kind == TYPE_FLOAT) {
+                    is_float = 1;
+                } else if (sym->type.kind == TYPE_LONG) {
                     is_long = 1;
                 }
                 break;
             }
         }
         
-        if (is_long) {
+        if (is_float) {
+            /* Load float variable (uses 2 stack slots) */
+            emit_opcode(codegen, OP_LOAD_FLOAT);
+            emit_u1(codegen, (uint8_t)local_idx);
+            update_stack(codegen, 2);
+        } else if (is_long) {
             /* Load long variable (uses 2 stack slots) */
             emit_opcode(codegen, OP_LOAD_LONG);
             emit_u1(codegen, (uint8_t)local_idx);
@@ -3440,6 +3579,9 @@ static uint16_t get_expression_type(CodeGenerator* codegen, ASTNode* expr_node) 
     switch (expr_node->type) {
         case NODE_LITERAL_LONG:
             return (uint16_t)TYPE_LONG;
+        
+        case NODE_LITERAL_FLOAT:
+            return (uint16_t)TYPE_FLOAT;
             
         case NODE_LITERAL_INT:
         case NODE_LITERAL_BOOL:

@@ -195,7 +195,6 @@ void stack_print(Stack* stack) {
         printf("  [%u] = %u (0x%04X)\n", i, stack->data[i], stack->data[i]);
     }
 }
-
 /**
  * Get stack statistics
  */
@@ -214,5 +213,131 @@ void stack_stats(Stack* stack, uint16_t* current_depth, uint16_t* max_depth) {
         *max_depth = stack->max_sp;
     }
 }
+
+/**
+ * Push a float value onto the stack (as 2 words)
+ * Float is stored as IEEE 754 32-bit: [high 16 bits] [low 16 bits]
+ */
+int stack_push_float(Stack* stack, float value) {
+    uint32_t bits;
+    uint16_t high, low;
+    
+    if (stack == NULL || stack->data == NULL) {
+        return -1;
+    }
+    
+    /* Check for stack overflow (need 2 slots) */
+    if (stack->sp + 2 > stack->size) {
+        return -1;
+    }
+    
+    /* Convert float to 32-bit representation */
+    memcpy(&bits, &value, sizeof(float));
+    
+    /* Split into high and low 16-bit words */
+    high = (uint16_t)(bits >> 16);
+    low = (uint16_t)(bits & 0xFFFF);
+    
+    /* Push high word first, then low word */
+    stack->data[stack->sp] = high;
+    stack->sp++;
+    stack->data[stack->sp] = low;
+    stack->sp++;
+    
+    /* Update max SP */
+    if (stack->sp > stack->max_sp) {
+        stack->max_sp = stack->sp;
+    }
+    
+    return 0;
+}
+
+/**
+ * Pop a float value from the stack (2 words)
+ * Float is stored as IEEE 754 32-bit: [high 16 bits] [low 16 bits]
+ */
+float stack_pop_float(Stack* stack) {
+    uint16_t low, high;
+    uint32_t bits;
+    float value;
+    
+    if (stack == NULL || stack->data == NULL || stack->sp < 2) {
+        return 0.0f;
+    }
+    
+    /* Pop low word first, then high word */
+    stack->sp--;
+    low = stack->data[stack->sp];
+    stack->sp--;
+    high = stack->data[stack->sp];
+    
+    /* Combine into 32-bit value */
+    bits = ((uint32_t)high << 16) | low;
+    
+    /* Convert to float */
+    memcpy(&value, &bits, sizeof(float));
+    
+    return value;
+}
+
+/**
+ * Peek at float value at top of stack without popping (2 words)
+ */
+float stack_peek_float(Stack* stack) {
+    uint16_t low, high;
+    uint32_t bits;
+    float value;
+    
+    if (stack == NULL || stack->data == NULL || stack->sp < 2) {
+        return 0.0f;
+    }
+    
+    /* Read low and high words without modifying SP */
+    low = stack->data[stack->sp - 1];
+    high = stack->data[stack->sp - 2];
+    
+    /* Combine into 32-bit value */
+    bits = ((uint32_t)high << 16) | low;
+    
+    /* Convert to float */
+    memcpy(&value, &bits, sizeof(float));
+    
+    return value;
+}
+
+/**
+ * Peek at float value at offset from top (2 words per float)
+ */
+float stack_peek_float_at(Stack* stack, uint16_t offset) {
+    uint16_t low, high;
+    uint32_t bits;
+    float value;
+    uint16_t word_offset;
+    
+    if (stack == NULL || stack->data == NULL) {
+        return 0.0f;
+    }
+    
+    /* Calculate word offset (each float is 2 words) */
+    word_offset = offset * 2;
+    
+    /* Check bounds */
+    if (word_offset + 2 > stack->sp) {
+        return 0.0f;
+    }
+    
+    /* Read low and high words */
+    low = stack->data[stack->sp - 1 - word_offset];
+    high = stack->data[stack->sp - 2 - word_offset];
+    
+    /* Combine into 32-bit value */
+    bits = ((uint32_t)high << 16) | low;
+    
+    /* Convert to float */
+    memcpy(&value, &bits, sizeof(float));
+    
+    return value;
+}
+
 
 

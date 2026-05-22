@@ -148,6 +148,32 @@ static int native_system_println_long(ExecutionContext* ctx, uint16_t* args, uin
 }
 
 /**
+ * System.out.println(float)
+ */
+static int native_system_println_float(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float float_value;
+    uint32_t float_bits;
+    
+    (void)ctx;
+    (void)result;
+    
+    if (arg_count >= 2) {
+        /* Float is stored as 2 words: [high:2] [low:2] */
+        float_bits = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+        
+        /* Convert bits to float using memcpy for safe type punning */
+        memcpy(&float_value, &float_bits, sizeof(float));
+        
+        /* Print float value */
+        printf("%.2f\n", float_value);
+    } else {
+        printf("ERROR: println(float) requires 2 arguments\n");
+    }
+    
+    return 0;
+}
+
+/**
  * System.out.println(String)
  */
 static int native_system_println_string(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
@@ -405,6 +431,19 @@ int native_register_builtins(void) {
         native_system_println_string,
         1,
         param_string,
+        NATIVE_RETURN_VOID
+    ) != 0) {
+        return -1;
+    }
+    
+    /* System.out.println(float) */
+    if (native_register(
+        "java/lang/System",
+        "println",
+        "(F)V",
+        native_system_println_float,
+        2,
+        NULL,  /* No param types needed for now */
         NATIVE_RETURN_VOID
     ) != 0) {
         return -1;
