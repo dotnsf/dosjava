@@ -35,6 +35,10 @@ typedef enum {
     TOK_CATCH,          /* catch */
     TOK_FINALLY,        /* finally */
     TOK_THROW,          /* throw */
+    TOK_SWITCH,         /* switch */
+    TOK_CASE,           /* case */
+    TOK_DEFAULT,        /* default */
+    TOK_BREAK,          /* break */
     
     /* Literals */
     TOK_IDENTIFIER,     /* variable/method/class names */
@@ -76,6 +80,7 @@ typedef enum {
     TOK_SEMICOLON,      /* ; */
     TOK_COMMA,          /* , */
     TOK_DOT,            /* . */
+    TOK_COLON,          /* : */
     
     /* Error */
     TOK_ERROR           /* Lexical error */

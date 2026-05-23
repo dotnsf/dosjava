@@ -31,6 +31,10 @@ typedef enum {
     NODE_CATCH,             /* Catch clause */
     NODE_FINALLY,           /* Finally block */
     NODE_THROW,             /* Throw statement */
+    NODE_SWITCH,            /* Switch statement */
+    NODE_CASE,              /* Case label */
+    NODE_DEFAULT,           /* Default label */
+    NODE_BREAK,             /* Break statement */
     
     /* Expressions */
     NODE_ASSIGN,            /* Assignment = */
@@ -215,6 +219,32 @@ typedef struct ASTNode {
         struct {
             uint16_t exception_expr; /* Index of exception expression */
         } throw_stmt;
+        
+        /* Switch statement */
+        struct {
+            uint16_t expr;          /* Index of switch expression */
+            uint16_t case_count;    /* Number of cases */
+            uint16_t first_case;    /* Index of first case */
+            uint16_t has_default;   /* 1 if has default case */
+            uint16_t default_stmt;  /* Index of default statement */
+        } switch_stmt;
+        
+        /* Case label */
+        struct {
+            uint16_t value;         /* Index of case value expression */
+            uint16_t stmt;          /* Index of case statement */
+            uint16_t next_case;     /* Index of next case (linked list) */
+        } case_label;
+        
+        /* Default label */
+        struct {
+            uint16_t stmt;          /* Index of default statement */
+        } default_label;
+        
+        /* Break statement */
+        struct {
+            uint16_t unused;        /* Reserved for future use */
+        } break_stmt;
         
         /* Assignment */
         struct {

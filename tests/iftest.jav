@@ -1,16 +1,18 @@
-// If Statement Test
 class IfTest {
     public static void main() {
-        int x = 15;
-        int result = 0;
+        int x;
         
-        if (x > 10) {
-            result = 100;
+        System.out.println("Start");
+        x = 1;
+        System.out.println("x = 1");
+        
+        if (x == 1) {
+            System.out.println("One");
         }
         
-        System.out.println(result);
+        System.out.println("End");
         return;
     }
 }
 
-
+// Made with Bob

@@ -34,6 +34,10 @@ static const struct {
     {"catch", TOK_CATCH},
     {"finally", TOK_FINALLY},
     {"throw", TOK_THROW},
+    {"switch", TOK_SWITCH},
+    {"case", TOK_CASE},
+    {"default", TOK_DEFAULT},
+    {"break", TOK_BREAK},
     {"true", TOK_TRUE},
     {"false", TOK_FALSE},
     {NULL, TOK_EOF}
@@ -621,6 +625,12 @@ int lexer_next_token(Lexer* lexer, Token* token) {
             
         case '.':
             token->type = TOK_DOT;
+            lexer->column++;
+            lexer_read_char(lexer);
+            break;
+            
+        case ':':
+            token->type = TOK_COLON;
             lexer->column++;
             lexer_read_char(lexer);
             break;

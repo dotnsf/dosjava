@@ -14,6 +14,8 @@ static int load_string_pool(CodeGenerator* codegen);
 static int load_symbol_table(CodeGenerator* codegen, const char* symbol_file);
 static uint16_t get_expression_type(CodeGenerator* codegen, ASTNode* expr_node);
 static uint16_t get_array_element_type(CodeGenerator* codegen, ASTNode* array_node);
+static int generate_switch_stmt(CodeGenerator* codegen, ASTNode* switch_node);
+static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, uint16_t switch_expr_type, uint16_t end_label);
 
 /* Initialize code generator */
 int codegen_init(CodeGenerator* codegen, const char* ast_file, const char* symbol_file, const char* output_file) {
@@ -726,6 +728,18 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
             }
             return 0;
         }
+        
+        case NODE_SWITCH:
+            return generate_switch_stmt(codegen, stmt_node);
+        
+        case NODE_BREAK:
+            /* Generate GOTO to break label */
+            if (codegen->break_label == 0) {
+                codegen_error(codegen, "break statement not in loop or switch");
+                return -1;
+            }
+            emit_jump(codegen, OP_GOTO, codegen->break_label);
+            return 0;
         
         default:
             codegen_error(codegen, "Unknown statement type");
@@ -3582,44 +3596,70 @@ uint16_t create_label(CodeGenerator* codegen) {
     uint16_t idx;
     
     if (!codegen || !codegen->context || !codegen->context->labels) {
-        return 0xFFFF;
+        return 0;
     }
     
     if (codegen->context->labels->count >= 128) {
-        return 0xFFFF;
+        return 0;
     }
     
     idx = codegen->context->labels->count;
-    codegen->context->labels->labels[idx].offset = 0;
+    codegen->context->labels->labels[idx].offset_count = 0;
     codegen->context->labels->labels[idx].target = -1;
     codegen->context->labels->count++;
     
-    return idx;
+    /* Return idx + 1 so that 0 can be used as "no label" */
+    return idx + 1;
 }
 
 /* Emit label */
 int emit_label(CodeGenerator* codegen, uint16_t label_index) {
+    uint16_t actual_index;
+    
     if (!codegen || !codegen->context || !codegen->context->labels) {
         return -1;
     }
     
-    if (label_index >= codegen->context->labels->count) {
+    if (label_index == 0) {
+        return -1;  /* 0 is invalid label */
+    }
+    
+    actual_index = label_index - 1;
+    
+    if (actual_index >= codegen->context->labels->count) {
         return -1;
     }
     
     /* Set label target to current code position */
-    codegen->context->labels->labels[label_index].target = codegen->context->code->size;
+    codegen->context->labels->labels[actual_index].target = codegen->context->code->size;
     
     return 0;
 }
 
 /* Emit jump */
 int emit_jump(CodeGenerator* codegen, uint8_t opcode, uint16_t label_index) {
+    Label* label;
+    uint16_t actual_index;
+    
     if (!codegen || !codegen->context || !codegen->context->labels) {
         return -1;
     }
     
-    if (label_index >= codegen->context->labels->count) {
+    if (label_index == 0) {
+        return -1;  /* 0 is invalid label */
+    }
+    
+    actual_index = label_index - 1;
+    
+    if (actual_index >= codegen->context->labels->count) {
+        return -1;
+    }
+    
+    label = &codegen->context->labels->labels[actual_index];
+    
+    /* Check if we have space for another offset */
+    if (label->offset_count >= 16) {
+        codegen_error(codegen, "Too many jumps to same label");
         return -1;
     }
     
@@ -3627,7 +3667,8 @@ int emit_jump(CodeGenerator* codegen, uint8_t opcode, uint16_t label_index) {
     emit_opcode(codegen, opcode);
     
     /* Record offset for backpatching */
-    codegen->context->labels->labels[label_index].offset = codegen->context->code->size;
+    label->offsets[label->offset_count] = codegen->context->code->size;
+    label->offset_count++;
     
     /* Emit placeholder offset */
     emit_u2(codegen, 0);
@@ -3637,9 +3678,10 @@ int emit_jump(CodeGenerator* codegen, uint8_t opcode, uint16_t label_index) {
 
 /* Backpatch labels */
 int backpatch_labels(CodeGenerator* codegen) {
-    uint16_t i;
+    uint16_t i, j;
     Label* label;
     int16_t offset;
+    uint16_t jump_offset;
     
     if (!codegen || !codegen->context || !codegen->context->labels) {
         return -1;
@@ -3649,13 +3691,18 @@ int backpatch_labels(CodeGenerator* codegen) {
     for (i = 0; i < codegen->context->labels->count; i++) {
         label = &codegen->context->labels->labels[i];
         
-        if (label->offset > 0 && label->target >= 0) {
-            /* Calculate relative offset */
-            offset = label->target - (label->offset + 2);
-            
-            /* Patch offset in code */
-            codegen->context->code->data[label->offset] = (uint8_t)(offset & 0xFF);
-            codegen->context->code->data[label->offset + 1] = (uint8_t)(offset >> 8);
+        if (label->target >= 0) {
+            /* Backpatch all jumps to this label */
+            for (j = 0; j < label->offset_count; j++) {
+                jump_offset = label->offsets[j];
+                
+                /* Calculate relative offset */
+                offset = label->target - (jump_offset + 2);
+                
+                /* Patch offset in code */
+                codegen->context->code->data[jump_offset] = (uint8_t)(offset & 0xFF);
+                codegen->context->code->data[jump_offset + 1] = (uint8_t)(offset >> 8);
+            }
         }
     }
     
@@ -3926,3 +3973,192 @@ int write_djc_file(CodeGenerator* codegen) {
 }
 
 
+
+
+/* Generate case comparison and conditional jump */
+static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, uint16_t switch_expr_type, uint16_t end_label) {
+    ASTNode* value_node;
+    uint16_t value_idx;
+    uint16_t stmt_idx;
+    uint16_t next_case_label;
+    
+    if (!case_node || case_node->type != NODE_CASE) {
+        return -1;
+    }
+    
+    /* Save case data before any codegen_get_node calls */
+    value_idx = case_node->data.case_label.value;
+    stmt_idx = case_node->data.case_label.stmt;
+    
+    /* Get case value */
+    value_node = codegen_get_node(codegen, value_idx);
+    if (!value_node) {
+        return -1;
+    }
+    
+    /* Create label for next case */
+    next_case_label = create_label(codegen);
+    
+    /* Duplicate switch value on stack for comparison */
+    emit_opcode(codegen, OP_DUP);
+    codegen->context->current_stack++;
+    
+    /* Generate case value expression */
+    if (generate_expression(codegen, value_node) != 0) {
+        return -1;
+    }
+    
+    /* Compare: if equal, jump to case body */
+    if (switch_expr_type == TYPE_INT) {
+        emit_opcode(codegen, OP_CMP_EQ);
+    } else if (switch_expr_type == TYPE_LONG) {
+        /* For long: use LCMP, push 0, then check if equal */
+        emit_opcode(codegen, OP_LCMP);
+        codegen->context->current_stack--;
+        emit_opcode(codegen, OP_PUSH_INT);
+        emit_u2(codegen, 0);
+        codegen->context->current_stack++;
+        emit_opcode(codegen, OP_CMP_EQ);
+    } else {
+        codegen_error(codegen, "Unsupported switch expression type");
+        return -1;
+    }
+    codegen->context->current_stack--;
+    
+    /* If not equal (result is 0), jump to next case */
+    emit_jump(codegen, OP_IF_FALSE, next_case_label);
+    codegen->context->current_stack--;
+    
+    /* Equal: pop the duplicated switch value */
+    emit_opcode(codegen, OP_POP);
+    codegen->context->current_stack--;
+    
+    /* Generate case body */
+    if (stmt_idx != 0) {
+        ASTNode* stmt_node = codegen_get_node(codegen, stmt_idx);
+        if (stmt_node) {
+            if (generate_statement(codegen, stmt_node) != 0) {
+                return -1;
+            }
+        } else {
+            codegen_error(codegen, "Failed to get case body statement node");
+            return -1;
+        }
+    } else {
+        codegen_error(codegen, "Case has no body statement");
+        return -1;
+    }
+    
+    /* After case body, jump to end (break will also jump here) */
+    emit_jump(codegen, OP_GOTO, end_label);
+    
+    /* Emit label for next case */
+    emit_label(codegen, next_case_label);
+    
+    return 0;
+}
+
+/* Generate switch statement */
+static int generate_switch_stmt(CodeGenerator* codegen, ASTNode* switch_node) {
+    ASTNode* expr_node;
+    ASTNode* case_node;
+    ASTNode* default_node;
+    uint16_t expr_idx;
+    uint16_t case_idx;
+    uint16_t default_idx;
+    uint16_t switch_expr_type;
+    uint16_t end_label;
+    uint16_t default_label;
+    uint16_t old_break_label;
+    uint16_t first_case;
+    uint8_t has_default;
+    
+    if (!switch_node || switch_node->type != NODE_SWITCH) {
+        codegen_error(codegen, "Invalid switch node");
+        return -1;
+    }
+    
+    /* Save switch node data before any codegen_get_node calls */
+    expr_idx = switch_node->data.switch_stmt.expr;
+    first_case = switch_node->data.switch_stmt.first_case;
+    has_default = switch_node->data.switch_stmt.has_default;
+    default_idx = switch_node->data.switch_stmt.default_stmt;
+    
+    /* Create end label for break statements */
+    end_label = create_label(codegen);
+    
+    /* Save old break label and set new one */
+    old_break_label = codegen->break_label;
+    codegen->break_label = end_label;
+    
+    /* Get switch expression */
+    expr_node = codegen_get_node(codegen, expr_idx);
+    if (!expr_node) {
+        codegen_error(codegen, "Failed to get switch expression node");
+        codegen->break_label = old_break_label;
+        return -1;
+    }
+    
+    /* Get switch expression type */
+    switch_expr_type = get_expression_type(codegen, expr_node);
+    
+    /* Generate switch expression (leave on stack for comparisons) */
+    if (generate_expression(codegen, expr_node) != 0) {
+        codegen_error(codegen, "Failed to generate switch expression");
+        codegen->break_label = old_break_label;
+        return -1;
+    }
+    
+    /* Create default label if needed */
+    if (has_default) {
+        default_label = create_label(codegen);
+    } else {
+        default_label = end_label;
+    }
+    
+    /* Generate all case comparisons */
+    case_idx = first_case;
+    while (case_idx != 0) {
+        case_node = codegen_get_node(codegen, case_idx);
+        if (!case_node) {
+            codegen->break_label = old_break_label;
+            return -1;
+        }
+        
+        if (generate_case_comparison(codegen, case_node, switch_expr_type, end_label) != 0) {
+            codegen->break_label = old_break_label;
+            return -1;
+        }
+        
+        /* Move to next case */
+        case_idx = case_node->data.case_label.next_case;
+    }
+    
+    /* If no case matched, pop switch value and jump to default or end */
+    emit_opcode(codegen, OP_POP);
+    codegen->context->current_stack--;
+    emit_jump(codegen, OP_GOTO, default_label);
+    
+    /* Generate default case if present */
+    if (has_default) {
+        emit_label(codegen, default_label);
+        
+        if (default_idx != 0) {
+            default_node = codegen_get_node(codegen, default_idx);
+            if (default_node) {
+                if (generate_statement(codegen, default_node) != 0) {
+                    codegen->break_label = old_break_label;
+                    return -1;
+                }
+            }
+        }
+    }
+    
+    /* Emit end label */
+    emit_label(codegen, end_label);
+    
+    /* Restore old break label */
+    codegen->break_label = old_break_label;
+    
+    return 0;
+}

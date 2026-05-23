@@ -18,6 +18,9 @@ static int current_scope_has_local_name(SemanticAnalyzer* analyzer, const char* 
 static int is_string_type(SemanticAnalyzer* analyzer, TypeInfo type);
 static int register_builtin_classes(SemanticAnalyzer* analyzer);
 static uint16_t semantic_add_string(SemanticAnalyzer* analyzer, const char* str);
+static int check_switch_stmt(SemanticAnalyzer* analyzer, ASTNode* switch_node);
+static int check_case_label(SemanticAnalyzer* analyzer, ASTNode* case_node, TypeInfo switch_type);
+static int is_constant_expression(ASTNode* expr_node);
 
 /* Initialize semantic analyzer */
 int semantic_init(SemanticAnalyzer* analyzer, const char* ast_file, const char* symbol_file) {
@@ -1591,6 +1594,17 @@ int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node, uint16_t stm
             /* For now, just accept it without checking */
             return 0;
         
+        case NODE_SWITCH:
+            return check_switch_stmt(analyzer, stmt_node);
+        
+        case NODE_BREAK:
+            /* Check if break is inside switch or loop */
+            if (!analyzer->in_switch && !analyzer->in_loop) {
+                semantic_error_node(analyzer, stmt_node, "break statement not in switch or loop");
+                return -1;
+            }
+            return 0;
+        
         default:
             semantic_error_node(analyzer, stmt_node, "Unknown statement type");
             return -1;
@@ -3159,3 +3173,144 @@ int get_unary_op_result_type(UnaryOp op, TypeInfo operand_type, TypeInfo* result
 }
 
 
+
+
+/* Check if expression is a compile-time constant */
+static int is_constant_expression(ASTNode* expr_node) {
+    if (!expr_node) {
+        return 0;
+    }
+    
+    /* For Phase 7.1, only accept integer literals */
+    /* Phase 7.2 will add string literals */
+    return expr_node->type == NODE_LITERAL_INT ||
+           expr_node->type == NODE_LITERAL_LONG;
+}
+
+/* Check case label */
+static int check_case_label(SemanticAnalyzer* analyzer, ASTNode* case_node, TypeInfo switch_type) {
+    ASTNode* value_node;
+    ASTNode* stmt_node;
+    TypeInfo value_type;
+    uint16_t value_idx;
+    uint16_t stmt_idx;
+    
+    if (!case_node || case_node->type != NODE_CASE) {
+        return -1;
+    }
+    
+    /* Get case value expression */
+    value_idx = case_node->data.case_label.value;
+    value_node = semantic_get_node(analyzer, value_idx);
+    if (!value_node) {
+        semantic_error_node(analyzer, case_node, "Invalid case value");
+        return -1;
+    }
+    
+    /* Check if value is a constant expression */
+    if (!is_constant_expression(value_node)) {
+        semantic_error_node(analyzer, case_node, "Case value must be a constant expression");
+        return -1;
+    }
+    
+    /* Check value expression type */
+    if (check_expression(analyzer, value_node, &value_type) != 0) {
+        return -1;
+    }
+    
+    /* Check type compatibility with switch expression */
+    if (value_type.kind != switch_type.kind) {
+        semantic_error_node(analyzer, case_node, "Case value type does not match switch expression type");
+        return -1;
+    }
+    
+    /* Check case statement (already in switch context) */
+    stmt_idx = case_node->data.case_label.stmt;
+    if (stmt_idx != 0) {
+        stmt_node = semantic_get_node(analyzer, stmt_idx);
+        if (stmt_node) {
+            if (check_statement(analyzer, stmt_node, stmt_idx) != 0) {
+                return -1;
+            }
+        }
+    }
+    
+    return 0;
+}
+
+/* Check switch statement */
+static int check_switch_stmt(SemanticAnalyzer* analyzer, ASTNode* switch_node) {
+    ASTNode* expr_node;
+    ASTNode* case_node;
+    ASTNode* default_node;
+    TypeInfo expr_type;
+    uint16_t expr_idx;
+    uint16_t case_idx;
+    uint16_t default_idx;
+    int old_in_switch;
+    
+    if (!switch_node || switch_node->type != NODE_SWITCH) {
+        return -1;
+    }
+    
+    /* Get switch expression */
+    expr_idx = switch_node->data.switch_stmt.expr;
+    expr_node = semantic_get_node(analyzer, expr_idx);
+    if (!expr_node) {
+        semantic_error_node(analyzer, switch_node, "Invalid switch expression");
+        return -1;
+    }
+    
+    /* Check switch expression type */
+    if (check_expression(analyzer, expr_node, &expr_type) != 0) {
+        return -1;
+    }
+    
+    /* For Phase 7.1, only allow int and long types */
+    /* Phase 7.2 will add String support */
+    if (expr_type.kind != TYPE_INT && expr_type.kind != TYPE_LONG) {
+        semantic_error_node(analyzer, switch_node, "Switch expression must be int or long type");
+        return -1;
+    }
+    
+    /* Set switch context */
+    old_in_switch = analyzer->in_switch;
+    analyzer->in_switch = 1;
+    
+    /* Check all case labels */
+    case_idx = switch_node->data.switch_stmt.first_case;
+    while (case_idx != 0) {
+        case_node = semantic_get_node(analyzer, case_idx);
+        if (!case_node) {
+            analyzer->in_switch = old_in_switch;
+            return -1;
+        }
+        
+        if (check_case_label(analyzer, case_node, expr_type) != 0) {
+            analyzer->in_switch = old_in_switch;
+            return -1;
+        }
+        
+        /* Move to next case */
+        case_idx = case_node->data.case_label.next_case;
+    }
+    
+    /* Check default statement if present */
+    if (switch_node->data.switch_stmt.has_default) {
+        default_idx = switch_node->data.switch_stmt.default_stmt;
+        if (default_idx != 0) {
+            default_node = semantic_get_node(analyzer, default_idx);
+            if (default_node) {
+                if (check_statement(analyzer, default_node, default_idx) != 0) {
+                    analyzer->in_switch = old_in_switch;
+                    return -1;
+                }
+            }
+        }
+    }
+    
+    /* Restore switch context */
+    analyzer->in_switch = old_in_switch;
+    
+    return 0;
+}

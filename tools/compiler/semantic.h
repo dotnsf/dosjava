@@ -42,6 +42,8 @@ typedef struct {
     TypeInfo expected_return;   /* Expected return type for current method */
     int has_return;             /* 1 if current method has return statement */
     uint16_t next_local_index;  /* Next local variable index in current method */
+    int in_switch;              /* 1 if inside switch statement */
+    int in_loop;                /* 1 if inside loop (for/while) */
     
     /* Error tracking */
     int has_error;

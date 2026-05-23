@@ -18,7 +18,8 @@
 
 /* Label for jump instructions */
 typedef struct {
-    uint16_t offset;        /* Offset in bytecode where label is referenced */
+    uint16_t offsets[16];   /* Offsets in bytecode where label is referenced */
+    uint8_t offset_count;   /* Number of offsets */
     int16_t target;         /* Target offset (-1 if not resolved) */
 } Label;
 
@@ -78,6 +79,7 @@ typedef struct {
     CodeGenContext* context;    /* Current method context */
     Symbol* current_class;
     Symbol* current_method;
+    uint16_t break_label;       /* Label for break statement (0 if not in loop/switch) */
     
     /* String pool (shared) */
     char string_pool[2048];

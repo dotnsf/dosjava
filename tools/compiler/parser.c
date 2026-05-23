@@ -21,6 +21,8 @@ static uint16_t parse_while_stmt(Parser* parser);
 static uint16_t parse_return_stmt(Parser* parser);
 static uint16_t parse_try_stmt(Parser* parser);
 static uint16_t parse_throw_stmt(Parser* parser);
+static uint16_t parse_switch_stmt(Parser* parser);
+static uint16_t parse_break_stmt(Parser* parser);
 static int parser_link_sibling(Parser* parser, uint16_t current_node, uint16_t next_node);
 static uint16_t parse_field_decl(Parser* parser, int is_public, int is_static, TypeInfo field_type, uint16_t name_offset);
 static uint16_t parse_method_body(Parser* parser, int is_public, int is_static, TypeInfo return_type, uint16_t name_offset);
@@ -827,6 +829,16 @@ uint16_t parse_statement(Parser* parser) {
         return parse_throw_stmt(parser);
     }
     
+    /* Switch statement */
+    if (parser_match(parser, TOK_SWITCH)) {
+        return parse_switch_stmt(parser);
+    }
+    
+    /* Break statement */
+    if (parser_match(parser, TOK_BREAK)) {
+        return parse_break_stmt(parser);
+    }
+    
     /* Expression statement */
     return parse_expr_stmt(parser);
 }
@@ -1313,6 +1325,229 @@ static uint16_t parse_throw_stmt(Parser* parser) {
     parser->nodes[throw_node - parser->total_nodes - 1].data.throw_stmt.exception_expr = exception_expr;
     
     return throw_node;
+}
+
+/**
+ * Parse switch statement
+ * SwitchStmt -> 'switch' '(' Expr ')' '{' (CaseLabel | DefaultLabel)* '}'
+ * CaseLabel -> 'case' Expr ':' Statement*
+ * DefaultLabel -> 'default' ':' Statement*
+ */
+static uint16_t parse_switch_stmt(Parser* parser) {
+    uint16_t switch_node;
+    uint16_t expr;
+    uint16_t first_case;
+    uint16_t prev_case;
+    uint16_t current_case;
+    uint16_t case_count;
+    uint16_t has_default;
+    uint16_t default_stmt;
+    uint16_t case_value;
+    uint16_t case_stmt;
+    
+    /* Expect 'switch' */
+    if (parser_expect(parser, TOK_SWITCH) < 0) {
+        return 0;
+    }
+    
+    /* Expect '(' */
+    if (parser_expect(parser, TOK_LPAREN) < 0) {
+        return 0;
+    }
+    
+    /* Parse switch expression */
+    expr = parse_expression(parser);
+    if (expr == 0) {
+        return 0;
+    }
+    
+    /* Expect ')' */
+    if (parser_expect(parser, TOK_RPAREN) < 0) {
+        return 0;
+    }
+    
+    /* Expect '{' */
+    if (parser_expect(parser, TOK_LBRACE) < 0) {
+        return 0;
+    }
+    
+    /* Parse case labels and default */
+    first_case = 0;
+    prev_case = 0;
+    case_count = 0;
+    has_default = 0;
+    default_stmt = 0;
+    
+    while (!parser_match(parser, TOK_RBRACE) && !parser_match(parser, TOK_EOF)) {
+        if (parser_match(parser, TOK_CASE)) {
+            /* Parse case label */
+            parser_next_token(parser);
+            
+            /* Parse case value */
+            case_value = parse_expression(parser);
+            if (case_value == 0) {
+                return 0;
+            }
+            
+            /* Expect ':' */
+            if (parser_expect(parser, TOK_COLON) < 0) {
+                return 0;
+            }
+            
+            /* Parse case statements until next case/default/} */
+            /* Create a block to hold multiple statements */
+            case_stmt = parser_alloc_node(parser, NODE_BLOCK);
+            if (case_stmt == 0) {
+                return 0;
+            }
+            
+            /* Parse statements until next case/default/} */
+            {
+                uint16_t first_stmt = 0;
+                uint16_t prev_stmt = 0;
+                uint16_t stmt_count = 0;
+                uint16_t stmt;
+                
+                while (!parser_match(parser, TOK_CASE) && !parser_match(parser, TOK_DEFAULT) &&
+                       !parser_match(parser, TOK_RBRACE) && !parser_match(parser, TOK_EOF)) {
+                    stmt = parse_statement(parser);
+                    if (stmt == 0) {
+                        break;
+                    }
+                    
+                    if (prev_stmt != 0) {
+                        parser_link_sibling(parser, prev_stmt, stmt);
+                    } else {
+                        first_stmt = stmt;
+                    }
+                    prev_stmt = stmt;
+                    stmt_count++;
+                }
+                
+                /* Fill block node */
+                parser->nodes[case_stmt - parser->total_nodes - 1].data.block.stmt_count = stmt_count;
+                parser->nodes[case_stmt - parser->total_nodes - 1].data.block.first_stmt = first_stmt;
+            }
+            
+            /* Allocate case node */
+            current_case = parser_alloc_node(parser, NODE_CASE);
+            if (current_case == 0) {
+                return 0;
+            }
+            
+            /* Fill case node */
+            parser->nodes[current_case - parser->total_nodes - 1].data.case_label.value = case_value;
+            parser->nodes[current_case - parser->total_nodes - 1].data.case_label.stmt = case_stmt;
+            parser->nodes[current_case - parser->total_nodes - 1].data.case_label.next_case = 0;
+            
+            /* Link to previous case */
+            if (prev_case != 0) {
+                parser->nodes[prev_case - parser->total_nodes - 1].data.case_label.next_case = current_case;
+            } else {
+                first_case = current_case;
+            }
+            prev_case = current_case;
+            case_count++;
+            
+        } else if (parser_match(parser, TOK_DEFAULT)) {
+            /* Parse default label */
+            parser_next_token(parser);
+            
+            /* Expect ':' */
+            if (parser_expect(parser, TOK_COLON) < 0) {
+                return 0;
+            }
+            
+            /* Parse default statements */
+            /* Create a block to hold multiple statements */
+            default_stmt = parser_alloc_node(parser, NODE_BLOCK);
+            if (default_stmt == 0) {
+                return 0;
+            }
+            
+            /* Parse statements until } */
+            {
+                uint16_t first_stmt = 0;
+                uint16_t prev_stmt = 0;
+                uint16_t stmt_count = 0;
+                uint16_t stmt;
+                
+                while (!parser_match(parser, TOK_RBRACE) && !parser_match(parser, TOK_EOF)) {
+                    stmt = parse_statement(parser);
+                    if (stmt == 0) {
+                        break;
+                    }
+                    
+                    if (prev_stmt != 0) {
+                        parser_link_sibling(parser, prev_stmt, stmt);
+                    } else {
+                        first_stmt = stmt;
+                    }
+                    prev_stmt = stmt;
+                    stmt_count++;
+                }
+                
+                /* Fill block node */
+                parser->nodes[default_stmt - parser->total_nodes - 1].data.block.stmt_count = stmt_count;
+                parser->nodes[default_stmt - parser->total_nodes - 1].data.block.first_stmt = first_stmt;
+            }
+            
+            has_default = 1;
+            
+        } else {
+            parser_error(parser, "Expected 'case' or 'default' in switch statement");
+            return 0;
+        }
+    }
+    
+    /* Expect '}' */
+    if (parser_expect(parser, TOK_RBRACE) < 0) {
+        return 0;
+    }
+    
+    /* Allocate switch node */
+    switch_node = parser_alloc_node(parser, NODE_SWITCH);
+    if (switch_node == 0) {
+        return 0;
+    }
+    
+    /* Fill switch node */
+    parser->nodes[switch_node - parser->total_nodes - 1].data.switch_stmt.expr = expr;
+    parser->nodes[switch_node - parser->total_nodes - 1].data.switch_stmt.case_count = case_count;
+    parser->nodes[switch_node - parser->total_nodes - 1].data.switch_stmt.first_case = first_case;
+    parser->nodes[switch_node - parser->total_nodes - 1].data.switch_stmt.has_default = has_default;
+    parser->nodes[switch_node - parser->total_nodes - 1].data.switch_stmt.default_stmt = default_stmt;
+    
+    return switch_node;
+}
+
+/**
+ * Parse break statement
+ * BreakStmt -> 'break' ';'
+ */
+static uint16_t parse_break_stmt(Parser* parser) {
+    uint16_t break_node;
+    
+    /* Expect 'break' */
+    if (parser_expect(parser, TOK_BREAK) < 0) {
+        return 0;
+    }
+    
+    /* Expect ';' */
+    if (parser_expect(parser, TOK_SEMICOLON) < 0) {
+        return 0;
+    }
+    
+    /* Allocate break node */
+    break_node = parser_alloc_node(parser, NODE_BREAK);
+    if (break_node == 0) {
+        return 0;
+    }
+    
+    /* Fill break node (unused field) */
+    parser->nodes[break_node - parser->total_nodes - 1].data.break_stmt.unused = 0;
+    
+    return break_node;
 }
 
 /**
@@ -2046,6 +2281,10 @@ const char* node_type_name(NodeType type) {
         case NODE_CATCH: return "CATCH";
         case NODE_FINALLY: return "FINALLY";
         case NODE_THROW: return "THROW";
+        case NODE_SWITCH: return "SWITCH";
+        case NODE_CASE: return "CASE";
+        case NODE_DEFAULT: return "DEFAULT";
+        case NODE_BREAK: return "BREAK";
         case NODE_EXPR_STMT: return "EXPR_STMT";
         case NODE_ASSIGN: return "ASSIGN";
         case NODE_BINARY_OP: return "BINARY_OP";
