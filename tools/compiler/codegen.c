@@ -1811,6 +1811,38 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
             use_float_ops = 1;
         }
         
+        /* Check if operands are Math method calls (which return float) */
+        if (check_left && check_left->type == NODE_CALL) {
+            const char* method_name = codegen_get_string(codegen, check_left->data.call.method_name);
+            if (method_name && (strcmp(method_name, "abs") == 0 ||
+                                strcmp(method_name, "min") == 0 ||
+                                strcmp(method_name, "max") == 0 ||
+                                strcmp(method_name, "sqrt") == 0 ||
+                                strcmp(method_name, "sin") == 0 ||
+                                strcmp(method_name, "cos") == 0 ||
+                                strcmp(method_name, "tan") == 0 ||
+                                strcmp(method_name, "pow") == 0 ||
+                                strcmp(method_name, "exp") == 0 ||
+                                strcmp(method_name, "log") == 0)) {
+                use_float_ops = 1;
+            }
+        }
+        if (check_right && check_right->type == NODE_CALL) {
+            const char* method_name = codegen_get_string(codegen, check_right->data.call.method_name);
+            if (method_name && (strcmp(method_name, "abs") == 0 ||
+                                strcmp(method_name, "min") == 0 ||
+                                strcmp(method_name, "max") == 0 ||
+                                strcmp(method_name, "sqrt") == 0 ||
+                                strcmp(method_name, "sin") == 0 ||
+                                strcmp(method_name, "cos") == 0 ||
+                                strcmp(method_name, "tan") == 0 ||
+                                strcmp(method_name, "pow") == 0 ||
+                                strcmp(method_name, "exp") == 0 ||
+                                strcmp(method_name, "log") == 0)) {
+                use_float_ops = 1;
+            }
+        }
+        
         /* Then check for long */
         if (!use_float_ops) {
             if (check_left && check_left->type == NODE_LITERAL_LONG) {
@@ -2652,6 +2684,19 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         is_native = 1;
     } else if (strcmp(method_name, "concat") == 0 && object_idx == 0) {
         is_native = 1;
+    } else if (object_idx != 0) {
+        /* Check if this is Math.method() call */
+        ASTNode* obj_node = codegen_get_node(codegen, object_idx);
+        if (obj_node && obj_node->type == NODE_IDENTIFIER) {
+            const char* obj_name = codegen_get_string(codegen, obj_node->data.identifier.name);
+            if (obj_name && strcmp(obj_name, "Math") == 0) {
+                is_native = 1;
+            }
+        }
+    }
+    
+    if (!is_native && strcmp(method_name, "concat") == 0 && object_idx == 0) {
+        is_native = 1;
     } else if (object_idx != 0 && strcmp(method_name, "length") == 0) {
         is_native = 1;
         is_string_length = 1;
@@ -2996,6 +3041,22 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         } else if (strcmp(method_name, "printLong") == 0) {
             /* System.printLong(long) */
             strcpy(descriptor, "(J)V");
+        } else if (strcmp(method_name, "abs") == 0 ||
+                   strcmp(method_name, "sqrt") == 0 ||
+                   strcmp(method_name, "sin") == 0 ||
+                   strcmp(method_name, "cos") == 0 ||
+                   strcmp(method_name, "tan") == 0 ||
+                   strcmp(method_name, "exp") == 0 ||
+                   strcmp(method_name, "log") == 0) {
+            /* Math.method(float) returns float */
+            strcpy(descriptor, "(F)F");
+            invoke_arg_count = 2;  /* Float takes 2 words on stack */
+        } else if (strcmp(method_name, "min") == 0 ||
+                   strcmp(method_name, "max") == 0 ||
+                   strcmp(method_name, "pow") == 0) {
+            /* Math.method(float, float) returns float */
+            strcpy(descriptor, "(FF)F");
+            invoke_arg_count = 4;  /* Two floats take 4 words on stack */
         } else if (arg_node_type == NODE_LITERAL_STRING || first_arg_is_string) {
             strcpy(descriptor, "(Ljava/lang/String;)V");
         } else if (arg_node_type == NODE_LITERAL_FLOAT) {
@@ -3017,6 +3078,18 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         is_string_lastindexof || is_string_substr || strcmp(method_name, "concat") == 0 ||
         strcmp(method_name, "readLine") == 0) {
         returns_value = 1;
+    } else if (strcmp(method_name, "abs") == 0 ||
+               strcmp(method_name, "min") == 0 ||
+               strcmp(method_name, "max") == 0 ||
+               strcmp(method_name, "sqrt") == 0 ||
+               strcmp(method_name, "sin") == 0 ||
+               strcmp(method_name, "cos") == 0 ||
+               strcmp(method_name, "tan") == 0 ||
+               strcmp(method_name, "pow") == 0 ||
+               strcmp(method_name, "exp") == 0 ||
+               strcmp(method_name, "log") == 0) {
+        /* All Math methods return float (2 words) */
+        returns_value = 2;  /* Float return value takes 2 words */
     } else if (!is_native) {
         method_sym = NULL;
         for (i = 0; i < codegen->symtable->symbol_count; i++) {
@@ -3078,11 +3151,12 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
         return -1;
     }
     
-    /* Check if this is a builtin class name (Socket, File, System) */
+    /* Check if this is a builtin class name (Socket, File, System, Math) */
     /* These are used for static method calls and should not be treated as variables */
     if (strcmp(var_name, "Socket") == 0 ||
         strcmp(var_name, "File") == 0 ||
-        strcmp(var_name, "System") == 0) {
+        strcmp(var_name, "System") == 0 ||
+        strcmp(var_name, "Math") == 0) {
         /* For builtin classes, we don't push anything on the stack */
         /* The method call handler will deal with it */
         return 0;

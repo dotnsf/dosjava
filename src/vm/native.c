@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
 /* Global native method registry */
 static NativeMethodRegistry g_native_registry;
@@ -390,6 +391,294 @@ static int native_string_toLowerCase(ExecutionContext* ctx, uint16_t* args, uint
     return 0;
 }
 
+/* ===== Math Class Methods ===== */
+
+/**
+ * Math.abs(float) - Absolute value
+ */
+static int native_math_abs(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float value, result_value;
+    uint32_t float_bits, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 2) {
+        return -1;
+    }
+    
+    /* Convert args to float */
+    float_bits = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    memcpy(&value, &float_bits, sizeof(float));
+    
+    /* Calculate absolute value */
+    result_value = (float)fabs((double)value);
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
+ * Math.min(float, float) - Minimum of two values
+ */
+static int native_math_min(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float a, b, result_value;
+    uint32_t float_bits_a, float_bits_b, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 4) {
+        return -1;
+    }
+    
+    /* Convert args to floats */
+    float_bits_a = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    float_bits_b = ((uint32_t)args[2] << 16) | (uint32_t)args[3];
+    memcpy(&a, &float_bits_a, sizeof(float));
+    memcpy(&b, &float_bits_b, sizeof(float));
+    
+    /* Calculate minimum */
+    result_value = (a < b) ? a : b;
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
+ * Math.max(float, float) - Maximum of two values
+ */
+static int native_math_max(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float a, b, result_value;
+    uint32_t float_bits_a, float_bits_b, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 4) {
+        return -1;
+    }
+    
+    /* Convert args to floats */
+    float_bits_a = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    float_bits_b = ((uint32_t)args[2] << 16) | (uint32_t)args[3];
+    memcpy(&a, &float_bits_a, sizeof(float));
+    memcpy(&b, &float_bits_b, sizeof(float));
+    
+    /* Calculate maximum */
+    result_value = (a > b) ? a : b;
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
+ * Math.sqrt(float) - Square root
+ */
+static int native_math_sqrt(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float value, result_value;
+    uint32_t float_bits, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 2) {
+        return -1;
+    }
+    
+    /* Convert args to float */
+    float_bits = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    memcpy(&value, &float_bits, sizeof(float));
+    
+    /* Calculate square root */
+    result_value = (float)sqrt((double)value);
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
+ * Math.sin(float) - Sine (radians)
+ */
+static int native_math_sin(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float value, result_value;
+    uint32_t float_bits, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 2) {
+        return -1;
+    }
+    
+    /* Convert args to float */
+    float_bits = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    memcpy(&value, &float_bits, sizeof(float));
+    
+    /* Calculate sine */
+    result_value = (float)sin((double)value);
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
+ * Math.cos(float) - Cosine (radians)
+ */
+static int native_math_cos(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float value, result_value;
+    uint32_t float_bits, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 2) {
+        return -1;
+    }
+    
+    /* Convert args to float */
+    float_bits = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    memcpy(&value, &float_bits, sizeof(float));
+    
+    /* Calculate cosine */
+    result_value = (float)cos((double)value);
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
+ * Math.tan(float) - Tangent (radians)
+ */
+static int native_math_tan(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float value, result_value;
+    uint32_t float_bits, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 2) {
+        return -1;
+    }
+    
+    /* Convert args to float */
+    float_bits = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    memcpy(&value, &float_bits, sizeof(float));
+    
+    /* Calculate tangent */
+    result_value = (float)tan((double)value);
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
+ * Math.pow(float, float) - Power (base^exponent)
+ */
+static int native_math_pow(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float base, exponent, result_value;
+    uint32_t float_bits_base, float_bits_exp, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 4) {
+        return -1;
+    }
+    
+    /* Convert args to floats */
+    float_bits_base = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    float_bits_exp = ((uint32_t)args[2] << 16) | (uint32_t)args[3];
+    memcpy(&base, &float_bits_base, sizeof(float));
+    memcpy(&exponent, &float_bits_exp, sizeof(float));
+    
+    /* Calculate power */
+    result_value = (float)pow((double)base, (double)exponent);
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
+ * Math.exp(float) - Exponential (e^x)
+ */
+static int native_math_exp(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float value, result_value;
+    uint32_t float_bits, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 2) {
+        return -1;
+    }
+    
+    /* Convert args to float */
+    float_bits = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    memcpy(&value, &float_bits, sizeof(float));
+    
+    /* Calculate exponential */
+    result_value = (float)exp((double)value);
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
+ * Math.log(float) - Natural logarithm
+ */
+static int native_math_log(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float value, result_value;
+    uint32_t float_bits, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 2) {
+        return -1;
+    }
+    
+    /* Convert args to float */
+    float_bits = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    memcpy(&value, &float_bits, sizeof(float));
+    
+    /* Calculate natural logarithm */
+    result_value = (float)log((double)value);
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
 /**
  * Register all built-in native methods
  */
@@ -536,6 +825,136 @@ int native_register_builtins(void) {
         1,
         param_string,
         NATIVE_RETURN_STRING
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.abs(float) */
+    if (native_register(
+        "Math",
+        "abs",
+        "(F)F",
+        native_math_abs,
+        2,  /* Float takes 2 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.min(float, float) */
+    if (native_register(
+        "Math",
+        "min",
+        "(FF)F",
+        native_math_min,
+        4,  /* Two floats take 4 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.max(float, float) */
+    if (native_register(
+        "Math",
+        "max",
+        "(FF)F",
+        native_math_max,
+        4,  /* Two floats take 4 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.sqrt(float) */
+    if (native_register(
+        "Math",
+        "sqrt",
+        "(F)F",
+        native_math_sqrt,
+        2,  /* Float takes 2 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.sin(float) */
+    if (native_register(
+        "Math",
+        "sin",
+        "(F)F",
+        native_math_sin,
+        2,  /* Float takes 2 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.cos(float) */
+    if (native_register(
+        "Math",
+        "cos",
+        "(F)F",
+        native_math_cos,
+        2,  /* Float takes 2 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.tan(float) */
+    if (native_register(
+        "Math",
+        "tan",
+        "(F)F",
+        native_math_tan,
+        2,  /* Float takes 2 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.pow(float, float) */
+    if (native_register(
+        "Math",
+        "pow",
+        "(FF)F",
+        native_math_pow,
+        4,  /* Two floats take 4 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.exp(float) */
+    if (native_register(
+        "Math",
+        "exp",
+        "(F)F",
+        native_math_exp,
+        2,  /* Float takes 2 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.log(float) */
+    if (native_register(
+        "Math",
+        "log",
+        "(F)F",
+        native_math_log,
+        2,  /* Float takes 2 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
     ) != 0) {
         return -1;
     }

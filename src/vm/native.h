@@ -20,14 +20,18 @@ typedef enum {
     NATIVE_PARAM_VOID = 0,      /* No parameter */
     NATIVE_PARAM_INT = 1,       /* int (16-bit) */
     NATIVE_PARAM_STRING = 2,    /* String (UTF8 constant index) */
-    NATIVE_PARAM_OBJECT = 3     /* Object reference */
+    NATIVE_PARAM_OBJECT = 3,    /* Object reference */
+    NATIVE_PARAM_LONG = 4,      /* long (32-bit, 2 words) */
+    NATIVE_PARAM_FLOAT = 5      /* float (32-bit, 2 words) */
 } NativeParamType;
 
 typedef enum {
     NATIVE_RETURN_VOID = 0,     /* No return value */
     NATIVE_RETURN_INT = 1,      /* int (16-bit) */
     NATIVE_RETURN_STRING = 2,   /* String (UTF8 constant index) */
-    NATIVE_RETURN_OBJECT = 3    /* Object reference */
+    NATIVE_RETURN_OBJECT = 3,   /* Object reference */
+    NATIVE_RETURN_LONG = 4,     /* long (32-bit, 2 words) */
+    NATIVE_RETURN_FLOAT = 5     /* float (32-bit, 2 words) */
 } NativeReturnType;
 
 /**

@@ -1,1 +1,9 @@
-7.50
+=== Pythagorean Theorem Test ===
+9.00
+16.00
+25.00
+5.00
+=== Circle Area Test ===
+78.50
+=== Distance Formula Test ===
+5.00

@@ -1349,7 +1349,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "7.50"
 echo.
 
-goto :completed
+goto :test31
 
 :test30_fail
 echo FAILED: Compilation error
@@ -1366,6 +1366,218 @@ goto :end
 :test30_badout
 echo FAILED: Output mismatch for Test 30
 echo Expected: "7.50"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test31
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 31: Math Basic
+echo ------------------------------
+..\build\bin\djc.exe mathbas.jav
+if errorlevel 1 goto :test31_fail
+if not exist mathbas.DJC goto :test31_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe mathbas.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test31_runfail
+linechk RT_OUT.TXT 2 "3.50" > nul
+if errorlevel 1 goto :test31_badout
+linechk RT_OUT.TXT 3 "3.50" > nul
+if errorlevel 1 goto :test31_badout
+linechk RT_OUT.TXT 5 "2.10" > nul
+if errorlevel 1 goto :test31_badout
+linechk RT_OUT.TXT 6 "1.00" > nul
+if errorlevel 1 goto :test31_badout
+linechk RT_OUT.TXT 8 "3.50" > nul
+if errorlevel 1 goto :test31_badout
+linechk RT_OUT.TXT 9 "5.00" > nul
+if errorlevel 1 goto :test31_badout
+linechk RT_OUT.TXT 11 "3.00" > nul
+if errorlevel 1 goto :test31_badout
+linechk RT_OUT.TXT 12 "4.00" > nul
+if errorlevel 1 goto :test31_badout
+linechk RT_OUT.TXT 13 "1.41" > nul
+if errorlevel 1 goto :test31_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "1.41"
+echo.
+
+goto :test32
+
+:test31_fail
+echo FAILED: Compilation error
+goto :end
+
+:test31_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test31_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test31_badout
+echo FAILED: Output mismatch for Test 31
+echo Expected: "1.41"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test32
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 32: Math Triangle
+echo ------------------------------
+..\build\bin\djc.exe mathtrig.jav
+if errorlevel 1 goto :test32_fail
+if not exist mathtrig.DJC goto :test32_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe mathtrig.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test32_runfail
+linechk RT_OUT.TXT 2 "0.00" > nul
+if errorlevel 1 goto :test32_badout
+linechk RT_OUT.TXT 3 "1.00" > nul
+if errorlevel 1 goto :test32_badout
+linechk RT_OUT.TXT 5 "1.00" > nul
+if errorlevel 1 goto :test32_badout
+linechk RT_OUT.TXT 6 "0.00" > nul
+if errorlevel 1 goto :test32_badout
+linechk RT_OUT.TXT 8 "0.00" > nul
+if errorlevel 1 goto :test32_badout
+linechk RT_OUT.TXT 9 "0.99" > nul
+if errorlevel 1 goto :test32_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "0.99"
+echo.
+
+goto :test33
+
+:test32_fail
+echo FAILED: Compilation error
+goto :end
+
+:test32_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test32_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test32_badout
+echo FAILED: Output mismatch for Test 32
+echo Expected: "0.99"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test33
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 33: Math Exp
+echo ------------------------------
+..\build\bin\djc.exe mathexp.jav
+if errorlevel 1 goto :test33_fail
+if not exist mathexp.DJC goto :test33_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe mathexp.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test33_runfail
+linechk RT_OUT.TXT 2 "8.00" > nul
+if errorlevel 1 goto :test33_badout
+linechk RT_OUT.TXT 3 "100.00" > nul
+if errorlevel 1 goto :test33_badout
+linechk RT_OUT.TXT 4 "1.00" > nul
+if errorlevel 1 goto :test33_badout
+linechk RT_OUT.TXT 6 "1.00" > nul
+if errorlevel 1 goto :test33_badout
+linechk RT_OUT.TXT 7 "2.72" > nul
+if errorlevel 1 goto :test33_badout
+linechk RT_OUT.TXT 8 "7.39" > nul
+if errorlevel 1 goto :test33_badout
+linechk RT_OUT.TXT 10 "0.00" > nul
+if errorlevel 1 goto :test33_badout
+linechk RT_OUT.TXT 11 "1.00" > nul
+if errorlevel 1 goto :test33_badout
+linechk RT_OUT.TXT 12 "2.30" > nul
+if errorlevel 1 goto :test33_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "2.30"
+echo.
+
+goto :test34
+
+:test33_fail
+echo FAILED: Compilation error
+goto :end
+
+:test33_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test33_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test33_badout
+echo FAILED: Output mismatch for Test 33
+echo Expected: "2.30"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test34
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 34: Math All
+echo ------------------------------
+..\build\bin\djc.exe mathall.jav
+if errorlevel 1 goto :test34_fail
+if not exist mathall.DJC goto :test34_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe mathall.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test34_runfail
+linechk RT_OUT.TXT 2 "9.00" > nul
+if errorlevel 1 goto :test34_badout
+linechk RT_OUT.TXT 3 "16.00" > nul
+if errorlevel 1 goto :test34_badout
+linechk RT_OUT.TXT 4 "25.00" > nul
+if errorlevel 1 goto :test34_badout
+linechk RT_OUT.TXT 5 "5.00" > nul
+if errorlevel 1 goto :test34_badout
+linechk RT_OUT.TXT 7 "78.50" > nul
+if errorlevel 1 goto :test34_badout
+linechk RT_OUT.TXT 9 "5.00" > nul
+if errorlevel 1 goto :test34_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "78.5, 5.00"
+echo.
+
+goto :completed
+
+:test34_fail
+echo FAILED: Compilation error
+goto :end
+
+:test34_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test34_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test34_badout
+echo FAILED: Output mismatch for Test 34
+echo Expected: "78.5, 5.00"
 echo Actual:
 type RT_OUT.TXT
 goto :end

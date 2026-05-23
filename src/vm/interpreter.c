@@ -1056,7 +1056,7 @@ int interpreter_step(ExecutionContext* ctx) {
                 const char* descriptor;
                 NativeMethodDescriptor* native_method;
                 uint16_t args[8];  /* Support up to 8 arguments */
-                uint16_t result;
+                uint16_t result[2];  /* Support up to 2-word return values (for float) */
                 uint8_t i;
                 int invoke_result;
                 
@@ -1083,8 +1083,9 @@ int interpreter_step(ExecutionContext* ctx) {
                     }
                     
                     /* Invoke native method */
-                    result = 0;
-                    invoke_result = native_invoke(ctx, native_method, args, arg_count, &result);
+                    result[0] = 0;
+                    result[1] = 0;
+                    invoke_result = native_invoke(ctx, native_method, args, arg_count, result);
                     
                     if (invoke_result != 0) {
                         printf("ERROR: Native method %s failed\n", method_name ? method_name : "???");
@@ -1093,9 +1094,22 @@ int interpreter_step(ExecutionContext* ctx) {
                     
                     /* Push result if method returns a value */
                     if (native_method->return_type != NATIVE_RETURN_VOID) {
-                        if (stack_push_shared(ctx, result) != 0) {
-                            printf("ERROR: Stack overflow\n");
-                            return -1;
+                        if (native_method->return_type == NATIVE_RETURN_FLOAT) {
+                            /* Float return value: 2 words [high, low] */
+                            if (stack_push_shared(ctx, result[0]) != 0) {
+                                printf("ERROR: Stack overflow\n");
+                                return -1;
+                            }
+                            if (stack_push_shared(ctx, result[1]) != 0) {
+                                printf("ERROR: Stack overflow\n");
+                                return -1;
+                            }
+                        } else {
+                            /* Single word return value */
+                            if (stack_push_shared(ctx, result[0]) != 0) {
+                                printf("ERROR: Stack overflow\n");
+                                return -1;
+                            }
                         }
                     }
                     

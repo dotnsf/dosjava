@@ -2512,6 +2512,73 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         }
     }
     
+    /* Special-case Math static methods */
+    if (object_idx != 0 && method_name) {
+        object_node = semantic_get_node(analyzer, object_idx);
+        if (object_node && object_node->type == NODE_IDENTIFIER) {
+            uint16_t class_name_off = object_node->data.identifier.name;
+            const char* class_name = semantic_get_string(analyzer, class_name_off);
+            
+            if (class_name && strcmp(class_name, "Math") == 0) {
+                /* Math.abs(float), Math.sqrt(float), Math.sin(float), Math.cos(float), Math.tan(float), Math.exp(float), Math.log(float) */
+                if (strcmp(method_name, "abs") == 0 || strcmp(method_name, "sqrt") == 0 ||
+                    strcmp(method_name, "sin") == 0 || strcmp(method_name, "cos") == 0 ||
+                    strcmp(method_name, "tan") == 0 || strcmp(method_name, "exp") == 0 ||
+                    strcmp(method_name, "log") == 0) {
+                    if (arg_count != 1) {
+                        semantic_error_node(analyzer, call_node, "Math method takes exactly 1 argument");
+                        return -1;
+                    }
+                    /* Check argument type */
+                    if (first_arg_idx != 0) {
+                        TypeInfo arg_type;
+                        arg_node = semantic_get_node(analyzer, first_arg_idx);
+                        if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
+                            return -1;
+                        }
+                        if (arg_type.kind != TYPE_FLOAT) {
+                            semantic_error_node(analyzer, call_node, "Math method requires float argument");
+                            return -1;
+                        }
+                    }
+                    result_type->kind = TYPE_FLOAT;
+                    result_type->class_name = 0;
+                    return 0;
+                }
+                /* Math.min(float, float), Math.max(float, float), Math.pow(float, float) */
+                else if (strcmp(method_name, "min") == 0 || strcmp(method_name, "max") == 0 ||
+                         strcmp(method_name, "pow") == 0) {
+                    if (arg_count != 2) {
+                        semantic_error_node(analyzer, call_node, "Math method takes exactly 2 arguments");
+                        return -1;
+                    }
+                    /* Check argument types */
+                    if (first_arg_idx != 0) {
+                        TypeInfo arg_type;
+                        uint16_t current_arg_idx = first_arg_idx;
+                        int checked_args = 0;
+                        
+                        while (current_arg_idx != 0 && checked_args < 2) {
+                            arg_node = semantic_get_node(analyzer, current_arg_idx);
+                            if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
+                                return -1;
+                            }
+                            if (arg_type.kind != TYPE_FLOAT) {
+                                semantic_error_node(analyzer, call_node, "Math method requires float arguments");
+                                return -1;
+                            }
+                            current_arg_idx = arg_node->next_sibling;
+                            checked_args++;
+                        }
+                    }
+                    result_type->kind = TYPE_FLOAT;
+                    result_type->class_name = 0;
+                    return 0;
+                }
+            }
+        }
+    }
+    
     /* Special-case Phase 1 String native instance methods */
     if (object_idx != 0 && method_name &&
         (strcmp(method_name, "length") == 0 ||
