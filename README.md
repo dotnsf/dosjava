@@ -20,6 +20,17 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 ### データ型
 - `int` - 16-bit符号付き整数（-32768 ～ 32767）
   - 配列のインデックスは `int` 型のみ
+- `long` - 32-bit符号付き整数（Phase 5で追加）
+  - リテラル: `123L` または `123l`
+  - 演算: `+`, `-`, `*`, `/`, `%`
+  - 比較: `==`, `!=`, `<`, `>`, `<=`, `>=`
+  - `System.out.println(long)` サポート
+- `float` - 32-bit浮動小数点数（Phase 6.1で追加）
+  - リテラル: `3.14f` または `3.14F`
+  - 演算: `+`, `-`, `*`, `/`, `%`
+  - 比較: `==`, `!=`, `<`, `>`, `<=`, `>=`
+  - `System.out.println(float)` サポート
+  - IEEE 754形式
 - `boolean` - 真偽値（true/false）
 - `void` - 戻り値なし
 - `String` - Phase 1 の限定サポート
@@ -51,11 +62,54 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 - static メソッド呼び出し
 
 ### 現在利用できる配列機能
-- `int[]`
-- `boolean[]`
+- `int[]` - 整数配列
+- `long[]` - 長整数配列（Phase 5.4で追加）
+- `float[]` - 浮動小数点配列（Phase 6.2で追加）
+- `boolean[]` - 真偽値配列
 - 配列要素アクセス
 - 配列要素代入
 - `array.length`
+
+### Mathクラス（Phase 6.3で追加）
+数学関数を提供するクラス
+
+#### 基本関数
+- `float Math.abs(float x)` - 絶対値
+- `float Math.min(float a, float b)` - 最小値
+- `float Math.max(float a, float b)` - 最大値
+- `float Math.sqrt(float x)` - 平方根
+
+#### 三角関数
+- `float Math.sin(float x)` - サイン（ラジアン）
+- `float Math.cos(float x)` - コサイン（ラジアン）
+- `float Math.tan(float x)` - タンジェント（ラジアン）
+
+#### 指数・対数関数
+- `float Math.pow(float base, float exp)` - べき乗
+- `float Math.exp(float x)` - 自然指数関数（e^x）
+- `float Math.log(float x)` - 自然対数（ln(x)）
+
+#### 使用例
+```java
+class MathDemo {
+    public static void main() {
+        float x = 3.0f;
+        float y = 4.0f;
+        
+        // ピタゴラスの定理: c = √(x² + y²)
+        float c = Math.sqrt(Math.pow(x, 2.0f) + Math.pow(y, 2.0f));
+        System.out.println(c);  // 5.00
+        
+        // 円の面積: A = π × r²
+        float pi = 3.14f;
+        float r = 5.0f;
+        float area = pi * Math.pow(r, 2.0f);
+        System.out.println(area);  // 78.50
+        
+        return;
+    }
+}
+```
 
 ### Dateクラス（Phase 3.5で追加、Phase 5.5でlong型対応）
 DOS環境で日付・時刻を扱うためのクラス
@@ -174,6 +228,8 @@ Date d = new Date(timestamp);
 
 - [djc.exe](https://github.com/dotnsf/dosjava/raw/refs/heads/main/build/bin/djc.exe)         - 統合コンパイラ
 - [djvm.exe](https://github.com/dotnsf/dosjava/raw/refs/heads/main/build/bin/djvm.exe)        - 仮想マシン
+- [linechk.exe](https://github.com/dotnsf/dosjava/raw/refs/heads/main/build/bin/linechk.exe)        - テスト時のファイルチェッカー（tests\runtest.bat 内で使用）
+
 
 ### ソースからビルド
 ```batch
@@ -431,10 +487,10 @@ Error: Type mismatch
 - ヒープ: ~40KB
 
 ### 言語制限
-- インスタンスベースのオブジェクト指向機能なし
+- インスタンスベースのオブジェクト指向機能なし（Dateクラスを除く）
 - `String` は Phase 1 の限定サポートのみ
 - `String + int`、`String` 引数、`String` 戻り値は未対応
-- float/double型なし
+- `double` 型なし（`float` は Phase 6.1 で追加済み）
 
 ## 開発フェーズ
 
@@ -470,11 +526,34 @@ Error: Type mismatch
 - Socket/ServerSocket クラス
 - ネットワークI/O
 
+### Phase 5: Long Type Support ✅ 完了
+- **Phase 5.1**: 32-bit long型の基本実装
+  - リテラル、演算子、比較演算
+- **Phase 5.2**: long型のコード生成とVM実装
+  - スタック操作、算術演算、比較演算
+- **Phase 5.3**: long型の出力サポート
+  - `System.out.println(long)` 実装
+- **Phase 5.4**: long配列サポート
+  - `long[]` 配列の作成、アクセス、代入
+- **Phase 5.5**: Date クラスのlong型対応
+  - タイムスタンプを秒単位のlong型で扱う
+
+### Phase 6: Float Type and Math Support ✅ 完了
+- **Phase 6.1**: 32-bit float型の実装
+  - リテラル、演算子、比較演算
+  - IEEE 754形式
+  - `System.out.println(float)` サポート
+- **Phase 6.2**: float配列サポート
+  - `float[]` 配列の作成、アクセス、代入
+- **Phase 6.3**: Math クラスの実装
+  - 基本関数: abs, min, max, sqrt
+  - 三角関数: sin, cos, tan
+  - 指数・対数: pow, exp, log
+  - 詳細: [PHASE6_3_MATH_COMPLETION.md](PHASE6_3_MATH_COMPLETION.md)
+
 ### 今後の予定
-- [ ] Phase 3.5.1 Exception Handling実装（コンパイラ/VM）
 - [ ] Phase 4 Network機能完成
-- [ ] Native Method Mechanism（Date/Exception Java統合）
-- [ ] より多くのランタイムライブラリ
+- [ ] Phase 7: より多くのランタイムライブラリ
 - [ ] 最適化
 - [ ] デバッガ
 
