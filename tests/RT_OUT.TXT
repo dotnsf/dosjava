@@ -1,9 +1,24 @@
-=== Pythagorean Theorem Test ===
-9.00
-16.00
-25.00
-5.00
-=== Circle Area Test ===
-78.50
-=== Distance Formula Test ===
-5.00
+=== Switch Statement Tests ===
+
+1. INT switch:
+  Two
+
+2. LONG switch:
+  Two hundred
+
+3. Default case:
+  Default matched
+
+4. No default (no match):
+  After switch
+
+5. Default at beginning:
+  Default first
+
+6. Nested switch:
+  x=1, y=2
+
+7. Many cases:
+  Five
+
+=== All tests complete ===

@@ -46,6 +46,12 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 - `while`
 - `for`
 - `return`
+- `switch` / `case` / `default` / `break`（Phase 7で追加）
+  - INT型、LONG型、STRING型のswitch文
+  - 複数のcase文
+  - default case（任意の位置）
+  - Nested switch（switch文のネスト）
+  - **制限**: Fall-through動作は未実装（各caseにbreakが必須）
 
 ### 演算子
 - **算術**: `+`, `-`, `*`, `/`, `%`

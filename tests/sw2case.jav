@@ -1,11 +1,9 @@
-class SwitchDebug {
+class Switch2Case {
     public static void main() {
         int x;
         
-        System.out.println("Start");
-        x = 1;
-        System.out.println("x = 1");
-        
+        x = 2;
+        System.out.print("x=2: ");
         switch (x) {
             case 1:
                 System.out.println("One");
@@ -13,12 +11,8 @@ class SwitchDebug {
             case 2:
                 System.out.println("Two");
                 break;
-            default:
-                System.out.println("Other");
-                break;
         }
         
-        System.out.println("End");
         return;
     }
 }

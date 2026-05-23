@@ -23,5 +23,3 @@ class SwitchTest2 {
         return;
     }
 }
-
-// Made with Bob

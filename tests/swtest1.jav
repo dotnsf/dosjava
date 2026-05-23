@@ -18,5 +18,3 @@ class SwitchTest1 {
         return;
     }
 }
-
-// Made with Bob

@@ -21,5 +21,3 @@ class StringSwitch {
         System.out.println("Done");
     }
 }
-
-// Made with Bob

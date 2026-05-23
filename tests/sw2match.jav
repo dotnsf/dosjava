@@ -1,8 +1,10 @@
-class SwitchSimple {
+class Switch2Match {
     public static void main() {
-        int x;
+        int x = 2;
+        System.out.print("x=");
+        System.out.print(x);
+        System.out.print(": ");
         
-        x = 1;
         switch (x) {
             case 1:
                 System.out.println("One");
@@ -10,11 +12,8 @@ class SwitchSimple {
             case 2:
                 System.out.println("Two");
                 break;
-            default:
-                System.out.println("Other");
-                break;
         }
         
-        return;
+        System.out.println("Done");
     }
 }

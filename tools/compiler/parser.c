@@ -1465,14 +1465,15 @@ static uint16_t parse_switch_stmt(Parser* parser) {
                 return 0;
             }
             
-            /* Parse statements until } */
+            /* Parse statements until next case/default/} */
             {
                 uint16_t first_stmt = 0;
                 uint16_t prev_stmt = 0;
                 uint16_t stmt_count = 0;
                 uint16_t stmt;
                 
-                while (!parser_match(parser, TOK_RBRACE) && !parser_match(parser, TOK_EOF)) {
+                while (!parser_match(parser, TOK_CASE) && !parser_match(parser, TOK_DEFAULT) &&
+                       !parser_match(parser, TOK_RBRACE) && !parser_match(parser, TOK_EOF)) {
                     stmt = parse_statement(parser);
                     if (stmt == 0) {
                         break;

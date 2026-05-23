@@ -3975,12 +3975,52 @@ int write_djc_file(CodeGenerator* codegen) {
 
 
 
+/* Check if a block ends with a break statement */
+static int block_ends_with_break(CodeGenerator* codegen, ASTNode* block_node) {
+    ASTNode* stmt_node;
+    uint16_t stmt_idx;
+    uint16_t stmt_count;
+    uint16_t i;
+    
+    if (!block_node || block_node->type != NODE_BLOCK) {
+        return 0;
+    }
+    
+    stmt_count = block_node->data.block.stmt_count;
+    if (stmt_count == 0) {
+        /* Empty block - falls through */
+        return 0;
+    }
+    
+    /* Find the last statement in the block */
+    stmt_idx = block_node->data.block.first_stmt;
+    for (i = 1; i < stmt_count && stmt_idx != 0; i++) {
+        stmt_node = codegen_get_node(codegen, stmt_idx);
+        if (!stmt_node) {
+            return 0;
+        }
+        stmt_idx = stmt_node->next_sibling;
+    }
+    
+    /* Check if last statement is a break */
+    if (stmt_idx != 0) {
+        stmt_node = codegen_get_node(codegen, stmt_idx);
+        if (stmt_node && stmt_node->type == NODE_BREAK) {
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
 /* Generate case comparison and conditional jump */
 static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, uint16_t switch_expr_type, uint16_t end_label) {
     ASTNode* value_node;
+    ASTNode* stmt_node;
     uint16_t value_idx;
     uint16_t stmt_idx;
     uint16_t next_case_label;
+    int has_break;
     
     if (!case_node || case_node->type != NODE_CASE) {
         return -1;
@@ -4000,10 +4040,24 @@ static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, 
     next_case_label = create_label(codegen);
     
     /* Duplicate switch value on stack for comparison */
-    emit_opcode(codegen, OP_DUP);
-    codegen->context->current_stack++;
+    /* For INT/STRING: use DUP twice */
+    /* For LONG: load from temporary variable (stored in generate_switch_stmt) */
+    if (switch_expr_type == TYPE_LONG) {
+        /* Load switch value from temporary local variable 126 */
+        emit_opcode(codegen, OP_LOAD_LONG);
+        emit_u1(codegen, 126);
+        codegen->context->current_stack += 2;  /* LONG uses 2 slots */
+    } else {
+        /* We need TWO copies: one for comparison, one to keep for next case */
+        /* Stack: [switch_value] -> [switch_value, switch_value, switch_value] */
+        emit_opcode(codegen, OP_DUP);
+        codegen->context->current_stack++;
+        emit_opcode(codegen, OP_DUP);
+        codegen->context->current_stack++;
+    }
     
     /* Generate case value expression */
+    /* Stack: [switch_value, switch_value, switch_value, case_value] */
     if (generate_expression(codegen, value_node) != 0) {
         return -1;
     }
@@ -4011,19 +4065,21 @@ static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, 
     /* Compare: if equal, jump to case body */
     if (switch_expr_type == TYPE_INT) {
         emit_opcode(codegen, OP_CMP_EQ);
+        /* CMP_EQ: 2 consumed, 1 produced = net -1 */
+        codegen->context->current_stack--;
     } else if (switch_expr_type == TYPE_LONG) {
         /* For long: use LCMP, push 0, then check if equal */
+        /* LCMP consumes 4 slots (2 longs) and produces 1 slot (int result) */
         emit_opcode(codegen, OP_LCMP);
-        codegen->context->current_stack--;
+        codegen->context->current_stack -= 3;  /* 4 consumed, 1 produced = net -3 */
         emit_opcode(codegen, OP_PUSH_INT);
         emit_u2(codegen, 0);
         codegen->context->current_stack++;
         emit_opcode(codegen, OP_CMP_EQ);
+        /* CMP_EQ: 2 consumed, 1 produced = net -1 */
+        codegen->context->current_stack--;
     } else if (switch_expr_type == TYPE_CLASS) {
         /* For String: call String.equals() method */
-        /* Stack before: [switch_str, case_str] */
-        /* Call equals: switch_str.equals(case_str) */
-        /* Returns int (1 or 0) */
         uint16_t method_idx;
         uint16_t desc_idx;
         char descriptor[80];
@@ -4048,25 +4104,43 @@ static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, 
         emit_u2(codegen, method_idx);
         emit_u1(codegen, 2);  /* 2 arguments: receiver + parameter */
         
-        /* Stack after: [result] where result is 1 (equal) or 0 (not equal) */
-        codegen->context->current_stack--;  /* 2 args consumed, 1 result pushed */
+        /* Stack after: [switch_value, result] where result is 1 (equal) or 0 (not equal) */
+        /* INVOKE_STATIC: 2 args consumed, 1 result pushed = net -1 */
+        codegen->context->current_stack--;
     } else {
         codegen_error(codegen, "Unsupported switch expression type");
         return -1;
     }
-    codegen->context->current_stack--;
     
-    /* If not equal (result is 0), jump to next case */
+    /* Stack after comparison: [switch_value, result] */
+    /* If not equal (result is 0), jump to next case (switch_value stays on stack) */
     emit_jump(codegen, OP_IF_FALSE, next_case_label);
-    codegen->context->current_stack--;
+    codegen->context->current_stack--;  /* IF_FALSE consumes result */
     
-    /* Equal: pop the duplicated switch value */
-    emit_opcode(codegen, OP_POP);
-    codegen->context->current_stack--;
+    /* Equal: We matched! Pop the switch_value before executing case body */
+    /* For INT/STRING: pop from stack */
+    /* For LONG: no need to pop (using temporary variable) */
+    if (switch_expr_type != TYPE_LONG) {
+        emit_opcode(codegen, OP_POP);
+        codegen->context->current_stack--;
+    }
+    
+    /* Check if case body ends with break (for fall-through support) */
+    if (stmt_idx != 0) {
+        stmt_node = codegen_get_node(codegen, stmt_idx);
+        if (!stmt_node) {
+            codegen_error(codegen, "Failed to get case body statement node");
+            return -1;
+        }
+        has_break = block_ends_with_break(codegen, stmt_node);
+    } else {
+        /* Empty case body - no break, will fall through */
+        has_break = 0;
+    }
     
     /* Generate case body */
     if (stmt_idx != 0) {
-        ASTNode* stmt_node = codegen_get_node(codegen, stmt_idx);
+        stmt_node = codegen_get_node(codegen, stmt_idx);
         if (stmt_node) {
             if (generate_statement(codegen, stmt_node) != 0) {
                 return -1;
@@ -4075,15 +4149,16 @@ static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, 
             codegen_error(codegen, "Failed to get case body statement node");
             return -1;
         }
-    } else {
-        codegen_error(codegen, "Case has no body statement");
-        return -1;
     }
+    /* else: Empty case body - this is valid for fall-through */
     
-    /* After case body, jump to end (break will also jump here) */
-    emit_jump(codegen, OP_GOTO, end_label);
+    /* After case body, jump to end only if it ends with break (no fall-through) */
+    if (has_break) {
+        emit_jump(codegen, OP_GOTO, end_label);
+    }
+    /* else: Fall-through - don't emit any jump, execution continues to next case */
     
-    /* Emit label for next case */
+    /* Emit label for next case (comparison failed, switch_value still on stack) */
     emit_label(codegen, next_case_label);
     
     return 0;
@@ -4133,11 +4208,22 @@ static int generate_switch_stmt(CodeGenerator* codegen, ASTNode* switch_node) {
     /* Get switch expression type */
     switch_expr_type = get_expression_type(codegen, expr_node);
     
-    /* Generate switch expression (leave on stack for comparisons) */
+    /* Generate switch expression */
     if (generate_expression(codegen, expr_node) != 0) {
         codegen_error(codegen, "Failed to generate switch expression");
         codegen->break_label = old_break_label;
         return -1;
+    }
+    
+    /* For LONG type, we need to store switch value in a temporary local variable */
+    /* because OP_DUP only duplicates 1 slot, but LONG uses 2 slots */
+    if (switch_expr_type == TYPE_LONG) {
+        /* Use local variable 126 as temporary storage for switch value */
+        /* 126+1=127 is within SHARED_LOCALS_SIZE (128) */
+        /* This assumes user code doesn't use local 126-127 */
+        emit_opcode(codegen, OP_STORE_LONG);
+        emit_u1(codegen, 126);
+        codegen->context->current_stack -= 2;  /* LONG uses 2 slots */
     }
     
     /* Create default label if needed */
@@ -4150,24 +4236,34 @@ static int generate_switch_stmt(CodeGenerator* codegen, ASTNode* switch_node) {
     /* Generate all case comparisons */
     case_idx = first_case;
     while (case_idx != 0) {
+        uint16_t next_case_idx;
+        
         case_node = codegen_get_node(codegen, case_idx);
         if (!case_node) {
             codegen->break_label = old_break_label;
             return -1;
         }
         
+        /* Save next_case before calling generate_case_comparison */
+        /* because codegen_get_node() reuses the same buffer */
+        next_case_idx = case_node->data.case_label.next_case;
+        
         if (generate_case_comparison(codegen, case_node, switch_expr_type, end_label) != 0) {
             codegen->break_label = old_break_label;
             return -1;
         }
         
-        /* Move to next case */
-        case_idx = case_node->data.case_label.next_case;
+        /* Move to next case using saved value */
+        case_idx = next_case_idx;
     }
     
-    /* If no case matched, pop switch value and jump to default or end */
-    emit_opcode(codegen, OP_POP);
-    codegen->context->current_stack--;
+    /* If no case matched, jump to default or end */
+    /* For INT/STRING: pop switch value from stack */
+    /* For LONG: no need to pop (using temporary variable) */
+    if (switch_expr_type != TYPE_LONG) {
+        emit_opcode(codegen, OP_POP);
+        codegen->context->current_stack--;
+    }
     emit_jump(codegen, OP_GOTO, default_label);
     
     /* Generate default case if present */

@@ -5,5 +5,3 @@ class NoSwitch {
         return;
     }
 }
-
-// Made with Bob

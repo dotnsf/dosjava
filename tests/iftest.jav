@@ -14,5 +14,3 @@ class IfTest {
         return;
     }
 }
-
-// Made with Bob

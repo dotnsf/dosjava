@@ -1561,7 +1561,7 @@ type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "78.5, 5.00"
 echo.
 
-goto :completed
+goto :test35
 
 :test34_fail
 echo FAILED: Compilation error
@@ -1578,6 +1578,58 @@ goto :end
 :test34_badout
 echo FAILED: Output mismatch for Test 34
 echo Expected: "78.5, 5.00"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test35
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 35: Switch
+echo ------------------------------
+..\build\bin\djc.exe switch.jav
+if errorlevel 1 goto :test35_fail
+if not exist switch.DJC goto :test35_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe switch.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test35_runfail
+linechk RT_OUT.TXT 4 "  Two" > nul
+if errorlevel 1 goto :test35_badout
+linechk RT_OUT.TXT 7 "  Two hundred" > nul
+if errorlevel 1 goto :test35_badout
+linechk RT_OUT.TXT 10 "  Default matched" > nul
+if errorlevel 1 goto :test35_badout
+linechk RT_OUT.TXT 13 "  After switch" > nul
+if errorlevel 1 goto :test35_badout
+linechk RT_OUT.TXT 16 "  Default first" > nul
+if errorlevel 1 goto :test35_badout
+linechk RT_OUT.TXT 19 "  x=1, y=2" > nul
+if errorlevel 1 goto :test35_badout
+linechk RT_OUT.TXT 22 "  Five" > nul
+if errorlevel 1 goto :test35_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "  Five"
+echo.
+
+goto :completed
+
+:test35_fail
+echo FAILED: Compilation error
+goto :end
+
+:test35_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test35_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test35_badout
+echo FAILED: Output mismatch for Test 35
+echo Expected: "  Five"
 echo Actual:
 type RT_OUT.TXT
 goto :end
