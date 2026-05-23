@@ -1875,8 +1875,9 @@ uint16_t parse_primary(Parser* parser) {
     
     /* Object/Array creation: new ClassName() or new Type[size] */
     if (parser_consume(parser, TOK_NEW)) {
-        /* Check if it's an array creation (int[], long[], or boolean[]) */
-        if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_LONG) || parser_match(parser, TOK_BOOLEAN)) {
+        /* Check if it's an array creation (int[], long[], float[], or boolean[]) */
+        if (parser_match(parser, TOK_INT) || parser_match(parser, TOK_LONG) ||
+            parser_match(parser, TOK_FLOAT) || parser_match(parser, TOK_BOOLEAN)) {
             uint16_t base_kind;
             uint16_t size_expr;
             
@@ -1884,6 +1885,8 @@ uint16_t parse_primary(Parser* parser) {
                 base_kind = TYPE_INT;
             } else if (parser_consume(parser, TOK_LONG)) {
                 base_kind = TYPE_LONG;
+            } else if (parser_consume(parser, TOK_FLOAT)) {
+                base_kind = TYPE_FLOAT;
             } else {
                 base_kind = TYPE_BOOLEAN;
                 parser_next_token(parser);

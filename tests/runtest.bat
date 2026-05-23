@@ -1194,7 +1194,7 @@ goto :end
 :test27
 
 if exist RT_OUT.TXT del RT_OUT.TXT
-echo Test 27: Date
+echo Test 27: Float(1)
 echo ------------------------------
 ..\build\bin\djc.exe ftst1.jav
 if errorlevel 1 goto :test27_fail
@@ -1240,7 +1240,7 @@ goto :end
 :test28
 
 if exist RT_OUT.TXT del RT_OUT.TXT
-echo Test 28: Date
+echo Test 28: Float(2)
 echo ------------------------------
 ..\build\bin\djc.exe ftst2.jav
 if errorlevel 1 goto :test28_fail
@@ -1249,19 +1249,19 @@ echo SUCCESS: Compilation passed
 ..\build\bin\djvm.exe ftst2.DJC > RT_OUT.TXT
 if errorlevel 1 goto :test28_runfail
 linechk RT_OUT.TXT 1 "1.50" > nul
-if errorlevel 1 goto :test27_badout
+if errorlevel 1 goto :test28_badout
 linechk RT_OUT.TXT 2 "10.00" > nul
-if errorlevel 1 goto :test27_badout
+if errorlevel 1 goto :test28_badout
 linechk RT_OUT.TXT 3 "3.70" > nul
-if errorlevel 1 goto :test27_badout
+if errorlevel 1 goto :test28_badout
 linechk RT_OUT.TXT 4 "1" > nul
-if errorlevel 1 goto :test27_badout
+if errorlevel 1 goto :test28_badout
 echo Output:
 type RT_OUT.TXT
 echo SUCCESS: Output matched expected value "1"
 echo.
 
-goto :completed
+goto :test29
 
 :test28_fail
 echo FAILED: Compilation error
@@ -1278,6 +1278,94 @@ goto :end
 :test28_badout
 echo FAILED: Output mismatch for Test 28
 echo Expected: "1"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test29
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 29: Float Array(1)
+echo ------------------------------
+..\build\bin\djc.exe farr2.jav
+if errorlevel 1 goto :test29_fail
+if not exist farr2.DJC goto :test29_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe farr2.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test29_runfail
+linechk RT_OUT.TXT 1 "1.00" > nul
+if errorlevel 1 goto :test29_badout
+linechk RT_OUT.TXT 2 "2.00" > nul
+if errorlevel 1 goto :test29_badout
+linechk RT_OUT.TXT 3 "3.00" > nul
+if errorlevel 1 goto :test29_badout
+linechk RT_OUT.TXT 4 "4.00" > nul
+if errorlevel 1 goto :test29_badout
+linechk RT_OUT.TXT 5 "5.00" > nul
+if errorlevel 1 goto :test29_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "5.00"
+echo.
+
+goto :test30
+
+:test29_fail
+echo FAILED: Compilation error
+goto :end
+
+:test29_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test29_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test29_badout
+echo FAILED: Output mismatch for Test 29
+echo Expected: "5.00"
+echo Actual:
+type RT_OUT.TXT
+goto :end
+
+
+:test30
+
+if exist RT_OUT.TXT del RT_OUT.TXT
+echo Test 30: Float Array(2)
+echo ------------------------------
+..\build\bin\djc.exe farr3.jav
+if errorlevel 1 goto :test30_fail
+if not exist farr3.DJC goto :test30_nofile
+echo SUCCESS: Compilation passed
+..\build\bin\djvm.exe farr3.DJC > RT_OUT.TXT
+if errorlevel 1 goto :test30_runfail
+linechk RT_OUT.TXT 1 "7.50" > nul
+if errorlevel 1 goto :test30_badout
+echo Output:
+type RT_OUT.TXT
+echo SUCCESS: Output matched expected value "7.50"
+echo.
+
+goto :completed
+
+:test30_fail
+echo FAILED: Compilation error
+goto :end
+
+:test30_nofile
+echo FAILED: DJC file not created
+goto :end
+
+:test30_runfail
+echo FAILED: Runtime error
+goto :end
+
+:test30_badout
+echo FAILED: Output mismatch for Test 30
+echo Expected: "7.50"
 echo Actual:
 type RT_OUT.TXT
 goto :end

@@ -2011,9 +2011,10 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             class_name = NULL;
             class_sym = NULL;
             
-            /* Check if it's an array (class_name is TYPE_INT, TYPE_LONG, or TYPE_BOOLEAN) */
-            if (class_name_value == TYPE_INT || class_name_value == TYPE_LONG || class_name_value == TYPE_BOOLEAN) {
-                /* Array creation: new int[size], new long[size], or new boolean[size] */
+            /* Check if it's an array (class_name is TYPE_INT, TYPE_LONG, TYPE_FLOAT, or TYPE_BOOLEAN) */
+            if (class_name_value == TYPE_INT || class_name_value == TYPE_LONG ||
+                class_name_value == TYPE_FLOAT || class_name_value == TYPE_BOOLEAN) {
+                /* Array creation: new int[size], new long[size], new float[size], or new boolean[size] */
                 ASTNode* size_node;
                 TypeInfo size_type;
                 
@@ -2083,6 +2084,8 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             /* Return element type from array's class_name field */
             if (array_type.class_name == TYPE_LONG) {
                 result_type->kind = TYPE_LONG;
+            } else if (array_type.class_name == TYPE_FLOAT) {
+                result_type->kind = TYPE_FLOAT;
             } else if (array_type.class_name == TYPE_BOOLEAN) {
                 result_type->kind = TYPE_BOOLEAN;
             } else {

@@ -3826,6 +3826,149 @@ int interpreter_step(ExecutionContext* ctx) {
             break;
         }
         
+        /* ===== Float Array Operations ===== */
+        
+        case OP_NEW_FLOAT_ARRAY: {
+            /* Create new float[] array
+             * Stack: [size] -> [array_ref]
+             * Memory layout: [length:2][elem0_high:2][elem0_low:2]...
+             * Each float element uses 2 words (4 bytes)
+             */
+            uint16_t size;
+            uint16_t total_size;
+            uint16_t* array_data;
+            uint16_t array_handle;
+            
+            size = stack_pop_shared(ctx);
+            
+            /* Validate size */
+            if (size > 8192) {  /* Reasonable limit for DOS */
+                printf("ERROR: Float array size too large: %u\n", size);
+                return -1;
+            }
+            
+            /* Calculate total size: (size * 2 + 1) * 2 bytes
+             * size * 2 = number of words for all float elements
+             * + 1 = length field
+             * * 2 = convert words to bytes
+             */
+            total_size = (uint16_t)((size * 2 + 1) * sizeof(uint16_t));
+            array_data = (uint16_t*)memory_alloc(total_size);
+            if (array_data == NULL) {
+                printf("ERROR: Out of memory allocating float array\n");
+                return -1;
+            }
+            
+            /* Initialize array: length + all elements to 0 */
+            memset(array_data, 0, total_size);
+            array_data[0] = size;  /* Store element count (not word count) */
+            
+            /* Allocate handle for array pointer */
+            array_handle = memory_alloc_array_handle(array_data);
+            if (array_handle == 0) {
+                printf("ERROR: Out of array handles\n");
+                memory_free(array_data);
+                return -1;
+            }
+            
+            if (stack_push_shared(ctx, array_handle) != 0) {
+                printf("ERROR: Stack overflow\n");
+                memory_free_array_handle(array_handle);
+                memory_free(array_data);
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FARRAY_LOAD: {
+            /* Load float element from array
+             * Stack: [array_ref, index] -> [high, low]
+             * Pushes 2 words: high word first, then low word
+             */
+            uint16_t index;
+            uint16_t array_handle;
+            uint16_t* array_data;
+            uint16_t length;
+            uint16_t offset;
+            uint16_t high;
+            uint16_t low;
+            
+            index = stack_pop_shared(ctx);
+            array_handle = stack_pop_shared(ctx);
+            array_data = (uint16_t*)memory_get_array_ptr(array_handle);
+            
+            if (array_data == NULL) {
+                printf("ERROR: Null array reference (FARRAY_LOAD)\n");
+                return -1;
+            }
+            
+            length = array_data[0];
+            if (index >= length) {
+                printf("ERROR: Float array index out of bounds (index=%u, length=%u)\n",
+                       index, length);
+                return -1;
+            }
+            
+            /* Calculate offset: 1 (length) + index * 2 (each float = 2 words) */
+            offset = 1 + (index * 2);
+            high = array_data[offset];
+            low = array_data[offset + 1];
+            
+            /* Push high word first, then low word */
+            if (stack_push_shared(ctx, high) != 0 ||
+                stack_push_shared(ctx, low) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
+        case OP_FARRAY_STORE: {
+            /* Store float element into array
+             * Stack: [array_ref, index, high, low] -> [high, low]
+             * Pops 4 values, stores float, pushes value back for assignment result
+             */
+            uint16_t low;
+            uint16_t high;
+            uint16_t index;
+            uint16_t array_handle;
+            uint16_t* array_data;
+            uint16_t length;
+            uint16_t offset;
+            
+            low = stack_pop_shared(ctx);
+            high = stack_pop_shared(ctx);
+            index = stack_pop_shared(ctx);
+            array_handle = stack_pop_shared(ctx);
+            
+            array_data = (uint16_t*)memory_get_array_ptr(array_handle);
+            
+            if (array_data == NULL) {
+                printf("ERROR: Null array reference (FARRAY_STORE)\n");
+                return -1;
+            }
+            
+            length = array_data[0];
+            if (index >= length) {
+                printf("ERROR: Float array index out of bounds (index=%u, length=%u)\n",
+                       index, length);
+                return -1;
+            }
+            
+            /* Calculate offset: 1 (length) + index * 2 (each float = 2 words) */
+            offset = 1 + (index * 2);
+            array_data[offset] = high;
+            array_data[offset + 1] = low;
+            
+            /* Push value back for assignment expression result */
+            if (stack_push_shared(ctx, high) != 0 ||
+                stack_push_shared(ctx, low) != 0) {
+                printf("ERROR: Stack overflow\n");
+                return -1;
+            }
+            break;
+        }
+        
         case OP_HALT:
             /* Halt execution */
             ctx->running = 0;

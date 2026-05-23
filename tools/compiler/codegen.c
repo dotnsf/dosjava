@@ -577,11 +577,12 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
                 ASTNode expr_copy;
                 uint16_t expr_type;
                 int is_long_assign = 0;
+                int is_float_assign = 0;
                 
                 memcpy(&expr_copy, expr_node, sizeof(ASTNode));
                 expr_type = expr_copy.type;
                 
-                /* Check if this is a long assignment */
+                /* Check if this is a long or float assignment */
                 if (expr_type == NODE_ASSIGN) {
                     ASTNode* target_node = codegen_get_node(codegen, expr_copy.data.assign.target);
                     if (target_node && target_node->type == NODE_IDENTIFIER) {
@@ -595,6 +596,8 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
                                     sym_name && strcmp(sym_name, var_name) == 0) {
                                     if (sym->type.kind == TYPE_LONG) {
                                         is_long_assign = 1;
+                                    } else if (sym->type.kind == TYPE_FLOAT) {
+                                        is_float_assign = 1;
                                     }
                                     break;
                                 }
@@ -615,8 +618,8 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
                     expr_type == NODE_ARRAY_ACCESS ||
                     expr_type == NODE_FIELD_ACCESS ||
                     expr_type == NODE_ASSIGN) {
-                    if (is_long_assign) {
-                        /* Long assignment leaves 2 words on stack, pop both */
+                    if (is_long_assign || is_float_assign) {
+                        /* Long/float assignment leaves 2 words on stack, pop both */
                         emit_opcode(codegen, OP_POP);
                         update_stack(codegen, -1);
                         emit_opcode(codegen, OP_POP);
@@ -1198,8 +1201,8 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             
             /* Check if it's an array (class_name stores element type) */
             if (class_name_value == TYPE_INT || class_name_value == TYPE_BOOLEAN ||
-                class_name_value == TYPE_LONG) {
-                /* Array creation: new int[size], new boolean[size], or new long[size] */
+                class_name_value == TYPE_LONG || class_name_value == TYPE_FLOAT) {
+                /* Array creation: new int[size], new boolean[size], new long[size], or new float[size] */
                 ASTNode* size_node;
                 uint8_t elem_type = (uint8_t)class_name_value;
                 
@@ -1213,6 +1216,8 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
                 /* Emit appropriate opcode based on element type */
                 if (elem_type == TYPE_LONG) {
                     emit_opcode(codegen, OP_NEW_LONG_ARRAY);
+                } else if (elem_type == TYPE_FLOAT) {
+                    emit_opcode(codegen, OP_NEW_FLOAT_ARRAY);
                 } else {
                     emit_opcode(codegen, OP_NEW_ARRAY);
                     emit_u1(codegen, elem_type);
@@ -1330,6 +1335,9 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             elem_type = get_array_element_type(codegen, &array_expr_copy);
             if (elem_type == TYPE_LONG) {
                 emit_opcode(codegen, OP_LARRAY_LOAD);
+                update_stack(codegen, 0);  /* Pops 2 (array, index), pushes 2 (high, low) */
+            } else if (elem_type == TYPE_FLOAT) {
+                emit_opcode(codegen, OP_FARRAY_LOAD);
                 update_stack(codegen, 0);  /* Pops 2 (array, index), pushes 2 (high, low) */
             } else {
                 emit_opcode(codegen, OP_ARRAY_LOAD);
@@ -1834,10 +1842,12 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                 }
             }
         }
-        /* Check if left operand is array access with long element type */
+        /* Check if left operand is array access with long or float element type */
         if (check_left && check_left->type == NODE_ARRAY_ACCESS) {
             uint16_t elem_type = get_array_element_type(codegen, check_left);
-            if (elem_type == TYPE_LONG) {
+            if (elem_type == TYPE_FLOAT) {
+                use_float_ops = 1;
+            } else if (elem_type == TYPE_LONG) {
                 use_long_ops = 1;
             }
         }
@@ -1861,10 +1871,12 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                 }
             }
         }
-        /* Check if right operand is array access with long element type */
+        /* Check if right operand is array access with long or float element type */
         if (check_right && check_right->type == NODE_ARRAY_ACCESS) {
             uint16_t elem_type = get_array_element_type(codegen, check_right);
-            if (elem_type == TYPE_LONG) {
+            if (elem_type == TYPE_FLOAT) {
+                use_float_ops = 1;
+            } else if (elem_type == TYPE_LONG) {
                 use_long_ops = 1;
             }
         }
@@ -2329,6 +2341,9 @@ int generate_assignment(CodeGenerator* codegen, ASTNode* assign_node) {
             elem_type = get_array_element_type(codegen, &array_expr_copy);
             if (elem_type == TYPE_LONG) {
                 emit_opcode(codegen, OP_LARRAY_STORE);
+                update_stack(codegen, -2);  /* Pops 4 (array, index, high, low), pushes 2 (high, low) */
+            } else if (elem_type == TYPE_FLOAT) {
+                emit_opcode(codegen, OP_FARRAY_STORE);
                 update_stack(codegen, -2);  /* Pops 4 (array, index, high, low), pushes 2 (high, low) */
             } else {
                 emit_opcode(codegen, OP_ARRAY_STORE);
@@ -2818,6 +2833,14 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
                             arg_node_type = NODE_LITERAL_FLOAT;
                         }
                     }
+                }
+            }
+            else if (arg_node_type == NODE_ARRAY_ACCESS) {
+                /* Check if array element is float type */
+                uint16_t elem_type = get_array_element_type(codegen, arg_node);
+                if (elem_type == TYPE_FLOAT) {
+                    /* Mark as float type for descriptor generation */
+                    arg_node_type = NODE_LITERAL_FLOAT;
                 }
             }
             
