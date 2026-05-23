@@ -4019,6 +4019,37 @@ static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, 
         emit_u2(codegen, 0);
         codegen->context->current_stack++;
         emit_opcode(codegen, OP_CMP_EQ);
+    } else if (switch_expr_type == TYPE_CLASS) {
+        /* For String: call String.equals() method */
+        /* Stack before: [switch_str, case_str] */
+        /* Call equals: switch_str.equals(case_str) */
+        /* Returns int (1 or 0) */
+        uint16_t method_idx;
+        uint16_t desc_idx;
+        char descriptor[80];
+        
+        /* Find or add "equals" method reference */
+        method_idx = find_method_index(codegen, "equals", 1);  /* 1 = is_native */
+        if (method_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add equals method reference");
+            return -1;
+        }
+        
+        /* Create descriptor for String.equals: (Ljava/lang/String;Ljava/lang/String;)I */
+        strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)I");
+        desc_idx = find_or_add_utf8(codegen, descriptor);
+        if (desc_idx == 0) {
+            codegen_error(codegen, "Failed to add equals descriptor");
+            return -1;
+        }
+        
+        /* Emit INVOKE_STATIC for String.equals */
+        emit_opcode(codegen, OP_INVOKE_STATIC);
+        emit_u2(codegen, method_idx);
+        emit_u1(codegen, 2);  /* 2 arguments: receiver + parameter */
+        
+        /* Stack after: [result] where result is 1 (equal) or 0 (not equal) */
+        codegen->context->current_stack--;  /* 2 args consumed, 1 result pushed */
     } else {
         codegen_error(codegen, "Unsupported switch expression type");
         return -1;

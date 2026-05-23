@@ -3181,10 +3181,10 @@ static int is_constant_expression(ASTNode* expr_node) {
         return 0;
     }
     
-    /* For Phase 7.1, only accept integer literals */
-    /* Phase 7.2 will add string literals */
+    /* Accept integer and string literals */
     return expr_node->type == NODE_LITERAL_INT ||
-           expr_node->type == NODE_LITERAL_LONG;
+           expr_node->type == NODE_LITERAL_LONG ||
+           expr_node->type == NODE_LITERAL_STRING;
 }
 
 /* Check case label */
@@ -3266,11 +3266,19 @@ static int check_switch_stmt(SemanticAnalyzer* analyzer, ASTNode* switch_node) {
         return -1;
     }
     
-    /* For Phase 7.1, only allow int and long types */
-    /* Phase 7.2 will add String support */
-    if (expr_type.kind != TYPE_INT && expr_type.kind != TYPE_LONG) {
-        semantic_error_node(analyzer, switch_node, "Switch expression must be int or long type");
+    /* Allow int, long, and String types */
+    if (expr_type.kind != TYPE_INT && expr_type.kind != TYPE_LONG && expr_type.kind != TYPE_CLASS) {
+        semantic_error_node(analyzer, switch_node, "Switch expression must be int, long, or String type");
         return -1;
+    }
+    
+    /* If TYPE_CLASS, verify it's String */
+    if (expr_type.kind == TYPE_CLASS) {
+        const char* class_name = semantic_get_string(analyzer, expr_type.class_name);
+        if (!class_name || strcmp(class_name, "String") != 0) {
+            semantic_error_node(analyzer, switch_node, "Switch expression must be int, long, or String type");
+            return -1;
+        }
     }
     
     /* Set switch context */
