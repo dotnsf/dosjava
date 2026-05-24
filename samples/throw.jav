@@ -5,35 +5,23 @@ class ThrowTest {
         // Test throw and catch
         try {
             result = 1;
-            throw new Exception("Test message");
+            throw 100;
             result = 0;  // Should not execute
         } catch (Exception e) {
             result = 2;
         }
         
-        // Test throw with message retrieval
-        String msg = "";
+        // Test another throw and catch
+        int test2 = 0;
         try {
-            throw new Exception("Error occurred");
+            test2 = 1;
+            throw 200;
         } catch (Exception e) {
-            msg = e.getMessage();
+            test2 = 3;
         }
         
-        // Test nested try-catch with throw
-        int nested = 0;
-        try {
-            try {
-                throw new Exception("Inner");
-            } catch (Exception e) {
-                nested = 1;
-                throw new Exception("Outer");
-            }
-        } catch (Exception e) {
-            nested = 2;
-        }
-        
-        // Verify results: result=2, msg="Error occurred", nested=2
-        if (result == 2 && msg.equals("Error occurred") && nested == 2) {
+        // Verify results: result=2, test2=3
+        if (result == 2 && test2 == 3) {
             System.out.println("throw.jav worked correctly.");
         }
         

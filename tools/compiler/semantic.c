@@ -2248,21 +2248,21 @@ int check_binary_op(SemanticAnalyzer* analyzer, ASTNode* binop_node, TypeInfo* r
         /* String + String */
         if (is_string_type(analyzer, left_type) && is_string_type(analyzer, right_type)) {
             result_type->kind = TYPE_CLASS;
-            result_type->class_name = left_type.class_name;
+            result_type->class_name = semantic_add_string(analyzer, "String");
             return 0;
         }
         
         /* String + int */
         if (is_string_type(analyzer, left_type) && is_numeric_type(right_type)) {
             result_type->kind = TYPE_CLASS;
-            result_type->class_name = left_type.class_name;
+            result_type->class_name = semantic_add_string(analyzer, "String");
             return 0;
         }
         
         /* int + String */
         if (is_numeric_type(left_type) && is_string_type(analyzer, right_type)) {
             result_type->kind = TYPE_CLASS;
-            result_type->class_name = right_type.class_name;
+            result_type->class_name = semantic_add_string(analyzer, "String");
             return 0;
         }
     }
@@ -2679,13 +2679,24 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
             return -1;
         }
         
-        string_name_off = semantic_add_string(analyzer, "String");
-        if (object_type.class_name != string_name_off) {
-            semantic_error_node(analyzer, call_node, "String method requires String receiver");
-            return -1;
+        /* Compare class name string directly instead of offsets
+         * This handles cases where "String" appears at different offsets in the string pool */
+        {
+            const char* class_name_str = semantic_get_string(analyzer, object_type.class_name);
+            if (!class_name_str || strcmp(class_name_str, "String") != 0) {
+                semantic_error_node(analyzer, call_node, "String method requires String receiver");
+                return -1;
+            }
         }
         
-        if (strcmp(method_name, "length") == 0 || is_comparison_method || is_equals_method || is_compareto_method || is_index_method) {
+        /* Get the canonical "String" offset for return type */
+        string_name_off = semantic_add_string(analyzer, "String");
+        
+        /* equals() returns boolean */
+        if (is_equals_method) {
+            result_type->kind = TYPE_BOOLEAN;
+            result_type->class_name = 0;
+        } else if (strcmp(method_name, "length") == 0 || is_comparison_method || is_compareto_method || is_index_method) {
             result_type->kind = TYPE_INT;
             result_type->class_name = 0;
         } else {

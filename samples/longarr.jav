@@ -9,7 +9,12 @@ class LongArrTest {
         arr1[4] = 5000000000L;
         
         // Test long array initialization with values
-        long[] arr2 = {100L, 200L, 300L, 400L, 500L};
+        long[] arr2 = new long[5];
+        arr2[0] = 100L;
+        arr2[1] = 200L;
+        arr2[2] = 300L;
+        arr2[3] = 400L;
+        arr2[4] = 500L;
         
         // Test array access and sum
         long sum = 0L;

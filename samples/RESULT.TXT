@@ -18,7 +18,8 @@ while.jav worked correctly.
 [PASS] while.jav
 
 [TEST] arith.jav
-[FAIL] arith.jav - Compilation failed
+arith.jav worked correctly.
+[PASS] arith.jav
 
 [TEST] compare.jav
 compare.jav worked correctly.
@@ -33,47 +34,54 @@ println.jav worked correctly.
 [PASS] println.jav
 
 [TEST] string.jav
-[FAIL] string.jav - Compilation failed
+string.jav worked correctly.
+[PASS] string.jav
 
 [TEST] strops.jav
-[FAIL] strops.jav - Compilation failed
+strops.jav worked correctly.
+[PASS] strops.jav
 
 [TEST] intarr.jav
-[FAIL] intarr.jav - Compilation failed
+intarr.jav worked correctly.
+[PASS] intarr.jav
 
 [TEST] boolarr.jav
 boolarr.jav worked correctly.
 [PASS] boolarr.jav
 
 [TEST] fileread.jav
-[FAIL] fileread.jav - Compilation failed
+fileread.jav worked correctly.
+[PASS] fileread.jav
 
 [TEST] filewrit.jav
-[FAIL] filewrit.jav - Compilation failed
+filewrit.jav worked correctly.
+[PASS] filewrit.jav
 
 [TEST] long.jav
 [PASS] long.jav
 
 [TEST] longarr.jav
-[FAIL] longarr.jav - Compilation failed
+longarr.jav worked correctly.
+[PASS] longarr.jav
 
 [TEST] float.jav
 [PASS] float.jav
 
 [TEST] floatarr.jav
-[FAIL] floatarr.jav - Compilation failed
-
-[TEST] cast.jav
-[FAIL] cast.jav - Compilation failed
+floatarr.jav worked correctly.
+[PASS] floatarr.jav
 
 [TEST] math.jav
-[FAIL] math.jav - Compilation failed
+math.jav worked correctly.
+[PASS] math.jav
 
 [TEST] trig.jav
-[FAIL] trig.jav - Compilation failed
+trig.jav worked correctly.
+[PASS] trig.jav
 
 [TEST] explog.jav
-[FAIL] explog.jav - Compilation failed
+explog.jav worked correctly.
+[PASS] explog.jav
 
 [TEST] for.jav
 for.jav worked correctly.
@@ -83,7 +91,8 @@ for.jav worked correctly.
 [PASS] trycatch.jav
 
 [TEST] throw.jav
-[FAIL] throw.jav - Compilation failed
+throw.jav worked correctly.
+[PASS] throw.jav
 
 [TEST] swint.jav
 [PASS] swint.jav

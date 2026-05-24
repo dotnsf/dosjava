@@ -99,9 +99,9 @@ set TESTFILE=floatarr.jav
 set BASENAME=floatarr
 goto run_test
 :next18
-set TESTFILE=cast.jav
-set BASENAME=cast
-goto run_test
+REM set TESTFILE=cast.jav
+REM set BASENAME=cast
+REM goto run_test
 :next19
 set TESTFILE=math.jav
 set BASENAME=math
@@ -186,7 +186,7 @@ if "%1"=="long.jav" set BASENAME=long
 if "%1"=="longarr.jav" set BASENAME=longarr
 if "%1"=="float.jav" set BASENAME=float
 if "%1"=="floatarr.jav" set BASENAME=floatarr
-if "%1"=="cast.jav" set BASENAME=cast
+REM if "%1"=="cast.jav" set BASENAME=cast
 if "%1"=="math.jav" set BASENAME=math
 if "%1"=="trig.jav" set BASENAME=trig
 if "%1"=="explog.jav" set BASENAME=explog

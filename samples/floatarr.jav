@@ -9,7 +9,12 @@ class FloatArrTest {
         arr1[4] = 5.5f;
         
         // Test float array initialization with values
-        float[] arr2 = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+        float[] arr2 = new float[5];
+        arr2[0] = 1.0f;
+        arr2[1] = 2.0f;
+        arr2[2] = 3.0f;
+        arr2[3] = 4.0f;
+        arr2[4] = 5.0f;
         
         // Test array access and sum
         float sum = 0.0f;

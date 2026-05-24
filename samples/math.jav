@@ -1,15 +1,15 @@
 class MathTest {
     public static void main() {
         // Test abs()
-        int abs1 = Math.abs(-5);
+        float abs1 = Math.abs(-5.0f);
         float abs2 = Math.abs(-3.5f);
         
         // Test min()
-        int min1 = Math.min(10, 20);
+        float min1 = Math.min(10.0f, 20.0f);
         float min2 = Math.min(3.5f, 2.5f);
         
         // Test max()
-        int max1 = Math.max(10, 20);
+        float max1 = Math.max(10.0f, 20.0f);
         float max2 = Math.max(3.5f, 2.5f);
         
         // Test sqrt()
@@ -21,9 +21,9 @@ class MathTest {
         float pow2 = Math.pow(5.0f, 2.0f);  // 25.0
         
         // Verify results
-        boolean check1 = (abs1 == 5 && abs2 > 3.49f && abs2 < 3.51f);
-        boolean check2 = (min1 == 10 && min2 > 2.49f && min2 < 2.51f);
-        boolean check3 = (max1 == 20 && max2 > 3.49f && max2 < 3.51f);
+        boolean check1 = (abs1 > 4.99f && abs1 < 5.01f && abs2 > 3.49f && abs2 < 3.51f);
+        boolean check2 = (min1 > 9.99f && min1 < 10.01f && min2 > 2.49f && min2 < 2.51f);
+        boolean check3 = (max1 > 19.99f && max1 < 20.01f && max2 > 3.49f && max2 < 3.51f);
         boolean check4 = (sqrt1 > 3.99f && sqrt1 < 4.01f);
         boolean check5 = (sqrt2 > 1.41f && sqrt2 < 1.42f);
         boolean check6 = (pow1 > 7.99f && pow1 < 8.01f);

@@ -9,7 +9,12 @@ class IntArrTest {
         arr1[4] = 50;
         
         // Test array initialization with values
-        int[] arr2 = {1, 2, 3, 4, 5};
+        int[] arr2 = new int[5];
+        arr2[0] = 1;
+        arr2[1] = 2;
+        arr2[2] = 3;
+        arr2[3] = 4;
+        arr2[4] = 5;
         
         // Test array access
         int sum = 0;
