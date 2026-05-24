@@ -218,7 +218,6 @@ int symtable_write(SymbolTable* table, const char* filename) {
         return -1;
     }
     
-    
     file = fopen(filename, "wb");
     if (!file) {
         return -1;
@@ -266,8 +265,6 @@ int symtable_read(SymbolTable* table, const char* filename) {
         fclose(file);
         return -1;
     }
-    
-    
     
     /* Validate counts */
     if (table->symbol_count > 256 || table->pool_size > 2048) {

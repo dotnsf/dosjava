@@ -3104,6 +3104,7 @@ int interpreter_step(ExecutionContext* ctx) {
             index = interpreter_read_u8(ctx);
             value = load_local_long(ctx, index);
             
+            
             if (stack_push_long(ctx, value) != 0) {
                 printf("ERROR: Stack overflow\n");
                 return -1;
@@ -3118,6 +3119,7 @@ int interpreter_step(ExecutionContext* ctx) {
             
             index = interpreter_read_u8(ctx);
             value = stack_pop_long(ctx);
+            
             
             store_local_long(ctx, index, value);
             break;

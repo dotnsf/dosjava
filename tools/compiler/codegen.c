@@ -812,8 +812,13 @@ int generate_block(CodeGenerator* codegen, ASTNode* block_node) {
 int generate_var_decl(CodeGenerator* codegen, ASTNode* var_node) {
     ASTNode* init_expr;
     const char* var_name;
+    char var_name_copy[64];
     uint16_t local_idx;
     uint16_t init_expr_idx;
+    int is_long;
+    int is_float;
+    uint16_t type_kind;
+    uint16_t symbol_index;
     
     if (!codegen || !var_node) {
         return -1;
@@ -826,29 +831,46 @@ int generate_var_decl(CodeGenerator* codegen, ASTNode* var_node) {
     if (!var_name) {
         return -1;
     }
+    
+    /* CRITICAL: Copy variable name to local buffer to protect from buffer reuse */
+    strncpy(var_name_copy, var_name, sizeof(var_name_copy) - 1);
+    var_name_copy[sizeof(var_name_copy) - 1] = '\0';
+    var_name = var_name_copy;
 
     /* Get local index */
     local_idx = get_local_index(codegen, var_name);
-
+    
     /* Check if this is a long or float variable (both use 2 slots) */
+    /* IMPORTANT: Find symbol with highest scope_level (innermost scope) */
+    is_long = 0;
+    is_float = 0;
+    symbol_index = 0xFFFF;
     {
-        int is_long = 0;
-        int is_float = 0;
         uint16_t i;
+        uint16_t best_scope = 0;
         for (i = 0; i < codegen->symtable->symbol_count; i++) {
             Symbol* sym = &codegen->symtable->symbols[i];
             const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
             if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                 sym_name && strcmp(sym_name, var_name) == 0) {
-                if (sym->type.kind == TYPE_LONG) {
-                    is_long = 1;
-                } else if (sym->type.kind == TYPE_FLOAT) {
-                    is_float = 1;
+                /* Choose symbol with highest scope_level (innermost scope) */
+                if (symbol_index == 0xFFFF || sym->scope_level >= best_scope) {
+                    symbol_index = i;
+                    best_scope = sym->scope_level;
                 }
-                break;
             }
         }
-
+        
+        /* Now access the symbol using the saved index */
+        if (symbol_index != 0xFFFF) {
+            Symbol* sym = &codegen->symtable->symbols[symbol_index];
+            type_kind = sym->type.kind;
+            if (type_kind == TYPE_LONG) {
+                is_long = 1;
+            } else if (type_kind == TYPE_FLOAT) {
+                is_float = 1;
+            }
+        }
         /* Update max_locals (long and float variables use 2 slots) */
         if (is_long || is_float) {
             if (local_idx + 2 > codegen->context->max_locals) {
@@ -3221,6 +3243,10 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
     /* Try to get local variable index */
     local_idx = get_local_index(codegen, var_name);
     
+    /* DEBUG: Print variable name and index */
+    if (local_idx != 0xFFFF) {
+    }
+    
     /* If found as local variable, load it */
     if (local_idx != 0xFFFF) {
         /* Check variable type */
@@ -3904,7 +3930,25 @@ uint16_t get_local_index(CodeGenerator* codegen, const char* name) {
         if (codegen->current_method) {
             param_count = codegen->current_method->data.method_data.param_count;
             result = param_count + best_sym->data.local_data.index;
-            return result;
+            
+            /* Adjust for long/float variables that use 2 slots */
+            {
+                uint16_t j;
+                uint16_t actual_index = param_count;
+                for (j = 0; j < codegen->symtable->symbol_count; j++) {
+                    Symbol* local_sym = &codegen->symtable->symbols[j];
+                    if (local_sym->kind == SYM_LOCAL &&
+                        local_sym->data.local_data.index < best_sym->data.local_data.index) {
+                        /* This local comes before our target variable */
+                        if (local_sym->type.kind == TYPE_LONG || local_sym->type.kind == TYPE_FLOAT) {
+                            actual_index += 2;  /* long/float use 2 slots */
+                        } else {
+                            actual_index += 1;
+                        }
+                    }
+                }
+                return actual_index;
+            }
         }
         result = best_sym->data.local_data.index;
         return result;

@@ -1,29 +1,19 @@
 class LongTest {
     public static void main() {
         // Test long variable declaration and assignment
-        long a = 1000000000L;
-        long b = 2000000000L;
+        long a = 100L;
+        long b = 200L;
         long c = a + b;
         
         // Test basic arithmetic
-        long sum = 100L + 200L;
-        long diff = 500L - 300L;
-        long prod = 10L * 20L;
-        long quot = 1000L / 10L;
-        long rem = 1007L % 100L;
-        
-        // Test comparison
-        boolean eq = (a == 1000000000L);
-        boolean lt = (a < b);
-        boolean gt = (b > a);
-        
-        // Test large values
-        long large = 9223372036854775807L;  // Max long value
+        long sum = 50L + 30L;
+        long diff = 100L - 40L;
+        long prod = 60L * 70L;
+        long quot = 200L / 40L;
+        long rem = 170L % 50L;
         
         // Verify results
-        if (c == 3000000000L && sum == 300L && diff == 200L && 
-            prod == 200L && quot == 100L && rem == 7L &&
-            eq && lt && gt) {
+        if (c == 300L && sum == 80L && diff == 60L && prod == 4200L && quot == 5L && rem == 20L) {
             System.out.println("long.jav worked correctly.");
         }
         

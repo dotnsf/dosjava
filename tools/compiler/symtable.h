@@ -23,8 +23,9 @@ typedef enum {
 } SymbolKind;
 
 /* Symbol entry */
+#pragma pack(push, 1)
 typedef struct {
-    SymbolKind kind;
+    uint16_t kind;          /* SymbolKind as uint16_t for consistent size */
     uint16_t name_offset;       /* Offset in string pool */
     TypeInfo type;              /* Symbol type */
     uint16_t scope_level;       /* Scope nesting level (0 = global) */
@@ -61,6 +62,7 @@ typedef struct {
         } param_data;
     } data;
 } Symbol;
+#pragma pack(pop)
 
 /* Symbol table */
 typedef struct {

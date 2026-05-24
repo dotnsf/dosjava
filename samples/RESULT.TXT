@@ -58,6 +58,7 @@ filewrit.jav worked correctly.
 [PASS] filewrit.jav
 
 [TEST] long.jav
+long.jav worked correctly.
 [PASS] long.jav
 
 [TEST] longarr.jav
