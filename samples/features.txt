@@ -1,0 +1,44 @@
+# DOSJava Feature Test List
+# Format: testfile.jav|Expected output message
+# Lines starting with # are comments
+
+# Phase 1: Basic Features
+int.jav|int.jav worked correctly.
+bool.jav|bool.jav worked correctly.
+if.jav|if.jav worked correctly.
+while.jav|while.jav worked correctly.
+arith.jav|arith.jav worked correctly.
+compare.jav|compare.jav worked correctly.
+logic.jav|logic.jav worked correctly.
+println.jav|println.jav worked correctly.
+
+# Phase 2: String and OOP Basics
+string.jav|string.jav worked correctly.
+strops.jav|strops.jav worked correctly.
+
+# Phase 3: Arrays and I/O
+intarr.jav|intarr.jav worked correctly.
+boolarr.jav|boolarr.jav worked correctly.
+fileread.jav|fileread.jav worked correctly.
+filewrit.jav|filewrit.jav worked correctly.
+
+# Phase 5: LONG type and array extensions
+long.jav|long.jav worked correctly.
+longarr.jav|longarr.jav worked correctly.
+
+# Phase 6: Float and Math
+float.jav|float.jav worked correctly.
+floatarr.jav|floatarr.jav worked correctly.
+cast.jav|cast.jav worked correctly.
+math.jav|math.jav worked correctly.
+trig.jav|trig.jav worked correctly.
+explog.jav|explog.jav worked correctly.
+
+# Phase 7: Control flow extensions
+for.jav|for.jav worked correctly.
+trycatch.jav|trycatch.jav worked correctly.
+throw.jav|throw.jav worked correctly.
+swint.jav|swint.jav worked correctly.
+swlong.jav|swlong.jav worked correctly.
+swstring.jav|swstring.jav worked correctly.
+swnest.jav|swnest.jav worked correctly.

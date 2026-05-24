@@ -1,0 +1,98 @@
+DOSJava Feature Verification
+============================
+
+[TEST] int.jav
+int.jav worked correctly.
+[PASS] int.jav
+
+[TEST] bool.jav
+[FAIL] bool.jav - Compilation failed
+
+[TEST] if.jav
+if.jav worked correctly.
+[PASS] if.jav
+
+[TEST] while.jav
+[FAIL] while.jav - Compilation failed
+
+[TEST] arith.jav
+[FAIL] arith.jav - Compilation failed
+
+[TEST] compare.jav
+compare.jav worked correctly.
+[PASS] compare.jav
+
+[TEST] logic.jav
+[FAIL] logic.jav - Compilation failed
+
+[TEST] println.jav
+[FAIL] println.jav - Compilation failed
+
+[TEST] string.jav
+[FAIL] string.jav - Compilation failed
+
+[TEST] strops.jav
+[FAIL] strops.jav - Compilation failed
+
+[TEST] intarr.jav
+[FAIL] intarr.jav - Compilation failed
+
+[TEST] boolarr.jav
+[FAIL] boolarr.jav - Compilation failed
+
+[TEST] fileread.jav
+[FAIL] fileread.jav - Compilation failed
+
+[TEST] filewrit.jav
+[FAIL] filewrit.jav - Compilation failed
+
+[TEST] long.jav
+[PASS] long.jav
+
+[TEST] longarr.jav
+[FAIL] longarr.jav - Compilation failed
+
+[TEST] float.jav
+[PASS] float.jav
+
+[TEST] floatarr.jav
+[FAIL] floatarr.jav - Compilation failed
+
+[TEST] cast.jav
+[FAIL] cast.jav - Compilation failed
+
+[TEST] math.jav
+[FAIL] math.jav - Compilation failed
+
+[TEST] trig.jav
+[FAIL] trig.jav - Compilation failed
+
+[TEST] explog.jav
+[FAIL] explog.jav - Compilation failed
+
+[TEST] for.jav
+[FAIL] for.jav - Compilation failed
+
+[TEST] trycatch.jav
+[PASS] trycatch.jav
+
+[TEST] throw.jav
+[FAIL] throw.jav - Compilation failed
+
+[TEST] swint.jav
+[PASS] swint.jav
+
+[TEST] swlong.jav
+[PASS] swlong.jav
+
+[TEST] swstring.jav
+[PASS] swstring.jav
+
+[TEST] swnest.jav
+swnest.jav worked correctly.
+[PASS] swnest.jav
+
+
+============================
+All tests completed
+============================

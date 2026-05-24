@@ -10,3 +10,4 @@ tests/A
 tests/B
 tests/C
 examples/*.djc
+samples/*.djc
