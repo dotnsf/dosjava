@@ -66,6 +66,7 @@ longarr.jav worked correctly.
 [PASS] longarr.jav
 
 [TEST] float.jav
+float.jav worked correctly.
 [PASS] float.jav
 
 [TEST] floatarr.jav
@@ -77,11 +78,9 @@ math.jav worked correctly.
 [PASS] math.jav
 
 [TEST] trig.jav
-trig.jav worked correctly.
 [PASS] trig.jav
 
 [TEST] explog.jav
-explog.jav worked correctly.
 [PASS] explog.jav
 
 [TEST] for.jav

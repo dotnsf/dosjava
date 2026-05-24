@@ -2188,28 +2188,54 @@ int generate_unary_op(CodeGenerator* codegen, ASTNode* unop_node) {
     /* Generate operation */
     switch (op) {
         case UNOP_NEG: {
-            /* Check if operand is long type */
+            /* Check if operand is long or float type */
             int is_long = 0;
+            int is_float = 0;
+            
             if (operand_node && operand_node->type == NODE_LITERAL_LONG) {
                 is_long = 1;
+            } else if (operand_node && operand_node->type == NODE_LITERAL_FLOAT) {
+                is_float = 1;
             } else if (operand_node && operand_node->type == NODE_IDENTIFIER) {
                 const char* var_name = codegen_get_string(codegen, operand_node->data.identifier.name);
                 if (var_name) {
                     uint16_t i;
+                    uint16_t best_scope = 0;
+                    uint16_t symbol_index = 0xFFFF;
+                    
+                    /* Find symbol with highest scope_level (innermost scope) */
                     for (i = 0; i < codegen->symtable->symbol_count; i++) {
                         Symbol* sym = &codegen->symtable->symbols[i];
                         const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
                         if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                             sym_name && strcmp(sym_name, var_name) == 0) {
-                            if (sym->type.kind == TYPE_LONG) {
-                                is_long = 1;
-                                break;
+                            if (symbol_index == 0xFFFF || sym->scope_level >= best_scope) {
+                                symbol_index = i;
+                                best_scope = sym->scope_level;
                             }
+                        }
+                    }
+                    
+                    /* Check type of the found symbol */
+                    if (symbol_index != 0xFFFF) {
+                        Symbol* sym = &codegen->symtable->symbols[symbol_index];
+                        if (sym->type.kind == TYPE_LONG) {
+                            is_long = 1;
+                        } else if (sym->type.kind == TYPE_FLOAT) {
+                            is_float = 1;
                         }
                     }
                 }
             }
-            emit_opcode(codegen, is_long ? OP_LNEG : OP_NEG);
+            
+            /* Emit appropriate negation opcode */
+            if (is_float) {
+                emit_opcode(codegen, OP_FNEG);
+            } else if (is_long) {
+                emit_opcode(codegen, OP_LNEG);
+            } else {
+                emit_opcode(codegen, OP_NEG);
+            }
             break;
         }
         case UNOP_NOT:

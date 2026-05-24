@@ -17,9 +17,9 @@ class FloatTest {
         
         // Test negative values
         float neg = -1.5f;
-        
+
         // Verify results
-        if (eq && !lt && gt && 
+        if (eq && !lt && !gt &&
             diff > 2.99f && diff < 3.01f &&
             prod > 5.99f && prod < 6.01f &&
             quot > 4.99f && quot < 5.01f &&
