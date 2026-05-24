@@ -741,6 +741,15 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
             emit_jump(codegen, OP_GOTO, codegen->break_label);
             return 0;
         
+        case NODE_CONTINUE:
+            /* Generate GOTO to continue label */
+            if (codegen->continue_label == 0) {
+                codegen_error(codegen, "continue statement not in loop");
+                return -1;
+            }
+            emit_jump(codegen, OP_GOTO, codegen->continue_label);
+            return 0;
+        
         default:
             codegen_error(codegen, "Unknown statement type");
             return -1;
@@ -950,6 +959,8 @@ int generate_while_stmt(CodeGenerator* codegen, ASTNode* while_node) {
     uint16_t loop_end;
     uint16_t condition_index;
     uint16_t body_index;
+    uint16_t saved_break_label;
+    uint16_t saved_continue_label;
     
     if (!codegen || !while_node) {
         return -1;
@@ -962,6 +973,14 @@ int generate_while_stmt(CodeGenerator* codegen, ASTNode* while_node) {
     /* Create labels */
     loop_start = create_label(codegen);
     loop_end = create_label(codegen);
+    
+    /* Save previous break/continue labels */
+    saved_break_label = codegen->break_label;
+    saved_continue_label = codegen->continue_label;
+    
+    /* Set break/continue labels for this loop */
+    codegen->break_label = loop_end;
+    codegen->continue_label = loop_start;
     
     /* Loop start */
     emit_label(codegen, loop_start);
@@ -988,6 +1007,10 @@ int generate_while_stmt(CodeGenerator* codegen, ASTNode* while_node) {
     /* Loop end */
     emit_label(codegen, loop_end);
     
+    /* Restore previous break/continue labels */
+    codegen->break_label = saved_break_label;
+    codegen->continue_label = saved_continue_label;
+    
     return 0;
 }
 
@@ -998,11 +1021,14 @@ int generate_for_stmt(CodeGenerator* codegen, ASTNode* for_node) {
     ASTNode* update_node;
     ASTNode* body_node;
     uint16_t loop_start;
+    uint16_t loop_update;
     uint16_t loop_end;
     uint16_t init_index;
     uint16_t condition_index;
     uint16_t update_index;
     uint16_t body_index;
+    uint16_t saved_break_label;
+    uint16_t saved_continue_label;
     
     if (!codegen || !for_node) {
         return -1;
@@ -1035,7 +1061,16 @@ int generate_for_stmt(CodeGenerator* codegen, ASTNode* for_node) {
     
     /* Create labels */
     loop_start = create_label(codegen);
+    loop_update = create_label(codegen);
     loop_end = create_label(codegen);
+    
+    /* Save previous break/continue labels */
+    saved_break_label = codegen->break_label;
+    saved_continue_label = codegen->continue_label;
+    
+    /* Set break/continue labels for this loop */
+    codegen->break_label = loop_end;
+    codegen->continue_label = loop_update;
     
     /* Loop start */
     emit_label(codegen, loop_start);
@@ -1058,6 +1093,9 @@ int generate_for_stmt(CodeGenerator* codegen, ASTNode* for_node) {
         generate_statement(codegen, body_node);
     }
     
+    /* Update label (for continue) */
+    emit_label(codegen, loop_update);
+    
     /* Generate update (optional) */
     if (update_index != 0) {
         update_node = codegen_get_node(codegen, update_index);
@@ -1074,6 +1112,10 @@ int generate_for_stmt(CodeGenerator* codegen, ASTNode* for_node) {
     
     /* Loop end */
     emit_label(codegen, loop_end);
+    
+    /* Restore previous break/continue labels */
+    codegen->break_label = saved_break_label;
+    codegen->continue_label = saved_continue_label;
     
     return 0;
 }

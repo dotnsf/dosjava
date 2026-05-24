@@ -23,6 +23,7 @@ static uint16_t parse_try_stmt(Parser* parser);
 static uint16_t parse_throw_stmt(Parser* parser);
 static uint16_t parse_switch_stmt(Parser* parser);
 static uint16_t parse_break_stmt(Parser* parser);
+static uint16_t parse_continue_stmt(Parser* parser);
 static int parser_link_sibling(Parser* parser, uint16_t current_node, uint16_t next_node);
 static uint16_t parse_field_decl(Parser* parser, int is_public, int is_static, TypeInfo field_type, uint16_t name_offset);
 static uint16_t parse_method_body(Parser* parser, int is_public, int is_static, TypeInfo return_type, uint16_t name_offset);
@@ -839,6 +840,11 @@ uint16_t parse_statement(Parser* parser) {
         return parse_break_stmt(parser);
     }
     
+    /* Continue statement */
+    if (parser_match(parser, TOK_CONTINUE)) {
+        return parse_continue_stmt(parser);
+    }
+    
     /* Expression statement */
     return parse_expr_stmt(parser);
 }
@@ -1552,6 +1558,35 @@ static uint16_t parse_break_stmt(Parser* parser) {
 }
 
 /**
+ * Parse continue statement
+ * ContinueStmt -> 'continue' ';'
+ */
+static uint16_t parse_continue_stmt(Parser* parser) {
+    uint16_t continue_node;
+    
+    /* Expect 'continue' */
+    if (parser_expect(parser, TOK_CONTINUE) < 0) {
+        return 0;
+    }
+    
+    /* Expect ';' */
+    if (parser_expect(parser, TOK_SEMICOLON) < 0) {
+        return 0;
+    }
+    
+    /* Allocate continue node */
+    continue_node = parser_alloc_node(parser, NODE_CONTINUE);
+    if (continue_node == 0) {
+        return 0;
+    }
+    
+    /* Fill continue node (unused field) */
+    parser->nodes[continue_node - parser->total_nodes - 1].data.continue_stmt.unused = 0;
+    
+    return continue_node;
+}
+
+/**
  * Parse expression (simplified for MVP)
  * Expr -> Assignment
  */
@@ -2091,6 +2126,31 @@ uint16_t parse_primary(Parser* parser) {
         }
         
         parser->nodes[node - parser->total_nodes - 1].data.literal_float.float_value = parser->current.value.float_value;
+        parser_next_token(parser);
+        
+        return node;
+    }
+    
+    /* Boolean literals: true and false */
+    if (parser_match(parser, TOK_TRUE)) {
+        node = parser_alloc_node(parser, NODE_LITERAL_BOOL);
+        if (node == 0) {
+            return 0;
+        }
+        
+        parser->nodes[node - parser->total_nodes - 1].data.literal_bool.bool_value = 1;  /* true = 1 */
+        parser_next_token(parser);
+        
+        return node;
+    }
+    
+    if (parser_match(parser, TOK_FALSE)) {
+        node = parser_alloc_node(parser, NODE_LITERAL_BOOL);
+        if (node == 0) {
+            return 0;
+        }
+        
+        parser->nodes[node - parser->total_nodes - 1].data.literal_bool.bool_value = 0;  /* false = 0 */
         parser_next_token(parser);
         
         return node;

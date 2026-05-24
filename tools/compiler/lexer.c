@@ -38,6 +38,7 @@ static const struct {
     {"case", TOK_CASE},
     {"default", TOK_DEFAULT},
     {"break", TOK_BREAK},
+    {"continue", TOK_CONTINUE},
     {"true", TOK_TRUE},
     {"false", TOK_FALSE},
     {NULL, TOK_EOF}
@@ -140,8 +141,13 @@ static int lexer_read_char(Lexer* lexer) {
  * Peek at next character without consuming
  */
 static char lexer_peek_char(Lexer* lexer) {
+    /* Refill buffer if needed */
     if (lexer->buf_pos >= lexer->buf_len) {
-        return '\0';
+        lexer->buf_len = fread(lexer->buffer, 1, sizeof(lexer->buffer), lexer->source);
+        lexer->buf_pos = 0;
+        if (lexer->buf_len == 0) {
+            return '\0'; /* EOF */
+        }
     }
     return lexer->buffer[lexer->buf_pos];
 }

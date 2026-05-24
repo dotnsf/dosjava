@@ -1605,6 +1605,14 @@ int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node, uint16_t stm
             }
             return 0;
         
+        case NODE_CONTINUE:
+            /* Check if continue is inside loop (not switch) */
+            if (!analyzer->in_loop) {
+                semantic_error_node(analyzer, stmt_node, "continue statement not in loop");
+                return -1;
+            }
+            return 0;
+        
         default:
             semantic_error_node(analyzer, stmt_node, "Unknown statement type");
             return -1;
@@ -1805,10 +1813,13 @@ int check_while_stmt(SemanticAnalyzer* analyzer, ASTNode* while_node) {
         }
     }
     
-    /* Check body */
+    /* Check body - set loop context */
     body_node = semantic_get_node(analyzer, body_idx);
     if (body_node) {
+        int saved_in_loop = analyzer->in_loop;
+        analyzer->in_loop = 1;
         check_statement(analyzer, body_node, body_idx);
+        analyzer->in_loop = saved_in_loop;
     }
     
     return 0;
@@ -1875,10 +1886,13 @@ int check_for_stmt(SemanticAnalyzer* analyzer, ASTNode* for_node) {
         }
     }
     
-    /* Check body */
+    /* Check body - set loop context */
     body_node = semantic_get_node(analyzer, body_idx);
     if (body_node) {
+        int saved_in_loop = analyzer->in_loop;
+        analyzer->in_loop = 1;
         check_statement(analyzer, body_node, body_idx);
+        analyzer->in_loop = saved_in_loop;
     }
     
     symtable_exit_scope(analyzer->symtable);

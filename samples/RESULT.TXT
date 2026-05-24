@@ -6,14 +6,16 @@ int.jav worked correctly.
 [PASS] int.jav
 
 [TEST] bool.jav
-[FAIL] bool.jav - Compilation failed
+bool.jav worked correctly.
+[PASS] bool.jav
 
 [TEST] if.jav
 if.jav worked correctly.
 [PASS] if.jav
 
 [TEST] while.jav
-[FAIL] while.jav - Compilation failed
+while.jav worked correctly.
+[PASS] while.jav
 
 [TEST] arith.jav
 [FAIL] arith.jav - Compilation failed
@@ -23,10 +25,12 @@ compare.jav worked correctly.
 [PASS] compare.jav
 
 [TEST] logic.jav
-[FAIL] logic.jav - Compilation failed
+logic.jav worked correctly.
+[PASS] logic.jav
 
 [TEST] println.jav
-[FAIL] println.jav - Compilation failed
+println.jav worked correctly.
+[PASS] println.jav
 
 [TEST] string.jav
 [FAIL] string.jav - Compilation failed
@@ -38,7 +42,8 @@ compare.jav worked correctly.
 [FAIL] intarr.jav - Compilation failed
 
 [TEST] boolarr.jav
-[FAIL] boolarr.jav - Compilation failed
+boolarr.jav worked correctly.
+[PASS] boolarr.jav
 
 [TEST] fileread.jav
 [FAIL] fileread.jav - Compilation failed
@@ -71,7 +76,8 @@ compare.jav worked correctly.
 [FAIL] explog.jav - Compilation failed
 
 [TEST] for.jav
-[FAIL] for.jav - Compilation failed
+for.jav worked correctly.
+[PASS] for.jav
 
 [TEST] trycatch.jav
 [PASS] trycatch.jav

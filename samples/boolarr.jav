@@ -9,7 +9,12 @@ class BoolArrTest {
         arr1[4] = true;
         
         // Test boolean array initialization with values
-        boolean[] arr2 = {true, true, false, false};
+        boolean[] arr2 = new boolean[4];
+        arr2[0] = true;
+        arr2[1] = true;
+        arr2[2] = false;
+        arr2[3] = false;
+        
         
         // Test array access and counting
         int trueCount = 0;
@@ -35,5 +40,3 @@ class BoolArrTest {
         return;
     }
 }
-
-// Made with Bob

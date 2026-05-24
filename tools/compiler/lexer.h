@@ -39,6 +39,7 @@ typedef enum {
     TOK_CASE,           /* case */
     TOK_DEFAULT,        /* default */
     TOK_BREAK,          /* break */
+    TOK_CONTINUE,       /* continue */
     
     /* Literals */
     TOK_IDENTIFIER,     /* variable/method/class names */

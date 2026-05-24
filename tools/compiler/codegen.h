@@ -80,6 +80,7 @@ typedef struct {
     Symbol* current_class;
     Symbol* current_method;
     uint16_t break_label;       /* Label for break statement (0 if not in loop/switch) */
+    uint16_t continue_label;    /* Label for continue statement (0 if not in loop) */
     
     /* String pool (shared) */
     char string_pool[2048];

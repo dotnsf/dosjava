@@ -35,6 +35,7 @@ typedef enum {
     NODE_CASE,              /* Case label */
     NODE_DEFAULT,           /* Default label */
     NODE_BREAK,             /* Break statement */
+    NODE_CONTINUE,          /* Continue statement */
     
     /* Expressions */
     NODE_ASSIGN,            /* Assignment = */
@@ -245,6 +246,11 @@ typedef struct ASTNode {
         struct {
             uint16_t unused;        /* Reserved for future use */
         } break_stmt;
+        
+        /* Continue statement */
+        struct {
+            uint16_t unused;        /* Reserved for future use */
+        } continue_stmt;
         
         /* Assignment */
         struct {
