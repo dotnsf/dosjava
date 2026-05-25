@@ -583,7 +583,13 @@ Error: Type mismatch
 
 ## ライセンス
 
-MIT License
+This code is licensed under the MIT License.
+
+This project is provided as-is without warranty. The MIT License permits use for any purpose, including commercial use.
+
+## Copyright
+
+2026 [K.Kimura @ Juge.Me](https://github.com/dotnsf) all rights reserved.
 
 ## 貢献
 
@@ -591,7 +597,7 @@ MIT License
 
 ## 作者
 
-DOS Java Compiler Project
+[K.Kimura](https://github.com/dotnsf), developed for 16-bit DOS environments using Open Watcom C/C++.
 
 ## 謝辞
 
