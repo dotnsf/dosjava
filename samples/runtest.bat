@@ -305,5 +305,3 @@ if "%TESTFILE%"=="swnest.jav" goto all_done
 goto all_done
 
 :end
-
-@REM Made with Bob

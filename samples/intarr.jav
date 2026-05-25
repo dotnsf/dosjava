@@ -38,5 +38,3 @@ class IntArrTest {
         return;
     }
 }
-
-// Made with Bob

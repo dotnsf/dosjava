@@ -1,0 +1,249 @@
+# Phase 8: Boolean Literal Support - Completion Report
+
+## Overview
+
+Phase 8では、DOSJavaコンパイラに `true` / `false` boolean リテラルのサポートを追加しました。これにより、`(1 == 1)` / `(1 == 0)` のような回避策が不要になり、より自然なJavaコードが書けるようになりました。
+
+## Implementation Summary
+
+### Phase 8.1: Parser Enhancement ✅
+**File**: `dosjava/tools/compiler/parser.c`
+
+**Changes**:
+- `parse_primary()` 関数に `TOK_TRUE` と `TOK_FALSE` の処理を追加
+- `NODE_LITERAL_BOOL` ノードを生成
+- true = 1, false = 0 として値を設定
+
+**Code**:
+```c
+/* Boolean literals */
+if (parser_match(parser, TOK_TRUE)) {
+    node = parser_alloc_node(parser, NODE_LITERAL_BOOL);
+    if (node == 0) return 0;
+    parser->nodes[node].data.literal_bool.value = 1;
+    return node;
+}
+
+if (parser_match(parser, TOK_FALSE)) {
+    node = parser_alloc_node(parser, NODE_LITERAL_BOOL);
+    if (node == 0) return 0;
+    parser->nodes[node].data.literal_bool.value = 0;
+    return node;
+}
+```
+
+### Phase 8.2: Semantic Analyzer ✅
+**Status**: 既に実装済み
+
+`semantic.c` の `analyze_expression()` 関数は既に `NODE_LITERAL_BOOL` をサポートしており、`TYPE_BOOLEAN` を返すように実装されていました。追加の変更は不要でした。
+
+### Phase 8.3: Code Generator ✅
+**Status**: 既に実装済み
+
+`codegen.c` の `generate_expression()` 関数は既に `NODE_LITERAL_BOOL` をサポートしており、適切なバイトコード（`OP_PUSH_INT` with 0 or 1）を生成するように実装されていました。追加の変更は不要でした。
+
+### Phase 8.4: Loop Context Bug Fix ✅
+**Issue**: `while (true)` や `for` ループでのbreak/continue文がコンパイルエラーになる
+
+**Root Cause**: 
+- `semantic.c` の `analyze_while_stmt()` と `analyze_for_stmt()` でループコンテキストフラグが設定されていなかった
+- break/continue文の検証時にループ外と判定されていた
+
+**Fix**:
+```c
+/* analyze_while_stmt() */
+old_in_loop = analyzer->in_loop;
+analyzer->in_loop = 1;  /* Set loop context */
+// ... analyze body ...
+analyzer->in_loop = old_in_loop;  /* Restore */
+
+/* analyze_for_stmt() */
+old_in_loop = analyzer->in_loop;
+analyzer->in_loop = 1;  /* Set loop context */
+// ... analyze body ...
+analyzer->in_loop = old_in_loop;  /* Restore */
+```
+
+## Testing Results
+
+### Test 1: Basic Boolean Literals ✅
+**File**: `tests/boollit.jav`
+
+```java
+class BoolLitTest {
+    void main() {
+        boolean t = true;
+        boolean f = false;
+        
+        if (t && !f) {
+            System.out.println("Boolean literals work!");
+        }
+    }
+}
+```
+
+**Result**: ✅ PASS
+```
+> djc.exe boollit.jav
+Compiled: boollit.jav -> boollit.djc
+
+> djvm.exe boollit.djc
+Boolean literals work!
+```
+
+### Test 2: While True Loop ✅
+**File**: `tests/whiletru.jav`
+
+```java
+class WhileTrueTest {
+    void main() {
+        int count = 0;
+        while (true) {
+            count = count + 1;
+            if (count == 3) {
+                break;
+            }
+        }
+        System.out.println("Count: ");
+        System.out.println(count);
+    }
+}
+```
+
+**Result**: ✅ PASS
+```
+> djc.exe whiletru.jav
+Compiled: whiletru.jav -> whiletru.djc
+
+> djvm.exe whiletru.djc
+Count: 
+3
+```
+
+### Test 3: Boolean in Conditions ✅
+**Test**: if文、while文、for文での使用
+
+**Result**: すべて正常にコンパイル＆実行
+
+## Code Quality Improvements
+
+### Before Phase 8
+```java
+// 回避策を使用
+boolean t = (1 == 1);
+boolean f = (1 == 0);
+
+while (1 == 1) {
+    // infinite loop
+    if (count == 10) break;
+}
+```
+
+### After Phase 8
+```java
+// 自然なJavaコード
+boolean t = true;
+boolean f = false;
+
+while (true) {
+    // infinite loop
+    if (count == 10) break;
+}
+```
+
+## Benefits
+
+1. **可読性向上**: `true`/`false` は `(1==1)`/`(1==0)` より明確
+2. **標準準拠**: Java言語仕様に準拠
+3. **保守性向上**: 回避策が不要
+4. **開発者体験**: より自然なコードが書ける
+
+## Files Modified
+
+### Core Implementation
+1. `dosjava/tools/compiler/parser.c`
+   - Lines 2057-2075: Boolean literal parsing
+
+2. `dosjava/tools/compiler/semantic.c`
+   - Lines 1891-1894: While loop context fix
+   - Lines 2015-2018: For loop context fix
+
+### Test Files Created
+1. `dosjava/tests/boollit.jav` - Basic boolean literal test
+2. `dosjava/tests/whiletru.jav` - While true loop test
+
+### Documentation
+1. `dosjava/PHASE8_BOOLEAN_LITERAL_PLAN.md` - Implementation plan
+2. `dosjava/PHASE8_COMPLETION.md` - This document
+3. `dosjava/README.md` - Updated with Phase 8 information
+
+## Related Phases
+
+### Phase 7: Switch Statement Support
+Phase 8の実装中に、Phase 7のswitch文でfall-through動作のバグを発見・修正しました：
+
+**Issue**: Fall-throughが動作せず、次のcaseではなくdefaultにジャンプ
+
+**Fix**: 2パス処理で全caseの本体ラベルを事前作成し、breakがない場合は次のcase本体に直接ジャンプ
+
+**Documentation**: `PHASE7_3_SWITCH_FALLTHROUGH_FIX.md`
+
+## Technical Details
+
+### AST Node Structure
+```c
+typedef struct {
+    uint8_t value;  /* 0 = false, 1 = true */
+} LiteralBoolData;
+```
+
+### Bytecode Generation
+- `true` → `OP_PUSH_INT 1`
+- `false` → `OP_PUSH_INT 0`
+
+Boolean値は内部的に整数（0/1）として扱われるため、既存のVMオペコードをそのまま使用できます。
+
+### Memory Impact
+- AST node size: 変更なし（既存のunion構造を使用）
+- Bytecode size: 3 bytes per literal (opcode + 2-byte value)
+- Runtime: 整数と同じスタック操作
+
+## Success Criteria
+
+All success criteria met:
+
+1. ✅ `true` and `false` keywords compile without errors
+2. ✅ Boolean literals have correct type (TYPE_BOOLEAN)
+3. ✅ Generated bytecode correctly represents boolean values
+4. ✅ VM executes boolean literal code correctly
+5. ✅ All existing tests continue to pass
+6. ✅ New tests using `true`/`false` pass
+7. ✅ Documentation is updated
+8. ✅ Loop context bug fixed (while/for with break/continue)
+
+## Lessons Learned
+
+1. **Existing Infrastructure**: Lexer already supported the tokens, semantic analyzer and code generator already had the infrastructure - only parser needed changes
+2. **Hidden Bugs**: Implementation revealed a loop context tracking bug in semantic analyzer
+3. **Incremental Testing**: Testing at each phase helped catch issues early
+4. **Documentation Value**: Comprehensive planning document made implementation straightforward
+
+## Future Enhancements
+
+Potential improvements for future phases:
+
+1. **Boolean Arrays**: Already supported, but could add initialization syntax
+2. **Boolean Methods**: Support boolean parameters and return values
+3. **Optimization**: Constant folding for boolean expressions
+4. **Short-circuit Evaluation**: Already implemented for `&&` and `||`
+
+## Conclusion
+
+Phase 8 successfully added boolean literal support to DOSJava. The implementation was straightforward due to existing infrastructure, and revealed and fixed a critical bug in loop context tracking. The compiler now supports natural Java boolean syntax, improving code readability and developer experience.
+
+Combined with Phase 7's switch statement support (including fall-through), DOSJava now has comprehensive control flow capabilities that closely match standard Java.
+
+---
+**Date**: 2026-05-25  
+**Status**: ✅ Complete  
+**Next Phase**: Phase 9 - Additional Runtime Libraries

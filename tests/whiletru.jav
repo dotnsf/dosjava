@@ -11,5 +11,3 @@ class WhileTrueTest {
         return;
     }
 }
-
-// Made with Bob

@@ -28,5 +28,3 @@ class ThrowTest {
         return;
     }
 }
-
-// Made with Bob

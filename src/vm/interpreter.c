@@ -2030,6 +2030,112 @@ int interpreter_step(ExecutionContext* ctx) {
                         return -1;
                     }
                     break;
+                } else if (strcmp(method_name, "Long.toString") == 0) {
+                    /* Long.toString(long) returns String */
+                    int32_t long_value;
+                    char long_buf[16];  /* Enough for 32-bit long */
+                    uint16_t const_idx;
+                    uint16_t low, high;
+                    
+                    if (arg_count != 1) {
+                        printf("ERROR: Long.toString expects 1 argument, got %u\n", arg_count);
+                        return -1;
+                    }
+                    
+                    /* Pop long value from stack (low word first, then high word) */
+                    low = stack_pop_shared(ctx);
+                    high = stack_pop_shared(ctx);
+                    long_value = ((int32_t)high << 16) | low;
+                    
+                    if (g_debug_mode) {
+                        printf("[DEBUG] Long.toString: converting %ld to String\n", (long)long_value);
+                    }
+                    
+                    /* Convert long to string */
+                    sprintf(long_buf, "%ld", (long)long_value);
+                    
+                    /* Add to constant pool */
+                    const_idx = ctx->djc_file->header.constant_pool_count;
+                    if (const_idx >= DJC_MAX_CONSTANTS) {
+                        printf("ERROR: Constant pool full during Long.toString\n");
+                        return -1;
+                    }
+                    
+                    ctx->djc_file->constants[const_idx].tag = CONST_UTF8;
+                    ctx->djc_file->constants[const_idx].length = (uint16_t)strlen(long_buf);
+                    ctx->djc_file->constants[const_idx].data.utf8_data = (char*)memory_alloc(strlen(long_buf) + 1);
+                    if (ctx->djc_file->constants[const_idx].data.utf8_data == NULL) {
+                        printf("ERROR: Out of memory during Long.toString\n");
+                        return -1;
+                    }
+                    strcpy(ctx->djc_file->constants[const_idx].data.utf8_data, long_buf);
+                    ctx->djc_file->header.constant_pool_count++;
+                    
+                    if (g_debug_mode) {
+                        printf("[DEBUG] Long.toString: created constant at index %u: \"%s\"\n",
+                               const_idx, long_buf);
+                    }
+                    
+                    /* Push string constant index to stack */
+                    if (stack_push_shared(ctx, const_idx) != 0) {
+                        printf("ERROR: Stack overflow\n");
+                        return -1;
+                    }
+                    break;
+                } else if (strcmp(method_name, "Float.toString") == 0) {
+                    /* Float.toString(float) returns String */
+                    float float_value;
+                    char float_buf[16];
+                    uint16_t const_idx;
+                    uint16_t low, high;
+                    uint32_t bits;
+                    
+                    if (arg_count != 1) {
+                        printf("ERROR: Float.toString expects 1 argument, got %u\n", arg_count);
+                        return -1;
+                    }
+                    
+                    /* Pop float value from stack (low word first, then high word) */
+                    low = stack_pop_shared(ctx);
+                    high = stack_pop_shared(ctx);
+                    bits = ((uint32_t)high << 16) | low;
+                    memcpy(&float_value, &bits, sizeof(float));
+                    
+                    if (g_debug_mode) {
+                        printf("[DEBUG] Float.toString: converting %.2f to String\n", float_value);
+                    }
+                    
+                    /* Convert float to string */
+                    sprintf(float_buf, "%.2f", float_value);
+                    
+                    /* Add to constant pool */
+                    const_idx = ctx->djc_file->header.constant_pool_count;
+                    if (const_idx >= DJC_MAX_CONSTANTS) {
+                        printf("ERROR: Constant pool full during Float.toString\n");
+                        return -1;
+                    }
+                    
+                    ctx->djc_file->constants[const_idx].tag = CONST_UTF8;
+                    ctx->djc_file->constants[const_idx].length = (uint16_t)strlen(float_buf);
+                    ctx->djc_file->constants[const_idx].data.utf8_data = (char*)memory_alloc(strlen(float_buf) + 1);
+                    if (ctx->djc_file->constants[const_idx].data.utf8_data == NULL) {
+                        printf("ERROR: Out of memory during Float.toString\n");
+                        return -1;
+                    }
+                    strcpy(ctx->djc_file->constants[const_idx].data.utf8_data, float_buf);
+                    ctx->djc_file->header.constant_pool_count++;
+                    
+                    if (g_debug_mode) {
+                        printf("[DEBUG] Float.toString: created constant at index %u: \"%s\"\n",
+                               const_idx, float_buf);
+                    }
+                    
+                    /* Push string constant index to stack */
+                    if (stack_push_shared(ctx, const_idx) != 0) {
+                        printf("ERROR: Stack overflow\n");
+                        return -1;
+                    }
+                    break;
                 }
                 
                 /* If we reach here, method_name was not recognized */

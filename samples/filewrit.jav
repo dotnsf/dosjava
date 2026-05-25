@@ -24,5 +24,3 @@ class FileWritTest {
         return;
     }
 }
-
-// Made with Bob

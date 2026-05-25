@@ -31,7 +31,9 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
   - 比較: `==`, `!=`, `<`, `>`, `<=`, `>=`
   - `System.out.println(float)` サポート
   - IEEE 754形式
-- `boolean` - 真偽値（true/false）
+- `boolean` - 真偽値
+  - リテラル: `true`, `false`（Phase 8で追加）
+  - 論理演算: `&&`, `||`, `!`
 - `void` - 戻り値なし
 - `String` - Phase 1 の限定サポート
   - 文字列リテラル
@@ -49,9 +51,9 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 - `switch` / `case` / `default` / `break`（Phase 7で追加）
   - INT型、LONG型、STRING型のswitch文
   - 複数のcase文
+  - Fall-through動作（Phase 7.3で追加）
   - default case（任意の位置）
   - Nested switch（switch文のネスト）
-  - **制限**: Fall-through動作は未実装（各caseにbreakが必須）
 
 ### 演算子
 - **算術**: `+`, `-`, `*`, `/`, `%`
@@ -557,9 +559,25 @@ Error: Type mismatch
   - 指数・対数: pow, exp, log
   - 詳細: [PHASE6_3_MATH_COMPLETION.md](PHASE6_3_MATH_COMPLETION.md)
 
+### Phase 7: Switch Statement Support ✅ 完了
+- **Phase 7.1**: 基本的なswitch文サポート
+  - INT型、LONG型、STRING型のswitch
+  - case文とdefault文
+- **Phase 7.2**: String switchの最適化
+  - 文字列比較の効率化
+- **Phase 7.3**: Fall-through動作の実装
+  - breakなしでの次のcaseへの継続実行
+  - 詳細: [PHASE7_3_SWITCH_FALLTHROUGH_FIX.md](PHASE7_3_SWITCH_FALLTHROUGH_FIX.md)
+
+### Phase 8: Boolean Literal Support ✅ 完了
+- `true` / `false` リテラルのサポート
+- パーサー、意味解析器、コード生成器の拡張
+- ループ条件での使用（`while (true)` など）
+- 詳細: [PHASE8_BOOLEAN_LITERAL_PLAN.md](PHASE8_BOOLEAN_LITERAL_PLAN.md)
+
 ### 今後の予定
 - [ ] Phase 4 Network機能完成
-- [ ] Phase 7: より多くのランタイムライブラリ
+- [ ] Phase 9: より多くのランタイムライブラリ
 - [ ] 最適化
 - [ ] デバッガ
 

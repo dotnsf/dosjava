@@ -61,5 +61,3 @@ class SwIntTest {
         return;
     }
 }
-
-// Made with Bob

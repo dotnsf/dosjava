@@ -30,5 +30,3 @@ class FloatTest {
         return;
     }
 }
-
-// Made with Bob

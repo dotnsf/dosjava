@@ -1,12 +1,12 @@
 # DOS Java Implementation Progress Report
 
-**Last Updated:** 2026-04-18
+**Last Updated:** 2026-05-25
 
 ## Overview
 
 This document tracks the implementation progress of the DOS Java project - a lightweight Java runtime for 16-bit PC-DOS systems.
 
-## Current Status: Phase 2 Complete ✓
+## Current Status: Phase 8 Complete ✓
 
 ### Phase 2 Completed Components ✓
 
@@ -279,15 +279,34 @@ This document tracks the implementation progress of the DOS Java project - a lig
 - [ ] Preprocessor working
 - [ ] Test suite passing
 
+## Recent Achievements
+
+### Phase 7: Switch Statement Support ✅
+- Basic switch statement implementation
+- Support for INT, LONG, STRING types
+- Fall-through behavior (Phase 7.3)
+- Nested switch statements
+- Documentation: [PHASE7_3_SWITCH_FALLTHROUGH_FIX.md](PHASE7_3_SWITCH_FALLTHROUGH_FIX.md)
+
+### Phase 8: Boolean Literal Support ✅
+- `true` / `false` keyword support
+- Parser enhancement for boolean literals
+- Loop context bug fix (while/for with break/continue)
+- Natural Java syntax support
+- Documentation: [PHASE8_COMPLETION.md](PHASE8_COMPLETION.md)
+
 ## Conclusion
 
-**Phase 1 is complete!** The foundation is solid with:
-- Robust memory management
-- Core runtime library (Object, String, System)
-- Working build system
-- Comprehensive documentation
+**Phase 8 is complete!** DOSJava now supports:
+- Comprehensive control flow (if/else, while, for, switch with fall-through)
+- Boolean literals (`true`/`false`)
+- Multiple data types (int, long, float, boolean, String)
+- Arrays (int[], long[], float[], boolean[])
+- Math library with trigonometric and logarithmic functions
+- Date/Time support
+- File I/O operations
 
-**Next focus:** Implement bytecode format I/O and class loader to enable actual program execution.
+**Next focus:** Additional runtime libraries and optimization.
 
 ---
 

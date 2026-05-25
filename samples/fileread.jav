@@ -20,5 +20,3 @@ class FileReadTest {
         return;
     }
 }
-
-// Made with Bob

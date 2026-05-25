@@ -78,9 +78,11 @@ math.jav worked correctly.
 [PASS] math.jav
 
 [TEST] trig.jav
+trig.jav worked correctly.
 [PASS] trig.jav
 
 [TEST] explog.jav
+explog.jav worked correctly.
 [PASS] explog.jav
 
 [TEST] for.jav
@@ -88,6 +90,7 @@ for.jav worked correctly.
 [PASS] for.jav
 
 [TEST] trycatch.jav
+trycatch.jav worked correctly.
 [PASS] trycatch.jav
 
 [TEST] throw.jav
@@ -95,12 +98,15 @@ throw.jav worked correctly.
 [PASS] throw.jav
 
 [TEST] swint.jav
+swint.jav worked correctly.
 [PASS] swint.jav
 
 [TEST] swlong.jav
+swlong.jav worked correctly.
 [PASS] swlong.jav
 
 [TEST] swstring.jav
+swstring.jav worked correctly.
 [PASS] swstring.jav
 
 [TEST] swnest.jav

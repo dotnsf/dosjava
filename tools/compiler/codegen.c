@@ -15,7 +15,8 @@ static int load_symbol_table(CodeGenerator* codegen, const char* symbol_file);
 static uint16_t get_expression_type(CodeGenerator* codegen, ASTNode* expr_node);
 static uint16_t get_array_element_type(CodeGenerator* codegen, ASTNode* array_node);
 static int generate_switch_stmt(CodeGenerator* codegen, ASTNode* switch_node);
-static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, uint16_t switch_expr_type, uint16_t end_label);
+static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, uint16_t switch_expr_type,
+                                    uint16_t end_label, uint16_t this_body_label, uint16_t next_body_label);
 
 /* Initialize code generator */
 int codegen_init(CodeGenerator* codegen, const char* ast_file, const char* symbol_file, const char* output_file) {
@@ -670,6 +671,12 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
             
             /* Generate catch block if present */
             if (stmt_node->data.try_stmt.catch_clause != 0) {
+                uint16_t skip_catch_label;
+                
+                /* Emit GOTO to skip catch block if no exception */
+                skip_catch_label = create_label(codegen);
+                emit_jump(codegen, OP_GOTO, skip_catch_label);
+                
                 emit_opcode(codegen, OP_CATCH_BEGIN);
                 
                 /* Record catch block code position AFTER emitting OP_CATCH_BEGIN */
@@ -698,6 +705,9 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
                     return -1;
                 }
                 emit_opcode(codegen, OP_CATCH_END);
+                
+                /* Emit label after catch block */
+                emit_label(codegen, skip_catch_label);
             }
             
             /* Generate finally block if present */
@@ -1510,6 +1520,10 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
     int right_is_string;
     int left_is_int;
     int right_is_int;
+    int left_is_long;
+    int left_is_float;
+    int right_is_long;
+    int right_is_float;
     
     if (!codegen || !binop_node) {
         return -1;
@@ -1576,6 +1590,10 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
     right_is_string = 0;
     left_is_int = 0;
     right_is_int = 0;
+    left_is_long = 0;
+    left_is_float = 0;
+    right_is_long = 0;
+    right_is_float = 0;
     
     if (op == (uint16_t)BINOP_ADD) {
         ASTNode* test_node;
@@ -1679,6 +1697,39 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
             }
         } else if (left_type == NODE_LITERAL_INT) {
             left_is_int = 1;
+        } else if (left_type == NODE_LITERAL_LONG) {
+            left_is_long = 1;
+        } else if (left_type == NODE_LITERAL_FLOAT) {
+            left_is_float = 1;
+        } else if (left_type == NODE_IDENTIFIER) {
+            /* Check if left identifier is long or float */
+            test_node = codegen_get_node(codegen, left_index);
+            if (test_node) {
+                const char* left_name = codegen_get_string(codegen, test_node->data.identifier.name);
+                if (left_name) {
+                    Symbol* left_sym = NULL;
+                    uint16_t best_scope = 0;
+                    uint16_t i;
+                    for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                        Symbol* sym = &codegen->symtable->symbols[i];
+                        const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                            sym_name && strcmp(sym_name, left_name) == 0) {
+                            if (!left_sym || sym->scope_level >= best_scope) {
+                                left_sym = sym;
+                                best_scope = sym->scope_level;
+                            }
+                        }
+                    }
+                    if (left_sym) {
+                        if (left_sym->type.kind == TYPE_LONG) {
+                            left_is_long = 1;
+                        } else if (left_sym->type.kind == TYPE_FLOAT) {
+                            left_is_float = 1;
+                        }
+                    }
+                }
+            }
         }
         
         /* Check if right operand is String */
@@ -1765,17 +1816,24 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                         right_is_string = 1;
                     } else if (right_sym && right_sym->type.kind == TYPE_INT) {
                         right_is_int = 1;
+                    } else if (right_sym && right_sym->type.kind == TYPE_LONG) {
+                        right_is_long = 1;
+                    } else if (right_sym && right_sym->type.kind == TYPE_FLOAT) {
+                        right_is_float = 1;
                     }
                 }
             }
         } else if (right_type == NODE_LITERAL_INT) {
             right_is_int = 1;
+        } else if (right_type == NODE_LITERAL_LONG) {
+            right_is_long = 1;
+        } else if (right_type == NODE_LITERAL_FLOAT) {
+            right_is_float = 1;
         }
         
-        /* String concatenation: String + String, String + int, int + String */
-        if ((left_is_string && right_is_string) ||
-            (left_is_string && right_is_int) ||
-            (left_is_int && right_is_string)) {
+        /* String concatenation: String + any numeric type */
+        if ((left_is_string && (right_is_string || right_is_int || right_is_long || right_is_float)) ||
+            ((left_is_int || left_is_long || left_is_float) && right_is_string)) {
             is_string_concat = 1;
         }
     }
@@ -1786,11 +1844,10 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
         generate_expression(codegen, left_node);
     }
     
-    /* Convert left int to String if needed */
+    /* Convert left operand to String if needed */
     if (is_string_concat && left_is_int) {
         uint16_t tostring_idx;
         uint16_t tostring_desc_idx;
-        
         
         tostring_idx = find_method_index(codegen, "Integer.toString", 1);
         if (tostring_idx == 0xFFFF) {
@@ -1809,6 +1866,48 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
         emit_u2(codegen, tostring_idx);
         emit_u1(codegen, 1);
         /* Stack: int -> String (no change in stack depth) */
+    } else if (is_string_concat && left_is_long) {
+        uint16_t tostring_idx;
+        uint16_t tostring_desc_idx;
+        
+        tostring_idx = find_method_index(codegen, "Long.toString", 1);
+        if (tostring_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Long.toString method reference");
+            return -1;
+        }
+        
+        tostring_desc_idx = find_or_add_utf8(codegen, "(J)Ljava/lang/String;");
+        if (tostring_desc_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Long.toString descriptor");
+            return -1;
+        }
+        codegen->methods[tostring_idx].descriptor_index = tostring_desc_idx;
+        
+        emit_opcode(codegen, OP_INVOKE_STATIC);
+        emit_u2(codegen, tostring_idx);
+        emit_u1(codegen, 1);
+        /* Stack: long -> String (no change in stack depth) */
+    } else if (is_string_concat && left_is_float) {
+        uint16_t tostring_idx;
+        uint16_t tostring_desc_idx;
+        
+        tostring_idx = find_method_index(codegen, "Float.toString", 1);
+        if (tostring_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Float.toString method reference");
+            return -1;
+        }
+        
+        tostring_desc_idx = find_or_add_utf8(codegen, "(F)Ljava/lang/String;");
+        if (tostring_desc_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Float.toString descriptor");
+            return -1;
+        }
+        codegen->methods[tostring_idx].descriptor_index = tostring_desc_idx;
+        
+        emit_opcode(codegen, OP_INVOKE_STATIC);
+        emit_u2(codegen, tostring_idx);
+        emit_u1(codegen, 1);
+        /* Stack: float -> String (no change in stack depth) */
     }
     
     /* Generate right operand */
@@ -1817,11 +1916,10 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
         generate_expression(codegen, right_node);
     }
     
-    /* Convert right int to String if needed */
+    /* Convert right operand to String if needed */
     if (is_string_concat && right_is_int) {
         uint16_t tostring_idx;
         uint16_t tostring_desc_idx;
-        
         
         tostring_idx = find_method_index(codegen, "Integer.toString", 1);
         if (tostring_idx == 0xFFFF) {
@@ -1840,6 +1938,48 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
         emit_u2(codegen, tostring_idx);
         emit_u1(codegen, 1);
         /* Stack: int -> String (no change in stack depth) */
+    } else if (is_string_concat && right_is_long) {
+        uint16_t tostring_idx;
+        uint16_t tostring_desc_idx;
+        
+        tostring_idx = find_method_index(codegen, "Long.toString", 1);
+        if (tostring_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Long.toString method reference");
+            return -1;
+        }
+        
+        tostring_desc_idx = find_or_add_utf8(codegen, "(J)Ljava/lang/String;");
+        if (tostring_desc_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Long.toString descriptor");
+            return -1;
+        }
+        codegen->methods[tostring_idx].descriptor_index = tostring_desc_idx;
+        
+        emit_opcode(codegen, OP_INVOKE_STATIC);
+        emit_u2(codegen, tostring_idx);
+        emit_u1(codegen, 1);
+        /* Stack: long -> String (no change in stack depth) */
+    } else if (is_string_concat && right_is_float) {
+        uint16_t tostring_idx;
+        uint16_t tostring_desc_idx;
+        
+        tostring_idx = find_method_index(codegen, "Float.toString", 1);
+        if (tostring_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Float.toString method reference");
+            return -1;
+        }
+        
+        tostring_desc_idx = find_or_add_utf8(codegen, "(F)Ljava/lang/String;");
+        if (tostring_desc_idx == 0xFFFF) {
+            codegen_error(codegen, "Failed to add Float.toString descriptor");
+            return -1;
+        }
+        codegen->methods[tostring_idx].descriptor_index = tostring_desc_idx;
+        
+        emit_opcode(codegen, OP_INVOKE_STATIC);
+        emit_u2(codegen, tostring_idx);
+        emit_u1(codegen, 1);
+        /* Stack: float -> String (no change in stack depth) */
     }
     
     if (is_string_concat) {
@@ -1889,6 +2029,20 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
             use_float_ops = 1;
         }
         
+        /* Check if operands are unary operations on float literals (e.g., -0.01f) */
+        if (check_left && check_left->type == NODE_UNARY_OP) {
+            ASTNode* unary_operand = codegen_get_node(codegen, check_left->data.unary_op.operand);
+            if (unary_operand && unary_operand->type == NODE_LITERAL_FLOAT) {
+                use_float_ops = 1;
+            }
+        }
+        if (check_right && check_right->type == NODE_UNARY_OP) {
+            ASTNode* unary_operand = codegen_get_node(codegen, check_right->data.unary_op.operand);
+            if (unary_operand && unary_operand->type == NODE_LITERAL_FLOAT) {
+                use_float_ops = 1;
+            }
+        }
+        
         /* Check if operands are Math method calls (which return float) */
         if (check_left && check_left->type == NODE_CALL) {
             const char* method_name = codegen_get_string(codegen, check_left->data.call.method_name);
@@ -1928,6 +2082,20 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
             }
             if (check_right && check_right->type == NODE_LITERAL_LONG) {
                 use_long_ops = 1;
+            }
+            
+            /* Check if operands are unary operations on long literals (e.g., -100L) */
+            if (check_left && check_left->type == NODE_UNARY_OP) {
+                ASTNode* unary_operand = codegen_get_node(codegen, check_left->data.unary_op.operand);
+                if (unary_operand && unary_operand->type == NODE_LITERAL_LONG) {
+                    use_long_ops = 1;
+                }
+            }
+            if (check_right && check_right->type == NODE_UNARY_OP) {
+                ASTNode* unary_operand = codegen_get_node(codegen, check_right->data.unary_op.operand);
+                if (unary_operand && unary_operand->type == NODE_LITERAL_LONG) {
+                    use_long_ops = 1;
+                }
             }
         }
         
@@ -4126,7 +4294,8 @@ static int block_ends_with_break(CodeGenerator* codegen, ASTNode* block_node) {
 }
 
 /* Generate case comparison and conditional jump */
-static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, uint16_t switch_expr_type, uint16_t end_label) {
+static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, uint16_t switch_expr_type,
+                                    uint16_t end_label, uint16_t this_body_label, uint16_t next_body_label) {
     ASTNode* value_node;
     ASTNode* stmt_node;
     uint16_t value_idx;
@@ -4148,7 +4317,7 @@ static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, 
         return -1;
     }
     
-    /* Create label for next case */
+    /* Create label for next case comparison */
     next_case_label = create_label(codegen);
     
     /* Duplicate switch value on stack for comparison */
@@ -4229,7 +4398,7 @@ static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, 
     emit_jump(codegen, OP_IF_FALSE, next_case_label);
     codegen->context->current_stack--;  /* IF_FALSE consumes result */
     
-    /* Equal: We matched! Pop the switch_value before executing case body */
+    /* Equal: We matched! Pop switch value and execute case body */
     /* For INT/STRING: pop from stack */
     /* For LONG: no need to pop (using temporary variable) */
     if (switch_expr_type != TYPE_LONG) {
@@ -4237,7 +4406,10 @@ static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, 
         codegen->context->current_stack--;
     }
     
-    /* Check if case body ends with break (for fall-through support) */
+    /* Emit case body label (for fall-through from previous case) */
+    emit_label(codegen, this_body_label);
+    
+    /* Check if case body is empty or ends with break */
     if (stmt_idx != 0) {
         stmt_node = codegen_get_node(codegen, stmt_idx);
         if (!stmt_node) {
@@ -4246,7 +4418,7 @@ static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, 
         }
         has_break = block_ends_with_break(codegen, stmt_node);
     } else {
-        /* Empty case body - no break, will fall through */
+        /* Empty case body - will fall through */
         has_break = 0;
     }
     
@@ -4264,13 +4436,19 @@ static int generate_case_comparison(CodeGenerator* codegen, ASTNode* case_node, 
     }
     /* else: Empty case body - this is valid for fall-through */
     
-    /* After case body, jump to end only if it ends with break (no fall-through) */
+    /* After case body: */
+    /* - If has break: jump to end */
+    /* - If no break and has next case: jump to next case body (skip its comparison) */
+    /* - If no break and no next case: fall through to default/end */
     if (has_break) {
         emit_jump(codegen, OP_GOTO, end_label);
+    } else if (next_body_label != 0) {
+        /* Fall-through: jump directly to next case body, skipping its comparison */
+        emit_jump(codegen, OP_GOTO, next_body_label);
     }
-    /* else: Fall-through - don't emit any jump, execution continues to next case */
+    /* else: No break and no next case - will fall through to default/end naturally */
     
-    /* Emit label for next case (comparison failed, switch_value still on stack) */
+    /* Emit label for next case comparison */
     emit_label(codegen, next_case_label);
     
     return 0;
@@ -4345,28 +4523,73 @@ static int generate_switch_stmt(CodeGenerator* codegen, ASTNode* switch_node) {
         default_label = end_label;
     }
     
-    /* Generate all case comparisons */
-    case_idx = first_case;
-    while (case_idx != 0) {
-        uint16_t next_case_idx;
+    /* First pass: Create body labels for all cases */
+    /* We need to know the next case's body label for fall-through */
+    {
+        uint16_t* body_labels;
+        uint16_t case_count = 0;
+        uint16_t i;
         
-        case_node = codegen_get_node(codegen, case_idx);
-        if (!case_node) {
+        /* Count cases */
+        case_idx = first_case;
+        while (case_idx != 0) {
+            case_node = codegen_get_node(codegen, case_idx);
+            if (!case_node) {
+                codegen->break_label = old_break_label;
+                return -1;
+            }
+            case_count++;
+            case_idx = case_node->data.case_label.next_case;
+        }
+        
+        /* Allocate array for body labels */
+        body_labels = (uint16_t*)malloc(case_count * sizeof(uint16_t));
+        if (!body_labels) {
+            codegen_error(codegen, "Failed to allocate memory for case body labels");
             codegen->break_label = old_break_label;
             return -1;
         }
         
-        /* Save next_case before calling generate_case_comparison */
-        /* because codegen_get_node() reuses the same buffer */
-        next_case_idx = case_node->data.case_label.next_case;
-        
-        if (generate_case_comparison(codegen, case_node, switch_expr_type, end_label) != 0) {
-            codegen->break_label = old_break_label;
-            return -1;
+        /* Create all body labels */
+        for (i = 0; i < case_count; i++) {
+            body_labels[i] = create_label(codegen);
         }
         
-        /* Move to next case using saved value */
-        case_idx = next_case_idx;
+        /* Second pass: Generate case comparisons with body labels */
+        case_idx = first_case;
+        i = 0;
+        while (case_idx != 0) {
+            uint16_t next_case_idx;
+            uint16_t this_body_label;
+            uint16_t next_body_label;
+            
+            case_node = codegen_get_node(codegen, case_idx);
+            if (!case_node) {
+                free(body_labels);
+                codegen->break_label = old_break_label;
+                return -1;
+            }
+            
+            /* Save next_case before calling generate_case_comparison */
+            next_case_idx = case_node->data.case_label.next_case;
+            
+            /* Get this case's body label and next case's body label */
+            this_body_label = body_labels[i];
+            next_body_label = (i + 1 < case_count) ? body_labels[i + 1] : 0;
+            
+            if (generate_case_comparison(codegen, case_node, switch_expr_type, end_label,
+                                        this_body_label, next_body_label) != 0) {
+                free(body_labels);
+                codegen->break_label = old_break_label;
+                return -1;
+            }
+            
+            /* Move to next case */
+            case_idx = next_case_idx;
+            i++;
+        }
+        
+        free(body_labels);
     }
     
     /* If no case matched, jump to default or end */

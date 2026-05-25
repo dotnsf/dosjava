@@ -60,5 +60,3 @@ class SwStringTest {
         return;
     }
 }
-
-// Made with Bob

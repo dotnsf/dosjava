@@ -34,7 +34,7 @@ class TryCatchTest {
         } finally {
             finallyRan2 = 1;
         }
-        
+
         // Verify results: result=3, finallyRan=1, caught=1, finallyRan2=1
         if (result == 3 && finallyRan == 1 && caught == 1 && finallyRan2 == 1) {
             System.out.println("trycatch.jav worked correctly.");
@@ -43,5 +43,3 @@ class TryCatchTest {
         return;
     }
 }
-
-// Made with Bob

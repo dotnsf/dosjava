@@ -21,7 +21,7 @@ class TrigTest {
         boolean check4 = (cos90 > -0.01f && cos90 < 0.01f);
         boolean check5 = (tan0 > -0.01f && tan0 < 0.01f);
         boolean check6 = (tan45 > 0.99f && tan45 < 1.01f);
-        
+
         if (check1 && check2 && check3 && check4 && check5 && check6) {
             System.out.println("trig.jav worked correctly.");
         }
@@ -29,5 +29,3 @@ class TrigTest {
         return;
     }
 }
-
-// Made with Bob

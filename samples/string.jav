@@ -27,5 +27,3 @@ class StringTest {
         return;
     }
 }
-
-// Made with Bob

@@ -11,17 +11,19 @@
  */
 
 /* Default heap size (in bytes) */
-#define DEFAULT_HEAP_SIZE 32768  /* 32KB for heap - expanded for Large memory model */
+#define DEFAULT_HEAP_SIZE 49152  /* 48KB for heap - expanded for string operations */
 
 /* Minimum allocation size */
 #define MIN_ALLOC_SIZE 4
 
 /* Memory block header */
+#pragma pack(push, 1)
 typedef struct MemBlock {
     uint16_t size;           /* Block size (including header) */
     uint8_t used;            /* 1 if allocated, 0 if free */
     struct MemBlock* next;   /* Next block in list */
 } MemBlock;
+#pragma pack(pop)
 
 /**
  * Memory manager state

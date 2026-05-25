@@ -38,5 +38,3 @@ class LongArrTest {
         return;
     }
 }
-
-// Made with Bob

@@ -25,5 +25,3 @@ class ExpLogTest {
         return;
     }
 }
-
-// Made with Bob

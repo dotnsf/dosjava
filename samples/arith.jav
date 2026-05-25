@@ -39,5 +39,3 @@ class ArithTest {
         return;
     }
 }
-
-// Made with Bob

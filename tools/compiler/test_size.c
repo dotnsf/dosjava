@@ -15,5 +15,3 @@ int main(void) {
     printf("  data offset: %u\n", (unsigned)((char*)&((Symbol*)0)->data - (char*)0));
     return 0;
 }
-
-// Made with Bob

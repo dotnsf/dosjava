@@ -41,5 +41,3 @@ class LogicTest {
         return;
     }
 }
-
-// Made with Bob

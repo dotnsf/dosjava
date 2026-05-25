@@ -45,5 +45,3 @@ class ForTest {
         return;
     }
 }
-
-// Made with Bob

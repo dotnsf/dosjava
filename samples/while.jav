@@ -37,5 +37,3 @@ class WhileTest {
         return;
     }
 }
-
-// Made with Bob

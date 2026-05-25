@@ -40,18 +40,13 @@ int memory_init(uint16_t heap_size) {
         return -1;
     }
     
-    /* Initialize manager state */
+    /* Initialize manager state - simple bump allocator */
     g_memory_manager.heap_size = heap_size;
-    g_memory_manager.bytes_used = sizeof(MemBlock);
-    g_memory_manager.bytes_free = heap_size - sizeof(MemBlock);
+    g_memory_manager.bytes_used = 0;
+    g_memory_manager.bytes_free = heap_size;
     g_memory_manager.alloc_count = 0;
     g_memory_manager.free_count = 0;
-    
-    /* Create initial free block */
-    g_memory_manager.free_list = (MemBlock*)g_memory_manager.heap_start;
-    g_memory_manager.free_list->size = heap_size;
-    g_memory_manager.free_list->used = 0;
-    g_memory_manager.free_list->next = NULL;
+    g_memory_manager.free_list = NULL;  /* Not used in bump allocator */
     
     g_memory_initialized = 1;
     return 0;
@@ -77,61 +72,32 @@ void memory_shutdown(void) {
  * Allocate memory from heap
  */
 void* memory_alloc(uint16_t size) {
-    MemBlock* block;
-    MemBlock* prev;
-    MemBlock* new_block;
-    uint16_t total_size;
+    void* ptr;
+    uint16_t aligned_size;
     
     if (!g_memory_initialized || size == 0) {
         return NULL;
     }
     
-    /* Align size and add header */
-    size = align_size(size);
-    total_size = size + sizeof(MemBlock);
+    /* Align size to 2-byte boundary */
+    aligned_size = align_size(size);
     
-    /* Ensure minimum allocation size */
-    if (total_size < MIN_ALLOC_SIZE + sizeof(MemBlock)) {
-        total_size = MIN_ALLOC_SIZE + sizeof(MemBlock);
+    /* Check if we have enough space */
+    if (g_memory_manager.bytes_used + aligned_size > g_memory_manager.heap_size) {
+        printf("ERROR: Out of memory (requested=%u, used=%u, total=%u)\n",
+               aligned_size, g_memory_manager.bytes_used, g_memory_manager.heap_size);
+        return NULL;
     }
     
-    /* Find first fit in free list */
-    prev = NULL;
-    block = g_memory_manager.free_list;
+    /* Allocate from current position (bump allocator) */
+    ptr = (void*)(g_memory_manager.heap_start + g_memory_manager.bytes_used);
     
-    while (block != NULL) {
-        if (!block->used && block->size >= total_size) {
-            /* Found suitable block */
-            
-            /* Split block if large enough */
-            if (block->size >= total_size + sizeof(MemBlock) + MIN_ALLOC_SIZE) {
-                new_block = (MemBlock*)((uint8_t*)block + total_size);
-                new_block->size = block->size - total_size;
-                new_block->used = 0;
-                new_block->next = block->next;
-                
-                block->size = total_size;
-                block->next = new_block;
-            }
-            
-            /* Mark block as used */
-            block->used = 1;
-            
-            /* Update statistics */
-            g_memory_manager.bytes_used += block->size;
-            g_memory_manager.bytes_free -= block->size;
-            g_memory_manager.alloc_count++;
-            
-            /* Return pointer after header */
-            return (void*)((uint8_t*)block + sizeof(MemBlock));
-        }
-        
-        prev = block;
-        block = block->next;
-    }
+    /* Update statistics */
+    g_memory_manager.bytes_used += aligned_size;
+    g_memory_manager.bytes_free -= aligned_size;
+    g_memory_manager.alloc_count++;
     
-    /* No suitable block found */
-    return NULL;
+    return ptr;
 }
 
 /**

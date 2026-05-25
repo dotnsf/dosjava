@@ -66,13 +66,10 @@ static int read_constants(FILE* fp, DJCFile* file) {
     
     pos_before = ftell(fp);
     
-    /* Allocate constant pool with small spare capacity (10 extra slots)
+    /* Allocate constant pool with maximum size
      * for runtime-generated String values such as concat results.
      */
-    alloc_count = file->header.constant_pool_count + 10;
-    if (alloc_count > DJC_MAX_CONSTANTS) {
-        alloc_count = DJC_MAX_CONSTANTS;
-    }
+    alloc_count = DJC_MAX_CONSTANTS;
     
     file->constants = (DJCConstant*)memory_alloc(
         sizeof(DJCConstant) * alloc_count);

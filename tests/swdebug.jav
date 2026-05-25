@@ -1,24 +1,29 @@
-class SwitchDebug {
-    public static void main() {
-        int x;
+class SwDebugTest {
+    void main() {
+        int z = 5;
+        int multiResult = 0;
         
-        System.out.println("Start");
-        x = 1;
-        System.out.println("x = 1");
+        System.out.println("Testing switch with z = " + z);
         
-        switch (x) {
+        switch (z) {
             case 1:
-                System.out.println("One");
+                System.out.println("Matched case 1");
+                multiResult = 1;
                 break;
-            case 2:
-                System.out.println("Two");
+            case 4:
+                System.out.println("Matched case 4");
+            case 5:
+                System.out.println("Matched case 5");
+            case 6:
+                System.out.println("Matched case 6");
+                multiResult = 2;
                 break;
             default:
-                System.out.println("Other");
+                System.out.println("Matched default");
+                multiResult = 0;
                 break;
         }
         
-        System.out.println("End");
-        return;
+        System.out.println("multiResult = " + multiResult);
     }
 }

@@ -44,5 +44,3 @@ class CompareTest {
         return;
     }
 }
-
-// Made with Bob

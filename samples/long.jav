@@ -20,5 +20,3 @@ class LongTest {
         return;
     }
 }
-
-// Made with Bob

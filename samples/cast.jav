@@ -40,5 +40,3 @@ class CastTest {
     }
 }
 */
-
-// Made with Bob

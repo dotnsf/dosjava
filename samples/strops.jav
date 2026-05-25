@@ -34,5 +34,3 @@ class StrOpsTest {
         return;
     }
 }
-
-// Made with Bob

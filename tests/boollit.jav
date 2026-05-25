@@ -14,5 +14,3 @@ class BoolLitTest {
         return;
     }
 }
-
-// Made with Bob

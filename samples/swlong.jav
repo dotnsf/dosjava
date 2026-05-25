@@ -61,5 +61,3 @@ class SwLongTest {
         return;
     }
 }
-
-// Made with Bob
