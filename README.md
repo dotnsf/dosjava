@@ -607,9 +607,23 @@ Error: Type mismatch
 - ループ条件での使用（`while (true)` など）
 - 詳細: [PHASE8_BOOLEAN_LITERAL_PLAN.md](PHASE8_BOOLEAN_LITERAL_PLAN.md)
 
+### Phase 9: Type System Enhancements ✅ 完了
+- **Phase 9.1**: 型キャストサポート
+  - `(type)expression` 構文の実装
+  - int ↔ long ↔ float の相互変換
+  - Math関数戻り値のキャスト対応
+- **Phase 9.2**: Math関数の整数引数サポート
+  - すべてのMath関数でint/long引数を受け入れ
+  - 自動的なfloat型への変換
+- **Phase 9.3**: nullリテラルサポート
+  - `null` キーワードの追加
+  - 参照型（String、配列）への代入
+  - null比較演算（`==`, `!=`）
+- 詳細: [PHASE9_COMPLETION.md](PHASE9_COMPLETION.md)
+
 ### 今後の予定
 - [ ] Phase 4 Network機能完成
-- [ ] Phase 9: より多くのランタイムライブラリ
+- [ ] Phase 10: より多くのランタイムライブラリ
 - [ ] 最適化
 - [ ] デバッガ
 
