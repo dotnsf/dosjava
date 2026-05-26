@@ -1892,14 +1892,77 @@ uint16_t parse_multiplicative(Parser* parser) {
 }
 
 /**
+ * Check if current token is a type keyword
+ */
+static int is_type_token(TokenType type) {
+    return (type == TOK_INT || type == TOK_LONG ||
+            type == TOK_FLOAT || type == TOK_BOOLEAN);
+}
+
+/**
+ * Parse type for cast expression
+ * Returns TypeInfo with kind and class_name set
+ */
+static TypeInfo parse_cast_type(Parser* parser) {
+    TypeInfo type;
+    type.kind = TYPE_VOID;
+    type.class_name = 0;
+    
+    if (parser_consume(parser, TOK_INT)) {
+        type.kind = TYPE_INT;
+    } else if (parser_consume(parser, TOK_LONG)) {
+        type.kind = TYPE_LONG;
+    } else if (parser_consume(parser, TOK_FLOAT)) {
+        type.kind = TYPE_FLOAT;
+    } else if (parser_consume(parser, TOK_BOOLEAN)) {
+        type.kind = TYPE_BOOLEAN;
+    }
+    
+    return type;
+}
+
+/**
  * Parse unary expression
- * Unary -> ('-' | '!') Unary | Postfix
+ * Unary -> ('-' | '!') Unary | '(' Type ')' Unary | Postfix
  */
 uint16_t parse_unary(Parser* parser) {
     uint16_t op_node;
     uint16_t operand;
     UnaryOp op;
+    TypeInfo target_type;
     
+    /* Check for cast expression: (type)expr */
+    if (parser->current.type == TOK_LPAREN) {
+        /* Look ahead to see if this is a cast */
+        if (is_type_token(parser->lookahead.type)) {
+            /* This looks like a cast expression */
+            parser_next_token(parser);  /* consume '(' */
+            
+            target_type = parse_cast_type(parser);
+            
+            if (parser_consume(parser, TOK_RPAREN)) {
+                /* This is a cast expression */
+                operand = parse_unary(parser);
+                if (operand == 0) {
+                    return 0;
+                }
+                
+                /* Create cast node */
+                op_node = parser_alloc_node(parser, NODE_CAST);
+                if (op_node == 0) {
+                    return 0;
+                }
+                
+                parser->nodes[op_node - parser->total_nodes - 1].data.cast.expr = operand;
+                parser->nodes[op_node - parser->total_nodes - 1].data.cast.target_type = target_type;
+                parser->nodes[op_node - parser->total_nodes - 1].data.cast.is_explicit = 1;
+                
+                return op_node;
+            }
+        }
+    }
+    
+    /* Check for unary operators */
     if (parser_consume(parser, TOK_MINUS)) {
         op = UNOP_NEG;
     } else if (parser_consume(parser, TOK_NOT)) {
@@ -2156,6 +2219,18 @@ uint16_t parse_primary(Parser* parser) {
         return node;
     }
     
+    /* null literal */
+    if (parser_match(parser, TOK_NULL)) {
+        node = parser_alloc_node(parser, NODE_LITERAL_NULL);
+        if (node == 0) {
+            return 0;
+        }
+        
+        parser_next_token(parser);
+        
+        return node;
+    }
+    
     /* String literal */
     if (parser_match(parser, TOK_STRING)) {
         node = parser_alloc_node(parser, NODE_LITERAL_STRING);
@@ -2355,10 +2430,12 @@ const char* node_type_name(NodeType type) {
         case NODE_NEW: return "NEW";
         case NODE_FIELD_ACCESS: return "FIELD_ACCESS";
         case NODE_ARRAY_ACCESS: return "ARRAY_ACCESS";
+        case NODE_CAST: return "CAST";
         case NODE_LITERAL_INT: return "LITERAL_INT";
         case NODE_LITERAL_LONG: return "LITERAL_LONG";
         case NODE_LITERAL_BOOL: return "LITERAL_BOOL";
         case NODE_LITERAL_STRING: return "LITERAL_STRING";
+        case NODE_LITERAL_NULL: return "LITERAL_NULL";
         case NODE_IDENTIFIER: return "IDENTIFIER";
         case NODE_THIS: return "THIS";
         default: return "UNKNOWN";

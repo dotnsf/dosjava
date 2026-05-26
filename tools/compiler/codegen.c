@@ -1227,6 +1227,11 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             update_stack(codegen, 1);
             return 0;
         
+        case NODE_LITERAL_NULL:
+            emit_opcode(codegen, OP_ACONST_NULL);
+            update_stack(codegen, 1);
+            return 0;
+        
         case NODE_LITERAL_STRING: {
             const char* str_value;
             uint16_t const_idx;
@@ -1499,6 +1504,107 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             emit_opcode(codegen, OP_GET_FIELD);
             emit_u2(codegen, field_idx);
             /* Stack: object -> value (no change in depth) */
+            return 0;
+        }
+        
+        case NODE_CAST: {
+            ASTNode* cast_expr_node;
+            TypeInfo target_type;
+            uint16_t expr_idx;
+            TypeKind source_kind;
+            uint16_t i;
+            const char* var_name;
+            const char* method_name;
+            
+            /* Save cast data before any codegen_get_node calls */
+            expr_idx = expr_node->data.cast.expr;
+            target_type = expr_node->data.cast.target_type;
+            
+            /* Generate code for the expression being cast */
+            cast_expr_node = codegen_get_node(codegen, expr_idx);
+            if (!cast_expr_node) {
+                codegen_error(codegen, "Invalid cast expression");
+                return -1;
+            }
+            
+            /* Determine source type from expression */
+            source_kind = TYPE_VOID;
+            
+            if (cast_expr_node->type == NODE_LITERAL_INT || cast_expr_node->type == NODE_LITERAL_BOOL) {
+                source_kind = TYPE_INT;
+            } else if (cast_expr_node->type == NODE_LITERAL_LONG) {
+                source_kind = TYPE_LONG;
+            } else if (cast_expr_node->type == NODE_LITERAL_FLOAT) {
+                source_kind = TYPE_FLOAT;
+            } else if (cast_expr_node->type == NODE_IDENTIFIER) {
+                /* Look up variable type in symbol table */
+                var_name = codegen_get_string(codegen, cast_expr_node->data.identifier.name);
+                if (var_name && codegen->symtable) {
+                    for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                        Symbol* sym = &codegen->symtable->symbols[i];
+                        const char* sym_name;
+                        
+                        if (sym->kind != SYM_LOCAL && sym->kind != SYM_PARAM && sym->kind != SYM_FIELD) {
+                            continue;
+                        }
+                        
+                        sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if (sym_name && strcmp(sym_name, var_name) == 0) {
+                            source_kind = sym->type.kind;
+                            break;
+                        }
+                    }
+                }
+            } else if (cast_expr_node->type == NODE_CALL) {
+                /* Determine return type of method call */
+                method_name = codegen_get_string(codegen, cast_expr_node->data.call.method_name);
+                if (method_name) {
+                    /* Check if it's a Math method that returns float */
+                    if (strcmp(method_name, "abs") == 0 ||
+                        strcmp(method_name, "min") == 0 ||
+                        strcmp(method_name, "max") == 0 ||
+                        strcmp(method_name, "sqrt") == 0 ||
+                        strcmp(method_name, "sin") == 0 ||
+                        strcmp(method_name, "cos") == 0 ||
+                        strcmp(method_name, "tan") == 0 ||
+                        strcmp(method_name, "pow") == 0 ||
+                        strcmp(method_name, "exp") == 0 ||
+                        strcmp(method_name, "log") == 0 ||
+                        strcmp(method_name, "floor") == 0 ||
+                        strcmp(method_name, "ceil") == 0) {
+                        source_kind = TYPE_FLOAT;
+                    }
+                    /* Add more method return types as needed */
+                }
+            }
+            
+            /* Generate the expression */
+            if (generate_expression(codegen, cast_expr_node) != 0) {
+                return -1;
+            }
+            
+            /* Emit appropriate cast opcode based on source and target types */
+            if (source_kind == TYPE_INT && target_type.kind == TYPE_LONG) {
+                emit_opcode(codegen, OP_I2L);
+                update_stack(codegen, 1);  /* int (1 slot) -> long (2 slots) */
+            } else if (source_kind == TYPE_INT && target_type.kind == TYPE_FLOAT) {
+                emit_opcode(codegen, OP_I2F);
+                update_stack(codegen, 1);  /* int (1 slot) -> float (2 slots) */
+            } else if (source_kind == TYPE_LONG && target_type.kind == TYPE_INT) {
+                emit_opcode(codegen, OP_L2I);
+                update_stack(codegen, -1);  /* long (2 slots) -> int (1 slot) */
+            } else if (source_kind == TYPE_LONG && target_type.kind == TYPE_FLOAT) {
+                emit_opcode(codegen, OP_L2F);
+                /* long (2 slots) -> float (2 slots), no stack change */
+            } else if (source_kind == TYPE_FLOAT && target_type.kind == TYPE_INT) {
+                emit_opcode(codegen, OP_F2I);
+                update_stack(codegen, -1);  /* float (2 slots) -> int (1 slot) */
+            } else if (source_kind == TYPE_FLOAT && target_type.kind == TYPE_LONG) {
+                emit_opcode(codegen, OP_F2L);
+                /* float (2 slots) -> long (2 slots), no stack change */
+            }
+            /* If source == target, no cast opcode needed (identity cast) */
+            
             return 0;
         }
         
@@ -2055,7 +2161,9 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                                 strcmp(method_name, "tan") == 0 ||
                                 strcmp(method_name, "pow") == 0 ||
                                 strcmp(method_name, "exp") == 0 ||
-                                strcmp(method_name, "log") == 0)) {
+                                strcmp(method_name, "log") == 0 ||
+                                strcmp(method_name, "floor") == 0 ||
+                                strcmp(method_name, "ceil") == 0)) {
                 use_float_ops = 1;
             }
         }
@@ -2070,7 +2178,9 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                                 strcmp(method_name, "tan") == 0 ||
                                 strcmp(method_name, "pow") == 0 ||
                                 strcmp(method_name, "exp") == 0 ||
-                                strcmp(method_name, "log") == 0)) {
+                                strcmp(method_name, "log") == 0 ||
+                                strcmp(method_name, "floor") == 0 ||
+                                strcmp(method_name, "ceil") == 0)) {
                 use_float_ops = 1;
             }
         }
@@ -2910,6 +3020,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     uint16_t method_idx;
     uint16_t object_idx;
     int is_native;
+    int is_math_method;
     NodeType arg_node_type;
     uint16_t saved_first_arg;
     Symbol* method_sym;
@@ -2963,6 +3074,18 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             const char* obj_name = codegen_get_string(codegen, obj_node->data.identifier.name);
             if (obj_name && strcmp(obj_name, "Math") == 0) {
                 is_native = 1;
+            }
+        }
+    }
+    
+    /* Check if this is a Math method call that needs argument type conversion */
+    is_math_method = 0;
+    if (object_idx != 0) {
+        ASTNode* obj_node = codegen_get_node(codegen, object_idx);
+        if (obj_node && obj_node->type == NODE_IDENTIFIER) {
+            const char* obj_name = codegen_get_string(codegen, obj_node->data.identifier.name);
+            if (obj_name && strcmp(obj_name, "Math") == 0) {
+                is_math_method = 1;
             }
         }
     }
@@ -3213,6 +3336,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         arg_idx = saved_first_arg;
         while (arg_idx != 0 && arg_count < total_arg_count) {
             uint16_t next_arg_idx;
+            TypeKind arg_type_kind;
             
             arg_node = codegen_get_node(codegen, arg_idx);
             if (!arg_node) {
@@ -3220,8 +3344,52 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             }
             
             next_arg_idx = arg_node->next_sibling;
+            
+            /* Determine argument type before generating expression */
+            arg_type_kind = TYPE_VOID;
+            if (is_math_method) {
+                /* Determine type of argument for Math methods */
+                if (arg_node->type == NODE_LITERAL_INT || arg_node->type == NODE_LITERAL_BOOL) {
+                    arg_type_kind = TYPE_INT;
+                } else if (arg_node->type == NODE_LITERAL_LONG) {
+                    arg_type_kind = TYPE_LONG;
+                } else if (arg_node->type == NODE_LITERAL_FLOAT) {
+                    arg_type_kind = TYPE_FLOAT;
+                } else if (arg_node->type == NODE_IDENTIFIER) {
+                    /* Look up variable type */
+                    const char* var_name = codegen_get_string(codegen, arg_node->data.identifier.name);
+                    if (var_name && codegen->symtable) {
+                        for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                            Symbol* sym = &codegen->symtable->symbols[i];
+                            const char* sym_name;
+                            
+                            if (sym->kind != SYM_LOCAL && sym->kind != SYM_PARAM && sym->kind != SYM_FIELD) {
+                                continue;
+                            }
+                            
+                            sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                            if (sym_name && strcmp(sym_name, var_name) == 0) {
+                                arg_type_kind = sym->type.kind;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
             if (generate_expression(codegen, arg_node) != 0) {
                 return -1;
+            }
+            
+            /* Insert implicit cast for Math methods if needed */
+            if (is_math_method && arg_type_kind != TYPE_VOID && arg_type_kind != TYPE_FLOAT) {
+                if (arg_type_kind == TYPE_INT) {
+                    emit_opcode(codegen, OP_I2F);
+                    update_stack(codegen, 1);  /* int (1 slot) -> float (2 slots) */
+                } else if (arg_type_kind == TYPE_LONG) {
+                    emit_opcode(codegen, OP_L2F);
+                    /* long (2 slots) -> float (2 slots), no stack change */
+                }
             }
             
             arg_idx = next_arg_idx;
@@ -3319,7 +3487,9 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
                    strcmp(method_name, "cos") == 0 ||
                    strcmp(method_name, "tan") == 0 ||
                    strcmp(method_name, "exp") == 0 ||
-                   strcmp(method_name, "log") == 0) {
+                   strcmp(method_name, "log") == 0 ||
+                   strcmp(method_name, "floor") == 0 ||
+                   strcmp(method_name, "ceil") == 0) {
             /* Math.method(float) returns float */
             strcpy(descriptor, "(F)F");
             invoke_arg_count = 2;  /* Float takes 2 words on stack */
@@ -3359,7 +3529,9 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
                strcmp(method_name, "tan") == 0 ||
                strcmp(method_name, "pow") == 0 ||
                strcmp(method_name, "exp") == 0 ||
-               strcmp(method_name, "log") == 0) {
+               strcmp(method_name, "log") == 0 ||
+               strcmp(method_name, "floor") == 0 ||
+               strcmp(method_name, "ceil") == 0) {
         /* All Math methods return float (2 words) */
         returns_value = 2;  /* Float return value takes 2 words */
     } else if (!is_native) {
@@ -3992,6 +4164,9 @@ static uint16_t get_expression_type(CodeGenerator* codegen, ASTNode* expr_node) 
         case NODE_LITERAL_INT:
         case NODE_LITERAL_BOOL:
             return (uint16_t)TYPE_INT;
+        
+        case NODE_LITERAL_NULL:
+            return (uint16_t)TYPE_NULL;
             
         case NODE_IDENTIFIER:
             var_name = codegen_get_string(codegen, expr_node->data.identifier.name);

@@ -73,6 +73,18 @@ float.jav worked correctly.
 floatarr.jav worked correctly.
 [PASS] floatarr.jav
 
+[TEST] cast.jav
+cast.jav worked correctly.
+[PASS] cast.jav
+
+[TEST] mathint.jav
+mathint.jav worked correctly.
+[PASS] mathint.jav
+
+[TEST] nulltest.jav
+nulltest.jav worked correctly.
+[PASS] nulltest.jav
+
 [TEST] math.jav
 math.jav worked correctly.
 [PASS] math.jav

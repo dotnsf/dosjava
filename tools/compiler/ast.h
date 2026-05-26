@@ -46,6 +46,7 @@ typedef enum {
     NODE_NEW,               /* Object creation */
     NODE_FIELD_ACCESS,      /* Field access obj.field */
     NODE_ARRAY_ACCESS,      /* Array access arr[i] */
+    NODE_CAST,              /* Type cast (type)expr */
     
     /* Literals and identifiers */
     NODE_LITERAL_INT,       /* Integer literal */
@@ -53,6 +54,7 @@ typedef enum {
     NODE_LITERAL_FLOAT,     /* Float literal */
     NODE_LITERAL_BOOL,      /* Boolean literal */
     NODE_LITERAL_STRING,    /* String literal */
+    NODE_LITERAL_NULL,      /* null literal */
     NODE_IDENTIFIER,        /* Variable/field reference */
     NODE_THIS               /* this keyword */
 } NodeType;
@@ -94,7 +96,8 @@ typedef enum {
     TYPE_BOOLEAN = 3,
     TYPE_CLASS = 4,
     TYPE_ARRAY = 5,   /* Current implementation treats arrays as int[] */
-    TYPE_FLOAT = 6
+    TYPE_FLOAT = 6,
+    TYPE_NULL = 7     /* null literal type */
 } TypeKind;
 
 /* Type information */
@@ -330,6 +333,13 @@ typedef struct ASTNode {
         struct {
             uint16_t name;          /* Offset in string pool */
         } identifier;
+        
+        /* Type cast */
+        struct {
+            uint16_t expr;          /* Index of expression to cast */
+            TypeInfo target_type;   /* Target type */
+            uint16_t is_explicit;   /* 0=implicit, 1=explicit */
+        } cast;
     } data;
     
     /* Next sibling (for lists) */

@@ -538,6 +538,62 @@ static int native_math_sin(ExecutionContext* ctx, uint16_t* args, uint8_t arg_co
 }
 
 /**
+ * Math.floor(float) - Floor function (round down)
+ */
+static int native_math_floor(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float value, result_value;
+    uint32_t float_bits, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 2) {
+        return -1;
+    }
+    
+    /* Convert args to float */
+    float_bits = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    memcpy(&value, &float_bits, sizeof(float));
+    
+    /* Calculate floor */
+    result_value = (float)floor((double)value);
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
+ * Math.ceil(float) - Ceiling function (round up)
+ */
+static int native_math_ceil(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    float value, result_value;
+    uint32_t float_bits, result_bits;
+    
+    (void)ctx;
+    
+    if (arg_count < 2) {
+        return -1;
+    }
+    
+    /* Convert args to float */
+    float_bits = ((uint32_t)args[0] << 16) | (uint32_t)args[1];
+    memcpy(&value, &float_bits, sizeof(float));
+    
+    /* Calculate ceiling */
+    result_value = (float)ceil((double)value);
+    
+    /* Convert result to 2 words */
+    memcpy(&result_bits, &result_value, sizeof(float));
+    result[0] = (uint16_t)(result_bits >> 16);
+    result[1] = (uint16_t)(result_bits & 0xFFFF);
+    
+    return 0;
+}
+
+/**
  * Math.cos(float) - Cosine (radians)
  */
 static int native_math_cos(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
@@ -952,6 +1008,32 @@ int native_register_builtins(void) {
         "log",
         "(F)F",
         native_math_log,
+        2,  /* Float takes 2 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.floor(float) */
+    if (native_register(
+        "Math",
+        "floor",
+        "(F)F",
+        native_math_floor,
+        2,  /* Float takes 2 words */
+        NULL,
+        NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Math.ceil(float) */
+    if (native_register(
+        "Math",
+        "ceil",
+        "(F)F",
+        native_math_ceil,
         2,  /* Float takes 2 words */
         NULL,
         NATIVE_RETURN_FLOAT

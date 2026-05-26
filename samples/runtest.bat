@@ -99,48 +99,56 @@ set TESTFILE=floatarr.jav
 set BASENAME=floatarr
 goto run_test
 :next18
-REM set TESTFILE=cast.jav
-REM set BASENAME=cast
-REM goto run_test
+set TESTFILE=cast.jav
+set BASENAME=cast
+goto run_test
 :next19
+set TESTFILE=mathint.jav
+set BASENAME=mathint
+goto run_test
+:next20
+set TESTFILE=nulltest.jav
+set BASENAME=nulltest
+goto run_test
+:next21
 set TESTFILE=math.jav
 set BASENAME=math
 goto run_test
-:next20
+:next22
 set TESTFILE=trig.jav
 set BASENAME=trig
 goto run_test
-:next21
+:next23
 set TESTFILE=explog.jav
 set BASENAME=explog
 goto run_test
 
 REM Test Phase 7
-:next22
+:next24
 set TESTFILE=for.jav
 set BASENAME=for
 goto run_test
-:next23
+:next25
 set TESTFILE=trycatch.jav
 set BASENAME=trycatch
 goto run_test
-:next24
+:next26
 set TESTFILE=throw.jav
 set BASENAME=throw
 goto run_test
-:next25
+:next27
 set TESTFILE=swint.jav
 set BASENAME=swint
 goto run_test
-:next26
+:next28
 set TESTFILE=swlong.jav
 set BASENAME=swlong
 goto run_test
-:next27
+:next29
 set TESTFILE=swstring.jav
 set BASENAME=swstring
 goto run_test
-:next28
+:next30
 set TESTFILE=swnest.jav
 set BASENAME=swnest
 goto run_test
@@ -186,7 +194,9 @@ if "%1"=="long.jav" set BASENAME=long
 if "%1"=="longarr.jav" set BASENAME=longarr
 if "%1"=="float.jav" set BASENAME=float
 if "%1"=="floatarr.jav" set BASENAME=floatarr
-REM if "%1"=="cast.jav" set BASENAME=cast
+if "%1"=="cast.jav" set BASENAME=cast
+if "%1"=="mathint.jav" set BASENAME=mathint
+if "%1"=="nulltest.jav" set BASENAME=nulltest
 if "%1"=="math.jav" set BASENAME=math
 if "%1"=="trig.jav" set BASENAME=trig
 if "%1"=="explog.jav" set BASENAME=explog
@@ -292,15 +302,17 @@ if "%TESTFILE%"=="longarr.jav" goto next16
 if "%TESTFILE%"=="float.jav" goto next17
 if "%TESTFILE%"=="floatarr.jav" goto next18
 if "%TESTFILE%"=="cast.jav" goto next19
-if "%TESTFILE%"=="math.jav" goto next20
-if "%TESTFILE%"=="trig.jav" goto next21
-if "%TESTFILE%"=="explog.jav" goto next22
-if "%TESTFILE%"=="for.jav" goto next23
-if "%TESTFILE%"=="trycatch.jav" goto next24
-if "%TESTFILE%"=="throw.jav" goto next25
-if "%TESTFILE%"=="swint.jav" goto next26
-if "%TESTFILE%"=="swlong.jav" goto next27
-if "%TESTFILE%"=="swstring.jav" goto next28
+if "%TESTFILE%"=="mathint.jav" goto next20
+if "%TESTFILE%"=="nulltest.jav" goto next21
+if "%TESTFILE%"=="math.jav" goto next22
+if "%TESTFILE%"=="trig.jav" goto next23
+if "%TESTFILE%"=="explog.jav" goto next24
+if "%TESTFILE%"=="for.jav" goto next25
+if "%TESTFILE%"=="trycatch.jav" goto next26
+if "%TESTFILE%"=="throw.jav" goto next27
+if "%TESTFILE%"=="swint.jav" goto next28
+if "%TESTFILE%"=="swlong.jav" goto next29
+if "%TESTFILE%"=="swstring.jav" goto next30
 if "%TESTFILE%"=="swnest.jav" goto all_done
 goto all_done
 

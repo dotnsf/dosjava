@@ -37,6 +37,7 @@ dosjava/
 **Build Commands**:
 ```batch
 wmake all           # Build everything
+wmake clean         # Clean build output
 build_all.bat       # Windows batch script
 build_djc.bat       # Build compiler only
 build_vm.bat        # Build VM only

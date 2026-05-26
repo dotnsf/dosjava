@@ -35,6 +35,9 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
   - リテラル: `true`, `false`（Phase 8で追加）
   - 論理演算: `&&`, `||`, `!`
 - `void` - 戻り値なし
+- `null` - nullリテラル（Phase 9.3で追加）
+  - 参照型（String、配列）への代入可能
+  - 参照型との比較演算（`==`, `!=`）
 - `String` - Phase 1 の限定サポート
   - 文字列リテラル
   - `String` ローカル変数
@@ -60,6 +63,9 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 - **関係**: `==`, `!=`, `<`, `>`, `<=`, `>=`
 - **論理**: `&&`, `||`, `!`
 - **代入**: `=`
+- **型キャスト**: `(type)expression`（Phase 9.1で追加）
+  - int ↔ long ↔ float の相互変換
+  - 例: `(int)3.7f`, `(float)42`, `(long)999`
 
 ### クラスとメソッド
 - クラス宣言（1ファイル1クラス）
@@ -78,24 +84,41 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 - 配列要素代入
 - `array.length`
 
-### Mathクラス（Phase 6.3で追加）
+### Mathクラス（Phase 6.3で追加、Phase 9.2で整数引数対応）
 数学関数を提供するクラス
+
+**Phase 9.2の拡張**: すべてのMath関数がint/long引数を受け入れ可能になりました。
+整数引数は自動的にfloatに変換されます。
 
 #### 基本関数
 - `float Math.abs(float x)` - 絶対値
+  - `Math.abs(int)`, `Math.abs(long)` も使用可能
 - `float Math.min(float a, float b)` - 最小値
+  - `Math.min(int, int)`, `Math.min(long, long)` も使用可能
 - `float Math.max(float a, float b)` - 最大値
+  - `Math.max(int, int)`, `Math.max(long, long)` も使用可能
 - `float Math.sqrt(float x)` - 平方根
+  - `Math.sqrt(int)`, `Math.sqrt(long)` も使用可能
+- `float Math.floor(float x)` - 床関数（Phase 6.3で追加）
+  - `Math.floor(int)`, `Math.floor(long)` も使用可能
+- `float Math.ceil(float x)` - 天井関数（Phase 6.3で追加）
+  - `Math.ceil(int)`, `Math.ceil(long)` も使用可能
 
 #### 三角関数
 - `float Math.sin(float x)` - サイン（ラジアン）
+  - `Math.sin(int)`, `Math.sin(long)` も使用可能
 - `float Math.cos(float x)` - コサイン（ラジアン）
+  - `Math.cos(int)`, `Math.cos(long)` も使用可能
 - `float Math.tan(float x)` - タンジェント（ラジアン）
+  - `Math.tan(int)`, `Math.tan(long)` も使用可能
 
 #### 指数・対数関数
 - `float Math.pow(float base, float exp)` - べき乗
+  - `Math.pow(int, int)`, `Math.pow(long, long)` も使用可能
 - `float Math.exp(float x)` - 自然指数関数（e^x）
+  - `Math.exp(int)`, `Math.exp(long)` も使用可能
 - `float Math.log(float x)` - 自然対数（ln(x)）
+  - `Math.log(int)`, `Math.log(long)` も使用可能
 
 #### 使用例
 ```java
@@ -113,6 +136,15 @@ class MathDemo {
         float r = 5.0f;
         float area = pi * Math.pow(r, 2.0f);
         System.out.println(area);  // 78.50
+        
+        // Phase 9.2: 整数引数の使用
+        int a = -42;
+        float absValue = Math.abs(a);  // 自動的にfloatに変換
+        System.out.println(absValue);  // 42.00
+        
+        int base = 2;
+        float result = Math.pow(base, 3);  // 2^3 = 8
+        System.out.println(result);  // 8.00
         
         return;
     }

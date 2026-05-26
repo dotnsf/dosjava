@@ -41,6 +41,7 @@ static const struct {
     {"continue", TOK_CONTINUE},
     {"true", TOK_TRUE},
     {"false", TOK_FALSE},
+    {"null", TOK_NULL},
     {NULL, TOK_EOF}
 };
 
@@ -728,6 +729,7 @@ const char* token_type_name(TokenType type) {
         case TOK_STRING: return "STRING";
         case TOK_TRUE: return "true";
         case TOK_FALSE: return "false";
+        case TOK_NULL: return "null";
         case TOK_PLUS: return "+";
         case TOK_MINUS: return "-";
         case TOK_STAR: return "*";

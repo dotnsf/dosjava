@@ -49,6 +49,7 @@ typedef enum {
     TOK_STRING,         /* string literal */
     TOK_TRUE,           /* true */
     TOK_FALSE,          /* false */
+    TOK_NULL,           /* null */
     
     /* Operators */
     TOK_PLUS,           /* + */

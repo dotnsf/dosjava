@@ -1065,6 +1065,7 @@ int interpreter_step(ExecutionContext* ctx) {
                 
                 /* Find native method in registry */
                 native_method = native_find(NULL, method_name, descriptor);
+                
                 if (native_method != NULL) {
                     /* Removed special handling for println(int) with 2 words on stack
                      * This was causing issues when float variables were used before println(int)
@@ -2489,6 +2490,11 @@ int interpreter_step(ExecutionContext* ctx) {
             
             break;
         }
+        case OP_ACONST_NULL:
+            /* Push null reference (0) */
+            stack_push_shared(ctx, 0);
+            break;
+        
         
         case OP_GET_FIELD: {
             /* Read instance field [field_name_idx:2] */

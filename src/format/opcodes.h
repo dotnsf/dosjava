@@ -64,6 +64,7 @@
 #define OP_PUT_FIELD     0x52  /* Write instance field [field:2] */
 #define OP_GET_STATIC    0x53  /* Read static field [field:2] */
 #define OP_PUT_STATIC    0x54  /* Write static field [field:2] */
+#define OP_ACONST_NULL   0x55  /* Push null reference */
 
 /* Array Operations (0x60-0x6F) */
 #define OP_NEW_ARRAY     0x60  /* Create new array [type:1] */

@@ -85,6 +85,7 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
     uint16_t name_offset, method_offset;
     const char* builtin_classes[] = {
         "System",
+        "Math",
         "BufferedWriter",
         "BufferedReader",
         "FileOutputStream",
@@ -1992,6 +1993,12 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             result_type->class_name = semantic_add_string(analyzer, "String");
             return 0;
         
+        case NODE_LITERAL_NULL:
+            /* null is compatible with any reference type */
+            result_type->kind = TYPE_NULL;
+            result_type->class_name = 0;
+            return 0;
+        
         case NODE_THIS: {
             /* 'this' keyword - only valid in instance methods (explicit this support) */
             if (!analyzer->current_method || analyzer->current_method->data.method_data.is_static) {
@@ -2202,6 +2209,66 @@ int check_expression(SemanticAnalyzer* analyzer, ASTNode* expr_node, TypeInfo* r
             
             semantic_error_node(analyzer, expr_node, "Field access requires object or array");
             return -1;
+        }
+        
+        case NODE_CAST: {
+            ASTNode* cast_expr_node;
+            TypeInfo expr_type;
+            TypeInfo target_type;
+            uint16_t expr_idx;
+            
+            /* Save cast data before any semantic_get_node calls */
+            expr_idx = expr_node->data.cast.expr;
+            target_type = expr_node->data.cast.target_type;
+            
+            /* Check the expression being cast */
+            cast_expr_node = semantic_get_node(analyzer, expr_idx);
+            if (!cast_expr_node || check_expression(analyzer, cast_expr_node, &expr_type) != 0) {
+                return -1;
+            }
+            
+            /* Validate cast compatibility */
+            /* Widening conversions (implicit, always safe):
+             * int -> long, int -> float, long -> float
+             */
+            /* Narrowing conversions (explicit, may lose precision):
+             * long -> int, float -> int, float -> long
+             */
+            
+            /* Check if cast is valid */
+            if (expr_type.kind == TYPE_INT) {
+                /* int can cast to: long, float */
+                if (target_type.kind != TYPE_LONG && target_type.kind != TYPE_FLOAT && target_type.kind != TYPE_INT) {
+                    semantic_error_node(analyzer, expr_node, "Cannot cast int to target type");
+                    return -1;
+                }
+            } else if (expr_type.kind == TYPE_LONG) {
+                /* long can cast to: int, float */
+                if (target_type.kind != TYPE_INT && target_type.kind != TYPE_FLOAT && target_type.kind != TYPE_LONG) {
+                    semantic_error_node(analyzer, expr_node, "Cannot cast long to target type");
+                    return -1;
+                }
+            } else if (expr_type.kind == TYPE_FLOAT) {
+                /* float can cast to: int, long */
+                if (target_type.kind != TYPE_INT && target_type.kind != TYPE_LONG && target_type.kind != TYPE_FLOAT) {
+                    semantic_error_node(analyzer, expr_node, "Cannot cast float to target type");
+                    return -1;
+                }
+            } else if (expr_type.kind == TYPE_BOOLEAN) {
+                /* boolean cannot be cast */
+                if (target_type.kind != TYPE_BOOLEAN) {
+                    semantic_error_node(analyzer, expr_node, "Cannot cast boolean type");
+                    return -1;
+                }
+            } else {
+                /* Other types (class, array) not supported for primitive casts */
+                semantic_error_node(analyzer, expr_node, "Cast not supported for this type");
+                return -1;
+            }
+            
+            /* Return the target type */
+            *result_type = target_type;
+            return 0;
         }
         
         default:
@@ -2549,24 +2616,25 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
             const char* class_name = semantic_get_string(analyzer, class_name_off);
             
             if (class_name && strcmp(class_name, "Math") == 0) {
-                /* Math.abs(float), Math.sqrt(float), Math.sin(float), Math.cos(float), Math.tan(float), Math.exp(float), Math.log(float) */
+                /* Math.abs(float), Math.sqrt(float), Math.sin(float), Math.cos(float), Math.tan(float), Math.exp(float), Math.log(float), Math.floor(float), Math.ceil(float) */
                 if (strcmp(method_name, "abs") == 0 || strcmp(method_name, "sqrt") == 0 ||
                     strcmp(method_name, "sin") == 0 || strcmp(method_name, "cos") == 0 ||
                     strcmp(method_name, "tan") == 0 || strcmp(method_name, "exp") == 0 ||
-                    strcmp(method_name, "log") == 0) {
+                    strcmp(method_name, "log") == 0 || strcmp(method_name, "floor") == 0 ||
+                    strcmp(method_name, "ceil") == 0) {
                     if (arg_count != 1) {
                         semantic_error_node(analyzer, call_node, "Math method takes exactly 1 argument");
                         return -1;
                     }
-                    /* Check argument type */
+                    /* Check argument type - accept int, long, or float */
                     if (first_arg_idx != 0) {
                         TypeInfo arg_type;
                         arg_node = semantic_get_node(analyzer, first_arg_idx);
                         if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
                             return -1;
                         }
-                        if (arg_type.kind != TYPE_FLOAT) {
-                            semantic_error_node(analyzer, call_node, "Math method requires float argument");
+                        if (arg_type.kind != TYPE_INT && arg_type.kind != TYPE_LONG && arg_type.kind != TYPE_FLOAT) {
+                            semantic_error_node(analyzer, call_node, "Math method requires numeric argument (int, long, or float)");
                             return -1;
                         }
                     }
@@ -2581,7 +2649,7 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                         semantic_error_node(analyzer, call_node, "Math method takes exactly 2 arguments");
                         return -1;
                     }
-                    /* Check argument types */
+                    /* Check argument types - accept int, long, or float */
                     if (first_arg_idx != 0) {
                         TypeInfo arg_type;
                         uint16_t current_arg_idx = first_arg_idx;
@@ -2592,8 +2660,8 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                             if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
                                 return -1;
                             }
-                            if (arg_type.kind != TYPE_FLOAT) {
-                                semantic_error_node(analyzer, call_node, "Math method requires float arguments");
+                            if (arg_type.kind != TYPE_INT && arg_type.kind != TYPE_LONG && arg_type.kind != TYPE_FLOAT) {
+                                semantic_error_node(analyzer, call_node, "Math method requires numeric arguments (int, long, or float)");
                                 return -1;
                             }
                             current_arg_idx = arg_node->next_sibling;
@@ -3080,6 +3148,14 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
 /* Type checking helpers */
 
 int types_compatible(TypeInfo t1, TypeInfo t2) {
+    /* null is compatible with any reference type (CLASS or ARRAY) */
+    if (t1.kind == TYPE_NULL && (t2.kind == TYPE_CLASS || t2.kind == TYPE_ARRAY)) {
+        return 1;
+    }
+    if (t2.kind == TYPE_NULL && (t1.kind == TYPE_CLASS || t1.kind == TYPE_ARRAY)) {
+        return 1;
+    }
+    
     if (t1.kind != t2.kind) {
         return 0;
     }

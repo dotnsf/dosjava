@@ -99,6 +99,7 @@ const char* opcode_name(uint8_t opcode) {
         case OP_PUT_FIELD:     return "PUT_FIELD";
         case OP_GET_STATIC:    return "GET_STATIC";
         case OP_PUT_STATIC:    return "PUT_STATIC";
+        case OP_ACONST_NULL:   return "ACONST_NULL";
         case OP_NEW_ARRAY:     return "NEW_ARRAY";
         case OP_ARRAY_LENGTH:  return "ARRAY_LENGTH";
         case OP_ARRAY_LOAD:    return "ARRAY_LOAD";
