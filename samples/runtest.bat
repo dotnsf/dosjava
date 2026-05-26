@@ -19,40 +19,44 @@ set RETURN=continue
 set FIRST_TEST=yes
 
 REM Test Phase 1
+set TESTFILE=hello.jav
+set BASENAME=hello
+goto run_test
+:next1
 set TESTFILE=int.jav
 set BASENAME=int
 goto run_test
-:next1
+:next2
 set TESTFILE=bool.jav
 set BASENAME=bool
 goto run_test
-:next2
+:next3
 set TESTFILE=if.jav
 set BASENAME=if
 goto run_test
-:next3
+:next4
 set TESTFILE=while.jav
 set BASENAME=while
 goto run_test
-:next4
+:next5
 set TESTFILE=arith.jav
 set BASENAME=arith
 goto run_test
-:next5
+:next6
 set TESTFILE=compare.jav
 set BASENAME=compare
 goto run_test
-:next6
+:next7
 set TESTFILE=logic.jav
 set BASENAME=logic
 goto run_test
-:next7
+:next8
 set TESTFILE=println.jav
 set BASENAME=println
 goto run_test
 
 REM Test Phase 2
-:next8
+:next9
 set TESTFILE=string.jav
 set BASENAME=string
 goto run_test
@@ -176,6 +180,7 @@ set TESTFILE=%1
 set RETURN=end
 set FIRST_TEST=yes
 REM Set basename based on filename
+if "%1"=="hello.jav" set BASENAME=hello
 if "%1"=="int.jav" set BASENAME=int
 if "%1"=="bool.jav" set BASENAME=bool
 if "%1"=="if.jav" set BASENAME=if
@@ -283,36 +288,37 @@ goto next_test
 REM If single test mode, exit after test
 if "%RETURN%"=="end" goto end
 REM Otherwise continue to next test
-if "%TESTFILE%"=="int.jav" goto next1
-if "%TESTFILE%"=="bool.jav" goto next2
-if "%TESTFILE%"=="if.jav" goto next3
-if "%TESTFILE%"=="while.jav" goto next4
-if "%TESTFILE%"=="arith.jav" goto next5
-if "%TESTFILE%"=="compare.jav" goto next6
-if "%TESTFILE%"=="logic.jav" goto next7
-if "%TESTFILE%"=="println.jav" goto next8
-if "%TESTFILE%"=="string.jav" goto next9
-if "%TESTFILE%"=="strops.jav" goto next10
-if "%TESTFILE%"=="intarr.jav" goto next11
-if "%TESTFILE%"=="boolarr.jav" goto next12
-if "%TESTFILE%"=="fileread.jav" goto next13
-if "%TESTFILE%"=="filewrit.jav" goto next14
-if "%TESTFILE%"=="long.jav" goto next15
-if "%TESTFILE%"=="longarr.jav" goto next16
-if "%TESTFILE%"=="float.jav" goto next17
-if "%TESTFILE%"=="floatarr.jav" goto next18
-if "%TESTFILE%"=="cast.jav" goto next19
-if "%TESTFILE%"=="mathint.jav" goto next20
-if "%TESTFILE%"=="nulltest.jav" goto next21
-if "%TESTFILE%"=="math.jav" goto next22
-if "%TESTFILE%"=="trig.jav" goto next23
-if "%TESTFILE%"=="explog.jav" goto next24
-if "%TESTFILE%"=="for.jav" goto next25
-if "%TESTFILE%"=="trycatch.jav" goto next26
-if "%TESTFILE%"=="throw.jav" goto next27
-if "%TESTFILE%"=="swint.jav" goto next28
-if "%TESTFILE%"=="swlong.jav" goto next29
-if "%TESTFILE%"=="swstring.jav" goto next30
+if "%TESTFILE%"=="hello.jav" goto next1
+if "%TESTFILE%"=="int.jav" goto next2
+if "%TESTFILE%"=="bool.jav" goto next3
+if "%TESTFILE%"=="if.jav" goto next4
+if "%TESTFILE%"=="while.jav" goto next5
+if "%TESTFILE%"=="arith.jav" goto next6
+if "%TESTFILE%"=="compare.jav" goto next7
+if "%TESTFILE%"=="logic.jav" goto next8
+if "%TESTFILE%"=="println.jav" goto next9
+if "%TESTFILE%"=="string.jav" goto next10
+if "%TESTFILE%"=="strops.jav" goto next11
+if "%TESTFILE%"=="intarr.jav" goto next12
+if "%TESTFILE%"=="boolarr.jav" goto next13
+if "%TESTFILE%"=="fileread.jav" goto next14
+if "%TESTFILE%"=="filewrit.jav" goto next15
+if "%TESTFILE%"=="long.jav" goto next16
+if "%TESTFILE%"=="longarr.jav" goto next17
+if "%TESTFILE%"=="float.jav" goto next18
+if "%TESTFILE%"=="floatarr.jav" goto next19
+if "%TESTFILE%"=="cast.jav" goto next20
+if "%TESTFILE%"=="mathint.jav" goto next21
+if "%TESTFILE%"=="nulltest.jav" goto next22
+if "%TESTFILE%"=="math.jav" goto next23
+if "%TESTFILE%"=="trig.jav" goto next24
+if "%TESTFILE%"=="explog.jav" goto next25
+if "%TESTFILE%"=="for.jav" goto next26
+if "%TESTFILE%"=="trycatch.jav" goto next27
+if "%TESTFILE%"=="throw.jav" goto next28
+if "%TESTFILE%"=="swint.jav" goto next29
+if "%TESTFILE%"=="swlong.jav" goto next30
+if "%TESTFILE%"=="swstring.jav" goto next31
 if "%TESTFILE%"=="swnest.jav" goto all_done
 goto all_done
 

@@ -1,6 +1,10 @@
 DOSJava Feature Verification
 ============================
 
+[TEST] hello.jav
+Hello World!
+[PASS] hello.jav
+
 [TEST] int.jav
 int.jav worked correctly.
 [PASS] int.jav
@@ -37,89 +41,45 @@ println.jav worked correctly.
 string.jav worked correctly.
 [PASS] string.jav
 
-[TEST] strops.jav
-strops.jav worked correctly.
-[PASS] strops.jav
-
 [TEST] intarr.jav
 intarr.jav worked correctly.
 [PASS] intarr.jav
-
-[TEST] boolarr.jav
-boolarr.jav worked correctly.
-[PASS] boolarr.jav
 
 [TEST] fileread.jav
 fileread.jav worked correctly.
 [PASS] fileread.jav
 
-[TEST] filewrit.jav
-filewrit.jav worked correctly.
-[PASS] filewrit.jav
-
 [TEST] long.jav
 long.jav worked correctly.
 [PASS] long.jav
-
-[TEST] longarr.jav
-longarr.jav worked correctly.
-[PASS] longarr.jav
 
 [TEST] float.jav
 float.jav worked correctly.
 [PASS] float.jav
 
-[TEST] floatarr.jav
-floatarr.jav worked correctly.
-[PASS] floatarr.jav
-
 [TEST] cast.jav
 cast.jav worked correctly.
 [PASS] cast.jav
-
-[TEST] mathint.jav
-mathint.jav worked correctly.
-[PASS] mathint.jav
 
 [TEST] nulltest.jav
 nulltest.jav worked correctly.
 [PASS] nulltest.jav
 
-[TEST] math.jav
-math.jav worked correctly.
-[PASS] math.jav
-
 [TEST] trig.jav
 trig.jav worked correctly.
 [PASS] trig.jav
-
-[TEST] explog.jav
-explog.jav worked correctly.
-[PASS] explog.jav
 
 [TEST] for.jav
 for.jav worked correctly.
 [PASS] for.jav
 
-[TEST] trycatch.jav
-trycatch.jav worked correctly.
-[PASS] trycatch.jav
-
 [TEST] throw.jav
 throw.jav worked correctly.
 [PASS] throw.jav
 
-[TEST] swint.jav
-swint.jav worked correctly.
-[PASS] swint.jav
-
 [TEST] swlong.jav
 swlong.jav worked correctly.
 [PASS] swlong.jav
-
-[TEST] swstring.jav
-swstring.jav worked correctly.
-[PASS] swstring.jav
 
 [TEST] swnest.jav
 swnest.jav worked correctly.
