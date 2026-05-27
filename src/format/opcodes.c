@@ -115,6 +115,7 @@ const char* opcode_name(uint8_t opcode) {
         case OP_FINALLY_BEGIN: return "FINALLY_BEGIN";
         case OP_FINALLY_END:   return "FINALLY_END";
         case OP_THROW:         return "THROW";
+        case OP_EXCEPTION_TO_STRING: return "EXCEPTION_TO_STRING";
         case OP_PUSH_LONG:     return "PUSH_LONG";
         case OP_LADD:          return "LADD";
         case OP_LSUB:          return "LSUB";
@@ -196,6 +197,7 @@ uint8_t opcode_length(uint8_t opcode) {
         case OP_FINALLY_BEGIN:
         case OP_FINALLY_END:
         case OP_THROW:
+        case OP_EXCEPTION_TO_STRING:
         case OP_LADD:
         case OP_LSUB:
         case OP_LMUL:

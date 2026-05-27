@@ -1,7 +1,10 @@
-class StrTest {
+class StringTest {
     public static void main() {
-        float f = 1.5f;
-        System.out.println("Value = " + f);
-        return;
+        String s1 = "Hello";
+        String s2 = "World";
+        String s3 = s1 + " " + s2;
+        System.out.println(s3);
     }
 }
+
+// Made with Bob

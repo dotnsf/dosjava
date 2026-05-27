@@ -88,6 +88,7 @@
 #define OP_FINALLY_BEGIN 0x94  /* Mark finally block begin */
 #define OP_FINALLY_END   0x95  /* Mark finally block end */
 #define OP_THROW         0x96  /* Throw exception */
+#define OP_EXCEPTION_TO_STRING 0x97  /* Convert exception to string */
 
 /* Long Operations (0xA0-0xAF) */
 /* Long values are stored as two 16-bit words on stack: [high:2] [low:2] */

@@ -377,7 +377,21 @@ static inline void store_local_long(ExecutionContext* ctx, uint8_t index, uint32
  * @return 0 if exception handled (jumped to catch), -1 if should terminate
  */
 static int throw_runtime_exception(ExecutionContext* ctx, const char* message) {
+    /* Save error message to context */
+    if (message != NULL) {
+        strncpy(ctx->exception_message, message, sizeof(ctx->exception_message) - 1);
+        ctx->exception_message[sizeof(ctx->exception_message) - 1] = '\0';
+    } else {
+        ctx->exception_message[0] = '\0';
+    }
+    
     if (ctx->in_try_block && ctx->catch_pc) {
+        /* Push exception reference (dummy value 0x0001) onto stack for catch parameter */
+        if (stack_push_shared(ctx, 0x0001) != 0) {
+            printf("ERROR: Stack overflow in throw_runtime_exception\n");
+            return -1;
+        }
+        
         /* Jump to catch block */
         ctx->pc = ctx->catch_pc;
         ctx->in_try_block = 0;
@@ -1151,9 +1165,6 @@ int interpreter_step(ExecutionContext* ctx) {
                             /* Convert to signed for proper display */
                             signed_value = (int32_t)long_value;
                             
-                            /* DEBUG: Print values */
-                            printf("DEBUG println(long): high=0x%04X low=0x%04X value=%lu (%ld)\n",
-                                   high, low, (unsigned long)long_value, (long)signed_value);
                             
                             if (is_println) {
                                 printf("%ld\n", (long)signed_value);
@@ -1315,11 +1326,6 @@ int interpreter_step(ExecutionContext* ctx) {
                         right_value = stack_pop_shared(ctx);
                         left_value = stack_pop_shared(ctx);
                         
-                        if (g_debug_mode) {
-                            printf("[DEBUG] concat: left_value=%u, right_value=%u\n", left_value, right_value);
-                            printf("[DEBUG] concat: constant_pool_count=%u\n", ctx->djc_file->header.constant_pool_count);
-                        }
-                        
                         left_str = NULL;
                         right_str = NULL;
                         
@@ -1334,11 +1340,6 @@ int interpreter_step(ExecutionContext* ctx) {
                             }
                         }
                         
-                        if (g_debug_mode) {
-                            printf("[DEBUG] concat: left_str=%s, right_str=%s\n",
-                                   left_str ? left_str : "NULL",
-                                   right_str ? right_str : "NULL");
-                        }
                         
                         if (!left_str || !right_str) {
                             printf("ERROR: Invalid string constant index for concat: %d, %d\n",
@@ -3197,6 +3198,34 @@ int interpreter_step(ExecutionContext* ctx) {
                 return 1;
             }
             break;
+        
+        case OP_EXCEPTION_TO_STRING: {
+            /* Convert exception to string using saved error message */
+            uint16_t const_index;
+            const char* message_to_use;
+            
+            /* Pop exception reference (we don't use it) */
+            if (ctx->stack_pointer > 0) {
+                ctx->stack_pointer--;
+            }
+            
+            /* Use "Exception" as default if no message is set */
+            message_to_use = (ctx->exception_message[0] != '\0') ? ctx->exception_message : "Exception";
+            
+            /* Add error message to constant pool and get its index */
+            const_index = djc_add_string(ctx->djc_file, message_to_use);
+            if (const_index == 0) {
+                printf("ERROR: Failed to add exception message to constant pool\n");
+                return -1;
+            }
+            
+            /* Push the constant index */
+            if (stack_push_shared(ctx, const_index) != 0) {
+                printf("ERROR: Stack overflow in EXCEPTION_TO_STRING\n");
+                return -1;
+            }
+            break;
+        }
         
         /* ===== Long Type Operations ===== */
         

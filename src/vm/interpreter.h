@@ -64,6 +64,7 @@ typedef struct {
     /* Exception handling (simple implementation) */
     uint8_t* catch_pc;          /* PC of catch block (0 if none) */
     uint8_t in_try_block;       /* 1 if currently in try block */
+    char exception_message[64]; /* Error message for runtime exceptions */
 } ExecutionContext;
 
 /**

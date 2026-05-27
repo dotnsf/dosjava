@@ -869,6 +869,10 @@ ASTNode* semantic_get_node(SemanticAnalyzer* analyzer, uint16_t node_index) {
     long file_pos;
     
     if (!analyzer || node_index == 0 || node_index > analyzer->total_nodes) {
+        if (node_index > analyzer->total_nodes) {
+            printf("DEBUG: semantic_get_node failed: node_index=%u > total_nodes=%u\n",
+                   node_index, analyzer->total_nodes);
+        }
         return NULL;
     }
     
@@ -1587,10 +1591,124 @@ int check_statement(SemanticAnalyzer* analyzer, ASTNode* stmt_node, uint16_t stm
             return 0;
         }
         
-        case NODE_TRY:
-            /* TODO: Implement try-catch-finally semantic check */
-            /* For now, just accept it without checking */
+        case NODE_TRY: {
+            /* Check try-catch-finally statement */
+            ASTNode* try_block_node;
+            ASTNode* catch_node;
+            ASTNode* catch_block_node;
+            ASTNode* finally_node;
+            uint16_t try_block_idx;
+            uint16_t catch_clause_idx;
+            uint16_t catch_block_idx;
+            uint16_t finally_block_idx;
+            
+            /* Read all indices from AST FIRST before any other operations */
+            /* This is critical because semantic_get_node() may invalidate stmt_node pointer */
+            try_block_idx = stmt_node->data.try_stmt.try_block;
+            catch_clause_idx = stmt_node->data.try_stmt.catch_clause;
+            finally_block_idx = stmt_node->data.try_stmt.finally_block;
+            
+            /* Check try block */
+            if (try_block_idx != 0) {
+                try_block_node = semantic_get_node(analyzer, try_block_idx);
+                if (try_block_node && check_statement(analyzer, try_block_node, try_block_idx) != 0) {
+                    return -1;
+                }
+            }
+            
+            /* Check catch clause */
+            if (catch_clause_idx != 0) {
+                const char* exception_var_name;
+                TypeInfo exception_type;
+                
+                catch_node = semantic_get_node(analyzer, catch_clause_idx);
+                if (catch_node) {
+                    /* Get exception variable name */
+                    exception_var_name = semantic_get_string(analyzer, catch_node->data.catch_clause.exception_var);
+                    
+                    /* Define exception type as Exception class */
+                    exception_type.kind = TYPE_CLASS;
+                    exception_type.class_name = semantic_add_string(analyzer, "Exception");
+                    
+                    /* Enter new scope for catch block */
+                    if (symtable_enter_scope(analyzer->symtable) != 0) {
+                        semantic_error(analyzer, 0, 0, "Max scope depth exceeded in catch");
+                        return -1;
+                    }
+                    
+                    /* Add exception variable to symbol table */
+                    {
+                        Symbol exception_sym;
+                        uint16_t name_offset;
+                        uint16_t local_count;
+                        
+                        /* Get name offset */
+                        name_offset = symtable_add_string(analyzer->symtable, exception_var_name);
+                        if (name_offset == 0xFFFF) {
+                            semantic_error(analyzer, 0, 0, "Failed to add exception variable name");
+                            symtable_exit_scope(analyzer->symtable);
+                            return -1;
+                        }
+                        
+                        /* Count existing local variables in current scope */
+                        local_count = 0;
+                        {
+                            uint16_t i;
+                            for (i = 0; i < analyzer->symtable->symbol_count; i++) {
+                                Symbol* sym = &analyzer->symtable->symbols[i];
+                                if (sym->kind == SYM_LOCAL &&
+                                    sym->scope_level == analyzer->symtable->scope_level) {
+                                    local_count++;
+                                }
+                            }
+                        }
+                        
+                        /* Create exception symbol */
+                        exception_sym.kind = SYM_LOCAL;
+                        exception_sym.name_offset = name_offset;
+                        exception_sym.type = exception_type;
+                        exception_sym.scope_level = analyzer->symtable->scope_level;
+                        exception_sym.data.local_data.index = local_count;
+                        
+                        /* Add to symbol table */
+                        if (symtable_add_symbol(analyzer->symtable, &exception_sym) == 0xFFFF) {
+                            semantic_error(analyzer, 0, 0, "Failed to add exception variable");
+                            symtable_exit_scope(analyzer->symtable);
+                            return -1;
+                        }
+                    }
+                    
+                    /* Check catch block */
+                    catch_block_idx = catch_node->data.catch_clause.catch_block;
+                    if (catch_block_idx != 0) {
+                        catch_block_node = semantic_get_node(analyzer, catch_block_idx);
+                        if (catch_block_node && check_statement(analyzer, catch_block_node, catch_block_idx) != 0) {
+                            symtable_exit_scope(analyzer->symtable);
+                            return -1;
+                        }
+                    }
+                    
+                    /* Exit catch scope */
+                    symtable_exit_scope(analyzer->symtable);
+                }
+            }
+            
+            /* Check finally block */
+            if (finally_block_idx != 0) {
+                finally_node = semantic_get_node(analyzer, finally_block_idx);
+                if (finally_node) {
+                    uint16_t finally_body_idx = finally_node->data.finally_block.finally_block;
+                    if (finally_body_idx != 0) {
+                        ASTNode* finally_body_node = semantic_get_node(analyzer, finally_body_idx);
+                        if (finally_body_node && check_statement(analyzer, finally_body_node, finally_body_idx) != 0) {
+                            return -1;
+                        }
+                    }
+                }
+            }
+            
             return 0;
+        }
         
         case NODE_THROW:
             /* TODO: Implement throw semantic check */
@@ -2312,8 +2430,19 @@ int check_binary_op(SemanticAnalyzer* analyzer, ASTNode* binop_node, TypeInfo* r
         return -1;
     }
     
-    /* String concatenation: String + String, String + int, int + String */
+    /* String concatenation: String + String, String + int, int + String, String + Exception, Exception + String */
     if (op == BINOP_ADD) {
+        const char* left_class_name = NULL;
+        const char* right_class_name = NULL;
+        
+        /* Get class names for TYPE_CLASS operands */
+        if (left_type.kind == TYPE_CLASS && left_type.class_name < analyzer->pool_size) {
+            left_class_name = semantic_get_string(analyzer, left_type.class_name);
+        }
+        if (right_type.kind == TYPE_CLASS && right_type.class_name < analyzer->pool_size) {
+            right_class_name = semantic_get_string(analyzer, right_type.class_name);
+        }
+        
         /* String + String */
         if (is_string_type(analyzer, left_type) && is_string_type(analyzer, right_type)) {
             result_type->kind = TYPE_CLASS;
@@ -2330,6 +2459,22 @@ int check_binary_op(SemanticAnalyzer* analyzer, ASTNode* binop_node, TypeInfo* r
         
         /* int + String */
         if (is_numeric_type(left_type) && is_string_type(analyzer, right_type)) {
+            result_type->kind = TYPE_CLASS;
+            result_type->class_name = semantic_add_string(analyzer, "String");
+            return 0;
+        }
+        
+        /* String + Exception */
+        if (is_string_type(analyzer, left_type) &&
+            right_class_name && strcmp(right_class_name, "Exception") == 0) {
+            result_type->kind = TYPE_CLASS;
+            result_type->class_name = semantic_add_string(analyzer, "String");
+            return 0;
+        }
+        
+        /* Exception + String */
+        if (left_class_name && strcmp(left_class_name, "Exception") == 0 &&
+            is_string_type(analyzer, right_type)) {
             result_type->kind = TYPE_CLASS;
             result_type->class_name = semantic_add_string(analyzer, "String");
             return 0;
@@ -2591,8 +2736,9 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                         }
                         
                         if (!(is_numeric_type(arg_type) ||
-                              (arg_class_name && strcmp(arg_class_name, "String") == 0))) {
-                            semantic_error_node(analyzer, call_node, "println supports only int or String in Phase 1");
+                              (arg_class_name && (strcmp(arg_class_name, "String") == 0 ||
+                                                  strcmp(arg_class_name, "Exception") == 0)))) {
+                            semantic_error_node(analyzer, call_node, "println supports only int, String, or Exception in Phase 1");
                             return -1;
                         }
                         

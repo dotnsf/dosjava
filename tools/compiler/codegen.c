@@ -688,6 +688,23 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
                 codegen->context->code->data[try_begin_pos + 2] = (uint8_t)((catch_offset >> 8) & 0xFF);
                 
                 catch_node = codegen_get_node(codegen, stmt_node->data.try_stmt.catch_clause);
+                if (catch_node && catch_node->data.catch_clause.exception_var != 0) {
+                    const char* exception_var_name;
+                    uint16_t var_index;
+                    
+                    /* Get exception variable name from string pool */
+                    exception_var_name = codegen_get_string(codegen, catch_node->data.catch_clause.exception_var);
+                    if (exception_var_name) {
+                        /* Get local variable index for exception */
+                        var_index = get_local_index(codegen, exception_var_name);
+                        
+                        if (var_index != 0xFFFF) {
+                            /* Store exception reference from stack to local variable */
+                            emit_opcode(codegen, OP_STORE_LOCAL);
+                            emit_u1(codegen, (uint8_t)var_index);
+                        }
+                    }
+                }
                 if (catch_node) {
                     catch_block_idx = catch_node->data.catch_clause.catch_block;
                     catch_block_node = codegen_get_node(codegen, catch_block_idx);
@@ -1749,8 +1766,14 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                                 if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                                     sym_name && strcmp(sym_name, var_name) == 0) {
                                     if (sym->type.kind == TYPE_CLASS) {
-                                        left_is_string = 1;
-                                        break;
+                                        const char* class_name = NULL;
+                                        if (sym->type.class_name < codegen->pool_size) {
+                                            class_name = codegen_get_string(codegen, sym->type.class_name);
+                                        }
+                                        if (class_name && (strcmp(class_name, "String") == 0 || strcmp(class_name, "Exception") == 0)) {
+                                            left_is_string = 1;
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -1765,8 +1788,14 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                                 if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                                     sym_name && strcmp(sym_name, var_name) == 0) {
                                     if (sym->type.kind == TYPE_CLASS) {
-                                        left_is_string = 1;
-                                        break;
+                                        const char* class_name = NULL;
+                                        if (sym->type.class_name < codegen->pool_size) {
+                                            class_name = codegen_get_string(codegen, sym->type.class_name);
+                                        }
+                                        if (class_name && (strcmp(class_name, "String") == 0 || strcmp(class_name, "Exception") == 0)) {
+                                            left_is_string = 1;
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -1795,7 +1824,14 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                         }
                     }
                     if (left_sym && left_sym->type.kind == TYPE_CLASS) {
-                        left_is_string = 1;
+                        /* Check if it's String or Exception class */
+                        const char* class_name = NULL;
+                        if (left_sym->type.class_name < codegen->pool_size) {
+                            class_name = codegen_get_string(codegen, left_sym->type.class_name);
+                        }
+                        if (class_name && (strcmp(class_name, "String") == 0 || strcmp(class_name, "Exception") == 0)) {
+                            left_is_string = 1;
+                        }
                     } else if (left_sym && left_sym->type.kind == TYPE_INT) {
                         left_is_int = 1;
                     }
@@ -1873,8 +1909,14 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                                 if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                                     sym_name && strcmp(sym_name, var_name) == 0) {
                                     if (sym->type.kind == TYPE_CLASS) {
-                                        right_is_string = 1;
-                                        break;
+                                        const char* class_name = NULL;
+                                        if (sym->type.class_name < codegen->pool_size) {
+                                            class_name = codegen_get_string(codegen, sym->type.class_name);
+                                        }
+                                        if (class_name && (strcmp(class_name, "String") == 0 || strcmp(class_name, "Exception") == 0)) {
+                                            right_is_string = 1;
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -1889,8 +1931,14 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                                 if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
                                     sym_name && strcmp(sym_name, var_name) == 0) {
                                     if (sym->type.kind == TYPE_CLASS) {
-                                        right_is_string = 1;
-                                        break;
+                                        const char* class_name = NULL;
+                                        if (sym->type.class_name < codegen->pool_size) {
+                                            class_name = codegen_get_string(codegen, sym->type.class_name);
+                                        }
+                                        if (class_name && (strcmp(class_name, "String") == 0 || strcmp(class_name, "Exception") == 0)) {
+                                            right_is_string = 1;
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -1919,7 +1967,14 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
                         }
                     }
                     if (right_sym && right_sym->type.kind == TYPE_CLASS) {
-                        right_is_string = 1;
+                        /* Check if it's String or Exception class */
+                        const char* class_name = NULL;
+                        if (right_sym->type.class_name < codegen->pool_size) {
+                            class_name = codegen_get_string(codegen, right_sym->type.class_name);
+                        }
+                        if (class_name && (strcmp(class_name, "String") == 0 || strcmp(class_name, "Exception") == 0)) {
+                            right_is_string = 1;
+                        }
                     } else if (right_sym && right_sym->type.kind == TYPE_INT) {
                         right_is_int = 1;
                     } else if (right_sym && right_sym->type.kind == TYPE_LONG) {
@@ -1944,10 +1999,56 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
         }
     }
     
-    /* Generate left operand */
-    left_node = codegen_get_node(codegen, left_index);
-    if (left_node) {
-        generate_expression(codegen, left_node);
+    /* Check if left operand is an Exception variable for string concatenation */
+    {
+        int left_handled = 0;
+        if (is_string_concat && left_is_string) {
+            ASTNode* test_node = codegen_get_node(codegen, left_index);
+            if (test_node && test_node->type == NODE_IDENTIFIER) {
+                const char* left_var_name = codegen_get_string(codegen, test_node->data.identifier.name);
+                if (left_var_name) {
+                    Symbol* left_sym = NULL;
+                    uint16_t best_scope = 0;
+                    uint16_t i;
+                    for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                        Symbol* sym = &codegen->symtable->symbols[i];
+                        const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                            sym_name && strcmp(sym_name, left_var_name) == 0) {
+                            if (!left_sym || sym->scope_level >= best_scope) {
+                                left_sym = sym;
+                                best_scope = sym->scope_level;
+                            }
+                        }
+                    }
+                    if (left_sym && left_sym->type.kind == TYPE_CLASS) {
+                        const char* class_name = NULL;
+                        if (left_sym->type.class_name < codegen->pool_size) {
+                            class_name = codegen_get_string(codegen, left_sym->type.class_name);
+                        }
+                        if (class_name && strcmp(class_name, "Exception") == 0) {
+                            /* Load Exception variable and convert to string */
+                            uint16_t local_idx = get_local_index(codegen, left_var_name);
+                            if (local_idx != 0xFFFF) {
+                                emit_opcode(codegen, OP_LOAD_LOCAL);
+                                emit_u1(codegen, (uint8_t)local_idx);
+                                emit_opcode(codegen, OP_EXCEPTION_TO_STRING);
+                                update_stack(codegen, 1);
+                                left_handled = 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        /* Generate left operand if not already handled */
+        if (!left_handled) {
+            left_node = codegen_get_node(codegen, left_index);
+            if (left_node) {
+                generate_expression(codegen, left_node);
+            }
+        }
     }
     
     /* Convert left operand to String if needed */
@@ -2016,10 +2117,56 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
         /* Stack: float -> String (no change in stack depth) */
     }
     
-    /* Generate right operand */
-    right_node = codegen_get_node(codegen, right_index);
-    if (right_node) {
-        generate_expression(codegen, right_node);
+    /* Check if right operand is an Exception variable for string concatenation */
+    {
+        int right_handled = 0;
+        if (is_string_concat && right_is_string) {
+            ASTNode* test_node = codegen_get_node(codegen, right_index);
+            if (test_node && test_node->type == NODE_IDENTIFIER) {
+                const char* right_var_name = codegen_get_string(codegen, test_node->data.identifier.name);
+                if (right_var_name) {
+                    Symbol* right_sym = NULL;
+                    uint16_t best_scope = 0;
+                    uint16_t i;
+                    for (i = 0; i < codegen->symtable->symbol_count; i++) {
+                        Symbol* sym = &codegen->symtable->symbols[i];
+                        const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                            sym_name && strcmp(sym_name, right_var_name) == 0) {
+                            if (!right_sym || sym->scope_level >= best_scope) {
+                                right_sym = sym;
+                                best_scope = sym->scope_level;
+                            }
+                        }
+                    }
+                    if (right_sym && right_sym->type.kind == TYPE_CLASS) {
+                        const char* class_name = NULL;
+                        if (right_sym->type.class_name < codegen->pool_size) {
+                            class_name = codegen_get_string(codegen, right_sym->type.class_name);
+                        }
+                        if (class_name && strcmp(class_name, "Exception") == 0) {
+                            /* Load Exception variable and convert to string */
+                            uint16_t local_idx = get_local_index(codegen, right_var_name);
+                            if (local_idx != 0xFFFF) {
+                                emit_opcode(codegen, OP_LOAD_LOCAL);
+                                emit_u1(codegen, (uint8_t)local_idx);
+                                emit_opcode(codegen, OP_EXCEPTION_TO_STRING);
+                                update_stack(codegen, 1);
+                                right_handled = 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        /* Generate right operand if not already handled */
+        if (!right_handled) {
+            right_node = codegen_get_node(codegen, right_index);
+            if (right_node) {
+                generate_expression(codegen, right_node);
+            }
+        }
     }
     
     /* Convert right operand to String if needed */
@@ -2091,7 +2238,6 @@ int generate_binary_op(CodeGenerator* codegen, ASTNode* binop_node) {
     if (is_string_concat) {
         uint16_t method_idx;
         uint16_t desc_idx;
-        
         
         method_idx = find_method_index(codegen, "concat", 1);
         if (method_idx == 0xFFFF) {
@@ -3345,6 +3491,10 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             
             next_arg_idx = arg_node->next_sibling;
             
+            /* Save original argument node type before expression generation */
+            {
+                uint16_t original_arg_node_type = arg_node->type;
+            
             /* Determine argument type before generating expression */
             arg_type_kind = TYPE_VOID;
             if (is_math_method) {
@@ -3380,6 +3530,48 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             if (generate_expression(codegen, arg_node) != 0) {
                 return -1;
             }
+            
+            /* For println, convert Exception variables to string marker
+             * Only for direct Exception variable references, not for expressions like string concatenation
+             */
+            if ((strcmp(method_name, "println") == 0 || strcmp(method_name, "print") == 0) &&
+                arg_node->type == NODE_IDENTIFIER &&
+                original_arg_node_type == NODE_IDENTIFIER) {
+                const char* arg_var_name;
+                Symbol* arg_sym;
+                uint16_t best_scope;
+                uint16_t j;
+                
+                arg_var_name = codegen_get_string(codegen, arg_node->data.identifier.name);
+                arg_sym = NULL;
+                best_scope = 0;
+                if (arg_var_name) {
+                    for (j = 0; j < codegen->symtable->symbol_count; j++) {
+                        Symbol* sym = &codegen->symtable->symbols[j];
+                        const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if ((sym->kind == SYM_LOCAL || sym->kind == SYM_PARAM) &&
+                            sym_name && strcmp(sym_name, arg_var_name) == 0) {
+                            if (!arg_sym || sym->scope_level >= best_scope) {
+                                arg_sym = sym;
+                                best_scope = sym->scope_level;
+                            }
+                        }
+                    }
+                    if (arg_sym && arg_sym->type.kind == TYPE_CLASS) {
+                        const char* class_name = NULL;
+                        if (arg_sym->type.class_name < codegen->pool_size) {
+                            class_name = codegen_get_string(codegen, arg_sym->type.class_name);
+                        }
+                        if (class_name && strcmp(class_name, "Exception") == 0) {
+                            /* Convert Exception reference to string marker for println */
+                            emit_opcode(codegen, OP_EXCEPTION_TO_STRING);
+                            /* Stack depth unchanged: exception ref -> string marker */
+                        }
+                    }
+                }
+            }
+            
+            }  /* End of original_arg_node_type scope */
             
             /* Insert implicit cast for Math methods if needed */
             if (is_math_method && arg_type_kind != TYPE_VOID && arg_type_kind != TYPE_FLOAT) {
@@ -3661,6 +3853,7 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
         /* Search in reverse order to find innermost scope first */
         int is_float = 0;
         int is_long = 0;
+        int is_exception = 0;
         for (i = codegen->symtable->symbol_count; i > 0; i--) {
             Symbol* sym = &codegen->symtable->symbols[i - 1];
             const char* sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
@@ -3670,6 +3863,12 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
                     is_float = 1;
                 } else if (sym->type.kind == TYPE_LONG) {
                     is_long = 1;
+                } else if (sym->type.kind == TYPE_CLASS) {
+                    /* Check if it's an Exception type */
+                    const char* class_name = symtable_get_string(codegen->symtable, sym->type.class_name);
+                    if (class_name && strcmp(class_name, "Exception") == 0) {
+                        is_exception = 1;
+                    }
                 }
                 break;
             }
@@ -3694,6 +3893,15 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
                 emit_u1(codegen, (uint8_t)local_idx);
             }
             update_stack(codegen, 1);
+            
+            /* If it's an Exception variable, we need to handle it specially */
+            /* For println: convert to 0xFFFF marker */
+            /* For string concat: load "Exception" string constant */
+            /* We'll handle this in the parent expression context */
+            if (is_exception) {
+                /* For now, just push the exception reference */
+                /* The parent context will decide how to convert it */
+            }
         }
         return 0;
     }

@@ -1,0 +1,14 @@
+=== Exception Print Tests ===
+
+Test 1: Direct println
+Exception
+Expected: Exception
+
+Test 2: String concatenation
+Caught: Exception
+Expected: Caught: Exception
+
+Test 3: Multiple concatenations
+Error [Exception] occurred
+Expected: Error [Exception] occurred
+=== All Tests Complete ===
