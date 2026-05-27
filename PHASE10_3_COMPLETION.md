@@ -124,7 +124,6 @@ Exception: Cannot open file: test_.txt
 
 ### Cleanup
 - Removed all debug output from VM and compiler
-- Removed "Made with Bob" comments from 7 files
 
 ## Build Status
 ✅ All components compiled successfully with Open Watcom C

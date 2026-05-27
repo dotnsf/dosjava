@@ -82,5 +82,3 @@ class ExceptionPrintTest {
         }
     }
 }
-
-// Made with Bob

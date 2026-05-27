@@ -7,5 +7,3 @@ class ExceptionTest2 {
         }
     }
 }
-
-// Made with Bob

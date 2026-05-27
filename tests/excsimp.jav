@@ -7,5 +7,3 @@ class ExcSimple {
         }
     }
 }
-
-// Made with Bob

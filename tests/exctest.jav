@@ -7,5 +7,3 @@ class ExcTest {
         }
     }
 }
-
-// Made with Bob

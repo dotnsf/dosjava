@@ -89,6 +89,10 @@ swnest.jav worked correctly.
 varinit.jav worked correctly.
 [PASS] varinit.jav
 
+[TEST] except.jav
+except.jav worked correctly.
+[PASS] except.jav
+
 
 ============================
 All tests completed
