@@ -1032,6 +1032,8 @@ void semantic_print_errors(SemanticAnalyzer* analyzer) {
 
 /* Perform semantic analysis */
 int semantic_analyze(SemanticAnalyzer* analyzer) {
+    uint16_t i;
+    
     if (!analyzer) {
         return -1;
     }
@@ -1725,7 +1727,6 @@ int check_var_decl(SemanticAnalyzer* analyzer, ASTNode* var_node) {
     }
     var_sym.type = var_type;  /* Use saved copy */
     var_sym.data.local_data.index = analyzer->next_local_index;
-    
     
     /* Long and float type variables occupy 2 slots */
     if (var_type.kind == TYPE_LONG || var_type.kind == TYPE_FLOAT) {

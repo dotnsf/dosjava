@@ -1138,16 +1138,25 @@ int interpreter_step(ExecutionContext* ctx) {
                          * (J)V - long parameter
                          */
                         if (descriptor && strcmp(descriptor, "(J)V") == 0) {
-                            /* Long parameter - pop 2 words [low, high] */
+                            /* Long parameter - pop 2 words [low, high] from stack */
                             uint16_t low, high;
                             uint32_t long_value;
+                            int32_t signed_value;
                             
+                            /* Stack order: [... high low] - pop in reverse order */
                             low = stack_pop_shared(ctx);
                             high = stack_pop_shared(ctx);
-                            long_value = ((uint32_t)high << 16) | low;
+                            /* Combine with explicit cast to prevent sign extension */
+                            long_value = ((uint32_t)high << 16) | (uint32_t)low;
+                            /* Convert to signed for proper display */
+                            signed_value = (int32_t)long_value;
+                            
+                            /* DEBUG: Print values */
+                            printf("DEBUG println(long): high=0x%04X low=0x%04X value=%lu (%ld)\n",
+                                   high, low, (unsigned long)long_value, (long)signed_value);
                             
                             if (is_println) {
-                                printf("%ld\n", (long)long_value);
+                                printf("%ld\n", (long)signed_value);
                             } else {
                                 printf("%ld", (long)long_value);
                             }
@@ -3199,7 +3208,7 @@ int interpreter_step(ExecutionContext* ctx) {
             
             high = interpreter_read_u16(ctx);
             low = interpreter_read_u16(ctx);
-            value = ((uint32_t)high << 16) | low;
+            value = ((uint32_t)high << 16) | (uint32_t)low;
             
             if (stack_push_long(ctx, value) != 0) {
                 printf("ERROR: Stack overflow\n");

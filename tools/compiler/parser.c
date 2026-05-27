@@ -858,6 +858,7 @@ uint16_t parse_var_decl(Parser* parser) {
     TypeInfo type;
     uint16_t name_offset;
     uint16_t init_expr;
+    const char* var_name;
     
     /* Parse type */
     if (parse_type(parser, &type) < 0) {
@@ -871,6 +872,7 @@ uint16_t parse_var_decl(Parser* parser) {
     }
     
     name_offset = parser->current.value.str_offset;
+    var_name = parser_get_string(parser, name_offset);
     parser_next_token(parser);
     
     /* Allocate var_decl node */

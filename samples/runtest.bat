@@ -156,6 +156,10 @@ goto run_test
 set TESTFILE=swnest.jav
 set BASENAME=swnest
 goto run_test
+:next31
+set TESTFILE=varinit.jav
+set BASENAME=varinit
+goto run_test
 
 :all_done
 echo.
@@ -212,6 +216,7 @@ if "%1"=="swint.jav" set BASENAME=swint
 if "%1"=="swlong.jav" set BASENAME=swlong
 if "%1"=="swstring.jav" set BASENAME=swstring
 if "%1"=="swnest.jav" set BASENAME=swnest
+if "%1"=="varinit.jav" set BASENAME=varinit
 goto run_test
 
 :run_test
@@ -319,7 +324,8 @@ if "%TESTFILE%"=="throw.jav" goto next28
 if "%TESTFILE%"=="swint.jav" goto next29
 if "%TESTFILE%"=="swlong.jav" goto next30
 if "%TESTFILE%"=="swstring.jav" goto next31
-if "%TESTFILE%"=="swnest.jav" goto all_done
+if "%TESTFILE%"=="swnest.jav" goto next31
+if "%TESTFILE%"=="varinit.jav" goto all_done
 goto all_done
 
 :end

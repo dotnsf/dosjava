@@ -73,6 +73,8 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 - `int` パラメータ付き static メソッド
 - `int` / `void` 戻り値
 - ローカル変数
+  - 宣言時の初期化サポート（Phase 10.1で追加）
+  - 例: `int a = 42;`, `String s = "Hello";`, `float f = 3.14f;`
 - static メソッド呼び出し
 
 ### 現在利用できる配列機能
@@ -621,9 +623,16 @@ Error: Type mismatch
   - null比較演算（`==`, `!=`）
 - 詳細: [PHASE9_COMPLETION.md](PHASE9_COMPLETION.md)
 
+### Phase 10: Language Feature Enhancements ✅ 完了
+- **Phase 10.1**: 変数宣言時の初期化サポート
+  - リテラルによる初期化（`int a = 42;`）
+  - 式による初期化（`int sum = a + b;`）
+  - すべてのプリミティブ型とString型に対応
+  - 詳細: [PHASE10_1_COMPLETION.md](PHASE10_1_COMPLETION.md)
+
 ### 今後の予定
 - [ ] Phase 4 Network機能完成
-- [ ] Phase 10: より多くのランタイムライブラリ
+- [ ] Phase 10.2: Exception変数の出力サポート
 - [ ] 最適化
 - [ ] デバッガ
 

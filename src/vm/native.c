@@ -131,6 +131,7 @@ static int native_system_println_int(ExecutionContext* ctx, uint16_t* args, uint
 static int native_system_println_long(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
     uint32_t long_value;
     uint16_t high, low;
+    int32_t signed_value;
     
     (void)ctx;
     (void)result;
@@ -139,8 +140,11 @@ static int native_system_println_long(ExecutionContext* ctx, uint16_t* args, uin
     if (arg_count >= 2) {
         high = args[0];
         low = args[1];
-        long_value = ((uint32_t)high << 16) | low;
-        printf("%ld\n", (long)long_value);
+        long_value = ((uint32_t)high << 16) | (uint32_t)low;
+        /* Convert to signed 32-bit for proper display */
+        signed_value = (int32_t)long_value;
+        
+        printf("%ld\n", (long)signed_value);
     } else {
         printf("ERROR: println(long) requires 2 arguments\n");
     }

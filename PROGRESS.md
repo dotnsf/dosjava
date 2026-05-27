@@ -1,12 +1,12 @@
 # DOS Java Implementation Progress Report
 
-**Last Updated:** 2026-05-25
+**Last Updated:** 2026-05-27
 
 ## Overview
 
 This document tracks the implementation progress of the DOS Java project - a lightweight Java runtime for 16-bit PC-DOS systems.
 
-## Current Status: Phase 8 Complete ✓
+## Current Status: Phase 10.1 Complete ✓
 
 ### Phase 2 Completed Components ✓
 
@@ -295,18 +295,42 @@ This document tracks the implementation progress of the DOS Java project - a lig
 - Natural Java syntax support
 - Documentation: [PHASE8_COMPLETION.md](PHASE8_COMPLETION.md)
 
+### Phase 9: Type System Enhancements ✅
+- **Phase 9.1**: Type casting support
+  - `(type)expression` syntax implementation
+  - int ↔ long ↔ float conversions
+  - Math function return value casting
+- **Phase 9.2**: Math integer argument support
+  - All Math functions accept int/long arguments
+  - Automatic float conversion
+- **Phase 9.3**: null literal support
+  - `null` keyword implementation
+  - Reference type (String, arrays) assignment
+  - null comparison operations (`==`, `!=`)
+- Documentation: [PHASE9_COMPLETION.md](PHASE9_COMPLETION.md)
+
+### Phase 10: Language Feature Enhancements ✅
+- **Phase 10.1**: Variable declaration with initialization
+  - Literal initialization (`int a = 42;`)
+  - Expression initialization (`int sum = a + b;`)
+  - All primitive types and String support
+  - Critical bug fix: Variable lookup now searches in reverse order for correct scoping
+- Documentation: [PHASE10_1_COMPLETION.md](PHASE10_1_COMPLETION.md)
+
 ## Conclusion
 
-**Phase 8 is complete!** DOSJava now supports:
+**Phase 10.1 is complete!** DOSJava now supports:
 - Comprehensive control flow (if/else, while, for, switch with fall-through)
-- Boolean literals (`true`/`false`)
+- Boolean literals (`true`/`false`) and null literal
 - Multiple data types (int, long, float, boolean, String)
+- Type casting (int ↔ long ↔ float)
+- Variable initialization at declaration
 - Arrays (int[], long[], float[], boolean[])
-- Math library with trigonometric and logarithmic functions
+- Math library with trigonometric and logarithmic functions (accepts int/long arguments)
 - Date/Time support
 - File I/O operations
 
-**Next focus:** Additional runtime libraries and optimization.
+**Next focus:** Phase 10.2 - Exception variable output support.
 
 ---
 

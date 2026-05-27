@@ -85,6 +85,10 @@ swlong.jav worked correctly.
 swnest.jav worked correctly.
 [PASS] swnest.jav
 
+[TEST] varinit.jav
+varinit.jav worked correctly.
+[PASS] varinit.jav
+
 
 ============================
 All tests completed

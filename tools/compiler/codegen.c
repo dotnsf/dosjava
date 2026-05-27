@@ -3505,9 +3505,51 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             /* System.out.println(float) */
             strcpy(descriptor, "(F)V");
             invoke_arg_count = 2;  /* Float takes 2 words on stack */
+        } else if (arg_node_type == NODE_LITERAL_LONG) {
+            /* System.out.println(long literal) */
+            strcpy(descriptor, "(J)V");
+            invoke_arg_count = 2;  /* Long takes 2 words on stack */
+        } else if (arg_node_type == NODE_IDENTIFIER) {
+            /* Check variable type for println */
+            ASTNode* first_arg_node = codegen_get_node(codegen, saved_first_arg);
+            if (first_arg_node) {
+                const char* var_name = codegen_get_string(codegen, first_arg_node->data.identifier.name);
+                TypeKind var_type = TYPE_INT;  /* Default to int */
+                
+                if (var_name && codegen->symtable) {
+                    /* Search in reverse order to find the most recent (innermost scope) symbol */
+                    for (i = codegen->symtable->symbol_count; i > 0; i--) {
+                        Symbol* sym = &codegen->symtable->symbols[i - 1];
+                        const char* sym_name;
+                        
+                        if (sym->kind != SYM_LOCAL && sym->kind != SYM_PARAM && sym->kind != SYM_FIELD) {
+                            continue;
+                        }
+                        
+                        sym_name = symtable_get_string(codegen->symtable, sym->name_offset);
+                        if (sym_name && strcmp(sym_name, var_name) == 0) {
+                            var_type = sym->type.kind;
+                            break;
+                        }
+                    }
+                }
+                
+                if (var_type == TYPE_LONG) {
+                    strcpy(descriptor, "(J)V");
+                    invoke_arg_count = 2;  /* Long takes 2 words on stack */
+                } else if (var_type == TYPE_FLOAT) {
+                    strcpy(descriptor, "(F)V");
+                    invoke_arg_count = 2;  /* Float takes 2 words on stack */
+                } else {
+                    strcpy(descriptor, "(I)V");
+                }
+            } else {
+                strcpy(descriptor, "(I)V");
+            }
         } else {
             strcpy(descriptor, "(I)V");
         }
+        
         
         desc_idx = find_or_add_utf8(codegen, descriptor);
         if (desc_idx != 0xFFFF) {
