@@ -11,6 +11,14 @@
  * Uses shared stack design to minimize memory usage in DOS environment
  */
 
+/* Exception type constants */
+#define EXCEPTION_TYPE_GENERIC                    0
+#define EXCEPTION_TYPE_NULL_POINTER               1
+#define EXCEPTION_TYPE_ARRAY_INDEX_OUT_OF_BOUNDS  2
+#define EXCEPTION_TYPE_NUMBER_FORMAT              3
+#define EXCEPTION_TYPE_ILLEGAL_ARGUMENT           4
+#define EXCEPTION_TYPE_STRING_INDEX_OUT_OF_BOUNDS 5
+
 /* Maximum call depth (nested method calls) */
 #define MAX_CALL_DEPTH 4
 
@@ -64,6 +72,7 @@ typedef struct {
     /* Exception handling (simple implementation) */
     uint8_t* catch_pc;          /* PC of catch block (0 if none) */
     uint8_t in_try_block;       /* 1 if currently in try block */
+    uint8_t exception_type;     /* Exception type (EXCEPTION_TYPE_*) */
     char exception_message[64]; /* Error message for runtime exceptions */
 } ExecutionContext;
 
@@ -154,6 +163,18 @@ float stack_pop_float_shared(ExecutionContext* ctx);
  * @return Float value at offset, or 0.0f if out of bounds
  */
 float stack_peek_float_shared(ExecutionContext* ctx, uint16_t offset);
+
+/**
+ * Throw a runtime exception
+ * If in try block, jump to catch block
+ * Otherwise, print error and terminate
+ *
+ * @param ctx Execution context
+ * @param exception_type Exception type (EXCEPTION_TYPE_*)
+ * @param message Error message
+ * @return 0 if exception handled (jumped to catch), -1 if should terminate
+ */
+int throw_runtime_exception(ExecutionContext* ctx, uint8_t exception_type, const char* message);
 
 #endif /* INTERPRETER_H */
 

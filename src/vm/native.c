@@ -1,4 +1,5 @@
 #include "native.h"
+#include "interpreter.h"
 #include "../runtime/system.h"
 #include "../runtime/string.h"
 #include "../format/djc.h"
@@ -740,6 +741,86 @@ static int native_math_log(ExecutionContext* ctx, uint16_t* args, uint8_t arg_co
 }
 
 /**
+ * Integer.parseInt(String) - Parse string to integer
+ * Throws NumberFormatException if string is not a valid integer
+ */
+static int native_integer_parseInt(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t string_index;
+    const char* str;
+    int value;
+    int sign;
+    int i;
+    char c;
+    int has_digits;
+    char msg[64];
+    
+    (void)arg_count;
+    
+    string_index = args[0];
+    str = NULL;
+    
+    /* Get string from constant pool */
+    if (string_index < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[string_index].tag == CONST_UTF8) {
+            str = ctx->djc_file->constants[string_index].data.utf8_data;
+        }
+    }
+    
+    if (str == NULL || str[0] == '\0') {
+        sprintf(msg, "Cannot parse empty string as integer");
+        if (throw_runtime_exception(ctx, EXCEPTION_TYPE_NUMBER_FORMAT, msg) != 0) {
+            return -1;
+        }
+        *result = 0;
+        return 0;
+    }
+    
+    /* Parse integer */
+    value = 0;
+    sign = 1;
+    i = 0;
+    has_digits = 0;
+    
+    /* Check for sign */
+    if (str[i] == '-') {
+        sign = -1;
+        i++;
+    } else if (str[i] == '+') {
+        i++;
+    }
+    
+    /* Parse digits */
+    while (str[i] != '\0') {
+        c = str[i];
+        if (c >= '0' && c <= '9') {
+            value = value * 10 + (c - '0');
+            has_digits = 1;
+        } else {
+            /* Invalid character */
+            sprintf(msg, "Cannot parse '%s' as integer", str);
+            if (throw_runtime_exception(ctx, EXCEPTION_TYPE_NUMBER_FORMAT, msg) != 0) {
+                return -1;
+            }
+            *result = 0;
+            return 0;
+        }
+        i++;
+    }
+    
+    if (!has_digits) {
+        sprintf(msg, "Cannot parse '%s' as integer", str);
+        if (throw_runtime_exception(ctx, EXCEPTION_TYPE_NUMBER_FORMAT, msg) != 0) {
+            return -1;
+        }
+        *result = 0;
+        return 0;
+    }
+    
+    *result = (uint16_t)(sign * value);
+    return 0;
+}
+
+/**
  * Register all built-in native methods
  */
 int native_register_builtins(void) {
@@ -1041,6 +1122,19 @@ int native_register_builtins(void) {
         2,  /* Float takes 2 words */
         NULL,
         NATIVE_RETURN_FLOAT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Integer.parseInt(String) */
+    if (native_register(
+        NULL,  /* No class name - match by method name and descriptor only */
+        "parseInt",
+        "(Ljava/lang/String;)I",
+        native_integer_parseInt,
+        1,
+        param_string,
+        NATIVE_RETURN_INT
     ) != 0) {
         return -1;
     }

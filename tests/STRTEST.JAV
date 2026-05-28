@@ -7,4 +7,3 @@ class StringTest {
     }
 }
 
-// Made with Bob

@@ -371,13 +371,16 @@ static inline void store_local_long(ExecutionContext* ctx, uint8_t index, uint32
  * Throw a runtime exception
  * If in try block, jump to catch block
  * Otherwise, print error and terminate
- * 
+ *
  * @param ctx Execution context
+ * @param exception_type Exception type (EXCEPTION_TYPE_*)
  * @param message Error message
  * @return 0 if exception handled (jumped to catch), -1 if should terminate
  */
-static int throw_runtime_exception(ExecutionContext* ctx, const char* message) {
-    /* Save error message to context */
+int throw_runtime_exception(ExecutionContext* ctx, uint8_t exception_type, const char* message) {
+    /* Save exception type and message to context */
+    ctx->exception_type = exception_type;
+    
     if (message != NULL) {
         strncpy(ctx->exception_message, message, sizeof(ctx->exception_message) - 1);
         ctx->exception_message[sizeof(ctx->exception_message) - 1] = '\0';
@@ -433,6 +436,7 @@ int interpreter_init_context(ExecutionContext* ctx, DJCFile* djc_file, DJCMethod
     /* Initialize exception handling state */
     ctx->catch_pc = NULL;
     ctx->in_try_block = 0;
+    ctx->exception_type = EXCEPTION_TYPE_GENERIC;
     
     /* Initialize shared stack */
     ctx->stack_pointer = 0;
@@ -703,7 +707,7 @@ int interpreter_step(ExecutionContext* ctx) {
             value1 = stack_pop_shared(ctx);
             if (value2 == 0) {
                 /* Try to throw exception */
-                if (throw_runtime_exception(ctx, "Division by zero") != 0) {
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_GENERIC, "Division by zero") != 0) {
                     return -1;  /* Not in try block - terminate */
                 }
                 break;  /* Exception handled - jumped to catch block */
@@ -721,7 +725,7 @@ int interpreter_step(ExecutionContext* ctx) {
             value1 = stack_pop_shared(ctx);
             if (value2 == 0) {
                 /* Try to throw exception */
-                if (throw_runtime_exception(ctx, "Modulo by zero") != 0) {
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_GENERIC, "Modulo by zero") != 0) {
                     return -1;  /* Not in try block - terminate */
                 }
                 break;  /* Exception handled - jumped to catch block */
@@ -947,8 +951,11 @@ int interpreter_step(ExecutionContext* ctx) {
             array_handle = stack_pop_shared(ctx);
             array_data = (uint16_t*)memory_get_array_ptr(array_handle);
             if (array_data == NULL) {
-                printf("ERROR: Null array reference (ARRAY_LENGTH)\n");
-                return -1;
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                           "Cannot get length of null array") != 0) {
+                    return -1;
+                }
+                break;
             }
             
             if (stack_push_shared(ctx, array_data[0]) != 0) {
@@ -967,12 +974,19 @@ int interpreter_step(ExecutionContext* ctx) {
             array_handle = stack_pop_shared(ctx);
             array_data = (uint16_t*)memory_get_array_ptr(array_handle);
             if (array_data == NULL) {
-                printf("ERROR: Null array reference (ARRAY_LOAD idx=%u)\n", index);
-                return -1;
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                           "Cannot read from null array") != 0) {
+                    return -1;
+                }
+                break;
             }
             if (index >= array_data[0]) {
-                printf("ERROR: Array index out of bounds\n");
-                return -1;
+                char msg[64];
+                sprintf(msg, "Array index out of bounds: %u", index);
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_ARRAY_INDEX_OUT_OF_BOUNDS, msg) != 0) {
+                    return -1;
+                }
+                break;
             }
             
             if (stack_push_shared(ctx, array_data[index + 1]) != 0) {
@@ -993,13 +1007,19 @@ int interpreter_step(ExecutionContext* ctx) {
             array_handle = stack_pop_shared(ctx);
             array_data = (uint16_t*)memory_get_array_ptr(array_handle);
             if (array_data == NULL) {
-                printf("ERROR: Null array reference (ARRAY_STORE idx=%u val=%u)\n", index, value);
-                return -1;
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                           "Cannot write to null array") != 0) {
+                    return -1;
+                }
+                break;
             }
             if (index >= array_data[0]) {
-                printf("ERROR: Array index out of bounds (idx=%u len=%u val=%u)\n",
-                    index, array_data[0], value);
-                return -1;
+                char msg[64];
+                sprintf(msg, "Array index out of bounds: %u", index);
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_ARRAY_INDEX_OUT_OF_BOUNDS, msg) != 0) {
+                    return -1;
+                }
+                break;
             }
             
             array_data[index + 1] = value;
@@ -1874,7 +1894,7 @@ int interpreter_step(ExecutionContext* ctx) {
                         /* Try to throw exception */
                         char error_msg[128];
                         sprintf(error_msg, "Cannot open file: %s", filename);
-                        if (throw_runtime_exception(ctx, error_msg) != 0) {
+                        if (throw_runtime_exception(ctx, EXCEPTION_TYPE_GENERIC, error_msg) != 0) {
                             return -1;  /* Not in try block - terminate */
                         }
                         break;  /* Exception handled - jumped to catch block */
@@ -3187,6 +3207,9 @@ int interpreter_step(ExecutionContext* ctx) {
                 ctx->stack_pointer--;
             }
             
+            /* Set exception type to GENERIC for user-thrown exceptions */
+            ctx->exception_type = EXCEPTION_TYPE_GENERIC;
+            
             /* If we have a catch block, jump to it */
             if (ctx->catch_pc != NULL) {
                 ctx->pc = ctx->catch_pc;
@@ -3377,7 +3400,7 @@ int interpreter_step(ExecutionContext* ctx) {
             
             /* Check for division by zero */
             if (value2 == 0) {
-                if (throw_runtime_exception(ctx, "Division by zero") != 0) {
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_GENERIC, "Division by zero") != 0) {
                     return -1;
                 }
                 break;
@@ -3408,7 +3431,7 @@ int interpreter_step(ExecutionContext* ctx) {
             
             /* Check for division by zero */
             if (value2 == 0) {
-                if (throw_runtime_exception(ctx, "Division by zero") != 0) {
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_GENERIC, "Division by zero") != 0) {
                     return -1;
                 }
                 break;
@@ -3544,15 +3567,21 @@ int interpreter_step(ExecutionContext* ctx) {
             array_data = (uint16_t*)memory_get_array_ptr(array_handle);
             
             if (array_data == NULL) {
-                printf("ERROR: Null array reference (LARRAY_LOAD)\n");
-                return -1;
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                           "Cannot read from null long array") != 0) {
+                    return -1;
+                }
+                break;
             }
             
             length = array_data[0];
             if (index >= length) {
-                printf("ERROR: Array index out of bounds (index=%u, length=%u)\n",
-                       index, length);
-                return -1;
+                char msg[64];
+                sprintf(msg, "Array index out of bounds: %u", index);
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_ARRAY_INDEX_OUT_OF_BOUNDS, msg) != 0) {
+                    return -1;
+                }
+                break;
             }
             
             /* Calculate offset: 1 (length) + index * 2 (each long = 2 words) */
@@ -3590,15 +3619,21 @@ int interpreter_step(ExecutionContext* ctx) {
             array_data = (uint16_t*)memory_get_array_ptr(array_handle);
             
             if (array_data == NULL) {
-                printf("ERROR: Null array reference (LARRAY_STORE)\n");
-                return -1;
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                           "Cannot write to null long array") != 0) {
+                    return -1;
+                }
+                break;
             }
             
             length = array_data[0];
             if (index >= length) {
-                printf("ERROR: Array index out of bounds (index=%u, length=%u)\n",
-                       index, length);
-                return -1;
+                char msg[64];
+                sprintf(msg, "Array index out of bounds: %u", index);
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_ARRAY_INDEX_OUT_OF_BOUNDS, msg) != 0) {
+                    return -1;
+                }
+                break;
             }
             
             /* Calculate offset: 1 (length) + index * 2 (each long = 2 words) */
@@ -4064,15 +4099,21 @@ int interpreter_step(ExecutionContext* ctx) {
             array_data = (uint16_t*)memory_get_array_ptr(array_handle);
             
             if (array_data == NULL) {
-                printf("ERROR: Null array reference (FARRAY_LOAD)\n");
-                return -1;
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                           "Cannot read from null float array") != 0) {
+                    return -1;
+                }
+                break;
             }
             
             length = array_data[0];
             if (index >= length) {
-                printf("ERROR: Float array index out of bounds (index=%u, length=%u)\n",
-                       index, length);
-                return -1;
+                char msg[64];
+                sprintf(msg, "Array index out of bounds: %u", index);
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_ARRAY_INDEX_OUT_OF_BOUNDS, msg) != 0) {
+                    return -1;
+                }
+                break;
             }
             
             /* Calculate offset: 1 (length) + index * 2 (each float = 2 words) */
@@ -4110,15 +4151,21 @@ int interpreter_step(ExecutionContext* ctx) {
             array_data = (uint16_t*)memory_get_array_ptr(array_handle);
             
             if (array_data == NULL) {
-                printf("ERROR: Null array reference (FARRAY_STORE)\n");
-                return -1;
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                           "Cannot write to null float array") != 0) {
+                    return -1;
+                }
+                break;
             }
             
             length = array_data[0];
             if (index >= length) {
-                printf("ERROR: Float array index out of bounds (index=%u, length=%u)\n",
-                       index, length);
-                return -1;
+                char msg[64];
+                sprintf(msg, "Array index out of bounds: %u", index);
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_ARRAY_INDEX_OUT_OF_BOUNDS, msg) != 0) {
+                    return -1;
+                }
+                break;
             }
             
             /* Calculate offset: 1 (length) + index * 2 (each float = 2 words) */

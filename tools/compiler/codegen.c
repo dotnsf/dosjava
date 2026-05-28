@@ -3214,11 +3214,11 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     } else if (strcmp(method_name, "concat") == 0 && object_idx == 0) {
         is_native = 1;
     } else if (object_idx != 0) {
-        /* Check if this is Math.method() call */
+        /* Check if this is Math.method() or Integer.method() call */
         ASTNode* obj_node = codegen_get_node(codegen, object_idx);
         if (obj_node && obj_node->type == NODE_IDENTIFIER) {
             const char* obj_name = codegen_get_string(codegen, obj_node->data.identifier.name);
-            if (obj_name && strcmp(obj_name, "Math") == 0) {
+            if (obj_name && (strcmp(obj_name, "Math") == 0 || strcmp(obj_name, "Integer") == 0)) {
                 is_native = 1;
             }
         }
@@ -3673,6 +3673,9 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         } else if (strcmp(method_name, "printLong") == 0) {
             /* System.printLong(long) */
             strcpy(descriptor, "(J)V");
+        } else if (strcmp(method_name, "parseInt") == 0) {
+            /* Integer.parseInt(String) returns int */
+            strcpy(descriptor, "(Ljava/lang/String;)I");
         } else if (strcmp(method_name, "abs") == 0 ||
                    strcmp(method_name, "sqrt") == 0 ||
                    strcmp(method_name, "sin") == 0 ||
@@ -3752,7 +3755,7 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     returns_value = 0;
     if (is_string_length || is_string_caseconv || is_string_compare || is_string_indexof ||
         is_string_lastindexof || is_string_substr || strcmp(method_name, "concat") == 0 ||
-        strcmp(method_name, "readLine") == 0) {
+        strcmp(method_name, "readLine") == 0 || strcmp(method_name, "parseInt") == 0) {
         returns_value = 1;
     } else if (strcmp(method_name, "abs") == 0 ||
                strcmp(method_name, "min") == 0 ||
@@ -3829,12 +3832,13 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
         return -1;
     }
     
-    /* Check if this is a builtin class name (Socket, File, System, Math) */
+    /* Check if this is a builtin class name (Socket, File, System, Math, Integer) */
     /* These are used for static method calls and should not be treated as variables */
     if (strcmp(var_name, "Socket") == 0 ||
         strcmp(var_name, "File") == 0 ||
         strcmp(var_name, "System") == 0 ||
-        strcmp(var_name, "Math") == 0) {
+        strcmp(var_name, "Math") == 0 ||
+        strcmp(var_name, "Integer") == 0) {
         /* For builtin classes, we don't push anything on the stack */
         /* The method call handler will deal with it */
         return 0;

@@ -86,6 +86,7 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
     const char* builtin_classes[] = {
         "System",
         "Math",
+        "Integer",
         "BufferedWriter",
         "BufferedReader",
         "FileOutputStream",
@@ -801,6 +802,55 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
                 param_sym.kind = SYM_PARAM;
                 param_sym.name_offset = param_offset;
                 param_sym.type.kind = TYPE_LONG;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+        }
+        
+        /* Add Integer class methods */
+        if (strcmp(builtin_classes[i], "Integer") == 0) {
+            /* Add parseInt(String) static method - returns int */
+            method_offset = semantic_add_string(analyzer, "parseInt");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_INT;
+            method_sym.data.method_data.param_count = 1;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameter for parseInt(String str) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset, string_class_offset;
+                
+                param_offset = semantic_add_string(analyzer, "str");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                string_class_offset = semantic_add_string(analyzer, "String");
+                if (string_class_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
                 param_sym.data.param_data.index = 0;
                 
                 if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
@@ -2823,6 +2873,39 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         }
     }
     
+    /* Special-case Integer static methods */
+    if (object_idx != 0 && method_name) {
+        ASTNode* object_node = semantic_get_node(analyzer, object_idx);
+        if (object_node && object_node->type == NODE_IDENTIFIER) {
+            const char* class_name = semantic_get_string(analyzer, object_node->data.identifier.name);
+            
+            if (class_name && strcmp(class_name, "Integer") == 0) {
+                /* Integer.parseInt(String) */
+                if (strcmp(method_name, "parseInt") == 0) {
+                    if (arg_count != 1) {
+                        semantic_error_node(analyzer, call_node, "Integer.parseInt takes exactly 1 argument");
+                        return -1;
+                    }
+                    /* Check argument type - must be String */
+                    if (first_arg_idx != 0) {
+                        TypeInfo arg_type;
+                        arg_node = semantic_get_node(analyzer, first_arg_idx);
+                        if (!arg_node || check_expression(analyzer, arg_node, &arg_type) != 0) {
+                            return -1;
+                        }
+                        if (!is_string_type(analyzer, arg_type)) {
+                            semantic_error_node(analyzer, call_node, "Integer.parseInt requires String argument");
+                            return -1;
+                        }
+                    }
+                    result_type->kind = TYPE_INT;
+                    result_type->class_name = 0;
+                    return 0;
+                }
+            }
+        }
+    }
+
     /* Special-case Phase 1 String native instance methods */
     if (object_idx != 0 && method_name &&
         (strcmp(method_name, "length") == 0 ||
