@@ -908,8 +908,12 @@ int interpreter_step(ExecutionContext* ctx) {
             (void)elem_type;
             
             if ((int16_t)size < 0) {
-                printf("ERROR: Negative array size\n");
-                return -1;
+                char error_msg[64];
+                sprintf(error_msg, "Negative array size: %d", (int16_t)size);
+                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_ILLEGAL_ARGUMENT, error_msg) != 0) {
+                    return -1;  /* Not in try block - terminate */
+                }
+                break;  /* Exception handled - jumped to catch block */
             }
             
             if (size > 0x7FFF / sizeof(uint16_t) - 1) {
@@ -1779,18 +1783,43 @@ int interpreter_step(ExecutionContext* ctx) {
                         
                         str_len = (uint16_t)strlen(src_str);
                         
-                        /* Validate and adjust from_index */
-                        if (from_index > str_len) {
-                            from_index = str_len;
+                        /* Validate from_index */
+                        if ((int16_t)from_index < 0) {
+                            char error_msg[64];
+                            sprintf(error_msg, "Invalid substring start index: %d", (int16_t)from_index);
+                            if (throw_runtime_exception(ctx, EXCEPTION_TYPE_ILLEGAL_ARGUMENT, error_msg) != 0) {
+                                return -1;  /* Not in try block - terminate */
+                            }
+                            break;  /* Exception handled - jumped to catch block */
                         }
                         
-                        /* Validate and adjust end_index */
+                        /* Validate from_index is within string bounds */
+                        if (from_index > str_len) {
+                            char error_msg[64];
+                            sprintf(error_msg, "String index out of bounds: %u", from_index);
+                            if (throw_runtime_exception(ctx, EXCEPTION_TYPE_STRING_INDEX_OUT_OF_BOUNDS, error_msg) != 0) {
+                                return -1;  /* Not in try block - terminate */
+                            }
+                            break;  /* Exception handled - jumped to catch block */
+                        }
+                        
+                        /* Validate and check end_index */
                         if (has_end_index) {
                             if (end_index > str_len) {
-                                end_index = str_len;
+                                char error_msg[64];
+                                sprintf(error_msg, "String index out of bounds: %u", end_index);
+                                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_STRING_INDEX_OUT_OF_BOUNDS, error_msg) != 0) {
+                                    return -1;  /* Not in try block - terminate */
+                                }
+                                break;  /* Exception handled - jumped to catch block */
                             }
                             if (end_index < from_index) {
-                                end_index = from_index;
+                                char error_msg[64];
+                                sprintf(error_msg, "Invalid substring range: start=%u, end=%u", from_index, end_index);
+                                if (throw_runtime_exception(ctx, EXCEPTION_TYPE_ILLEGAL_ARGUMENT, error_msg) != 0) {
+                                    return -1;  /* Not in try block - terminate */
+                                }
+                                break;  /* Exception handled - jumped to catch block */
                             }
                         } else {
                             end_index = str_len;
