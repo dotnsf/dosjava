@@ -93,6 +93,10 @@ varinit.jav worked correctly.
 except.jav worked correctly.
 [PASS] except.jav
 
+[TEST] excauto.jav
+excauto.jav worked correctly.
+[PASS] excauto.jav
+
 
 ============================
 All tests completed

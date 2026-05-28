@@ -87,6 +87,7 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
         "System",
         "Math",
         "Integer",
+        "Exception",
         "BufferedWriter",
         "BufferedReader",
         "FileOutputStream",
@@ -856,6 +857,48 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
                 if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
                     return -1;
                 }
+            }
+        }
+        
+        /* Add Exception class methods */
+        if (strcmp(builtin_classes[i], "Exception") == 0) {
+            /* Add getType() method - returns int */
+            method_offset = semantic_add_string(analyzer, "getType");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_INT;
+            method_sym.data.method_data.param_count = 0;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 0;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add getMessage() method - returns String */
+            method_offset = semantic_add_string(analyzer, "getMessage");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_CLASS;
+            method_sym.type.class_name = semantic_add_string(analyzer, "String");
+            method_sym.data.method_data.param_count = 0;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 0;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
             }
         }
     }

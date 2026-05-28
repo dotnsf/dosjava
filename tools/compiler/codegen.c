@@ -3213,6 +3213,9 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         is_native = 1;
     } else if (strcmp(method_name, "concat") == 0 && object_idx == 0) {
         is_native = 1;
+    } else if (strcmp(method_name, "getType") == 0 || strcmp(method_name, "getMessage") == 0) {
+        /* Exception.getType() and Exception.getMessage() are native */
+        is_native = 1;
     } else if (object_idx != 0) {
         /* Check if this is Math.method() or Integer.method() call */
         ASTNode* obj_node = codegen_get_node(codegen, object_idx);
@@ -3676,6 +3679,12 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         } else if (strcmp(method_name, "parseInt") == 0) {
             /* Integer.parseInt(String) returns int */
             strcpy(descriptor, "(Ljava/lang/String;)I");
+        } else if (strcmp(method_name, "getType") == 0) {
+            /* Exception.getType() returns int */
+            strcpy(descriptor, "()I");
+        } else if (strcmp(method_name, "getMessage") == 0) {
+            /* Exception.getMessage() returns String */
+            strcpy(descriptor, "()Ljava/lang/String;");
         } else if (strcmp(method_name, "abs") == 0 ||
                    strcmp(method_name, "sqrt") == 0 ||
                    strcmp(method_name, "sin") == 0 ||
@@ -3755,7 +3764,8 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
     returns_value = 0;
     if (is_string_length || is_string_caseconv || is_string_compare || is_string_indexof ||
         is_string_lastindexof || is_string_substr || strcmp(method_name, "concat") == 0 ||
-        strcmp(method_name, "readLine") == 0 || strcmp(method_name, "parseInt") == 0) {
+        strcmp(method_name, "readLine") == 0 || strcmp(method_name, "parseInt") == 0 ||
+        strcmp(method_name, "getType") == 0 || strcmp(method_name, "getMessage") == 0) {
         returns_value = 1;
     } else if (strcmp(method_name, "abs") == 0 ||
                strcmp(method_name, "min") == 0 ||

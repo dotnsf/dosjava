@@ -240,15 +240,78 @@ Date d = new Date(timestamp);
 - **タイムゾーン**: ローカル時刻のみ（タイムゾーン変換なし）
 - **精度**: 秒単位（ミリ秒精度なし）
 
+### Exceptionクラス（Phase 11で追加）
+ランタイム例外の検出と処理を行うためのクラス
+
+#### 自動検出される例外
+DOSJava VMは以下の5種類のランタイム例外を自動的に検出し、スローします：
+
+| 例外タイプ | タイプコード | 検出条件 |
+|-----------|-------------|---------|
+| NullPointerException | 1 | null配列/オブジェクトへのアクセス |
+| ArrayIndexOutOfBoundsException | 2 | 配列の範囲外アクセス |
+| NumberFormatException | 3 | Integer.parseInt()での不正な文字列 |
+| IllegalArgumentException | 4 | 負の配列サイズ、不正なsubstr範囲 |
+| StringIndexOutOfBoundsException | 5 | substr()の範囲外アクセス |
+
+#### メソッド
+- `int getType()` - 例外のタイプコード（0-5）を返す
+  - 0: 一般的な例外（throw文で明示的にスローされた場合）
+  - 1-5: 上記の自動検出例外
+- `String getMessage()` - 例外メッセージを返す
+
+#### 使用例
+```java
+class ExceptionDemo {
+    public static void main() {
+        try {
+            // 配列の範囲外アクセスを試みる
+            int[] arr = new int[5];
+            int x = arr[10];  // ArrayIndexOutOfBoundsException
+        } catch (Exception e) {
+            System.out.println("Exception caught!");
+            
+            // 例外タイプを取得
+            int type = e.getType();
+            System.out.println("Type: ");
+            System.out.println(type);  // 2
+            
+            // 例外メッセージを取得
+            String msg = e.getMessage();
+            System.out.println("Message: ");
+            System.out.println(msg);  // "Array index out of bounds"
+        }
+        
+        return;
+    }
+}
+```
+
+#### 例外処理の構文
+```java
+try {
+    // 例外が発生する可能性のあるコード
+    int result = Integer.parseInt("abc");  // NumberFormatException
+} catch (Exception e) {
+    // 例外処理
+    System.out.println("Error occurred");
+}
+```
+
+#### 重要な注意事項
+- すべての例外は `Exception` 型としてキャッチされます
+- 例外の種類は `getType()` メソッドで判別します
+- `throw` 文で明示的に例外をスローすることも可能です
+- ネストされた try-catch ブロックもサポートされています
+
 ### 制限事項
-- インスタンスメソッド不可（Dateクラスを除く）
+- インスタンスメソッド不可（Date、Exceptionクラスを除く）
 - メソッドオーバーロード不可
 - `String` パラメータ不可
 - `String` 戻り値不可
 - `String + int` 不可
-- 一般オブジェクト生成不可（Dateクラスを除く）
+- 一般オブジェクト生成不可（Date、Exceptionクラスを除く）
 - 継承・インターフェース不可
-- 例外処理不可（Phase 3.5.1でテストファイル作成済み、実装は将来）
 - パッケージ・import不可
 
 ## システム要件
@@ -553,10 +616,10 @@ Error: Type mismatch
 - BufferedReader/BufferedWriter
 - コンストラクタ引数サポート
 
-### Phase 3.5: Exception Handling and Date Support 🔄 進行中
-- **Phase 3.5.1**: Exception Handling ⏳ 準備完了
-  - try-catch-finally-throw テストファイル作成済み
-  - コンパイラ/VM実装待ち
+### Phase 3.5: Exception Handling and Date Support ✅ 完了
+- **Phase 3.5.1**: Exception Handling ✅ 完了
+  - try-catch-finally-throw 構文の実装
+  - 基本的な例外処理機能
 - **Phase 3.5.2**: Date Support ✅ 完了
   - DOS Time API実装（dostime.h/dostime.c）
   - Date クラス実装（date.h/date.c）
@@ -630,9 +693,31 @@ Error: Type mismatch
   - すべてのプリミティブ型とString型に対応
   - 詳細: [PHASE10_1_COMPLETION.md](PHASE10_1_COMPLETION.md)
 
+### Phase 11: Runtime Exception Detection and Auto-Throw ✅ 完了
+- **Phase 11.1**: Exception Type System Enhancement
+  - 5種類の例外タイプコード（0-5）の定義
+  - ExecutionContextへの例外情報フィールド追加
+- **Phase 11.2**: NullPointerException Detection
+  - null配列/オブジェクトアクセスの自動検出
+- **Phase 11.3**: ArrayIndexOutOfBoundsException Detection
+  - 配列範囲外アクセスの自動検出
+- **Phase 11.4**: NumberFormatException Detection
+  - Integer.parseInt()での不正文字列の検出
+- **Phase 11.5**: IllegalArgumentException Detection
+  - 負の配列サイズ、不正なsubstr範囲の検出
+- **Phase 11.6**: StringIndexOutOfBoundsException Detection
+  - substr()範囲外アクセスの検出
+- **Phase 11.7**: Exception Message Retrieval
+  - Exception.getType()メソッドの実装
+  - Exception.getMessage()メソッドの実装
+- **Phase 11.8**: Comprehensive Testing
+  - 10個の包括的テストケース（tests/excall.jav）
+  - サンプルプログラム（samples/excauto.jav）
+- **Phase 11.9**: Documentation
+  - 詳細: [PHASE11_COMPLETION.md](PHASE11_COMPLETION.md)
+
 ### 今後の予定
 - [ ] Phase 4 Network機能完成
-- [ ] Phase 10.2: Exception変数の出力サポート
 - [ ] 最適化
 - [ ] デバッガ
 

@@ -821,6 +821,44 @@ static int native_integer_parseInt(ExecutionContext* ctx, uint16_t* args, uint8_
 }
 
 /**
+ * Exception.getType() - Get exception type code
+ * Returns integer type code (EXCEPTION_TYPE_*)
+ */
+static int native_exception_getType(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    (void)args;
+    (void)arg_count;
+    
+    /* Return the exception type from context */
+    *result = (uint16_t)ctx->exception_type;
+    return 0;
+}
+
+/**
+ * Exception.getMessage() - Get exception message
+ * Returns string constant pool index
+ */
+static int native_exception_getMessage(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t i;
+    
+    (void)args;
+    (void)arg_count;
+    
+    /* Find or create string constant for exception message */
+    for (i = 0; i < ctx->djc_file->header.constant_pool_count; i++) {
+        if (ctx->djc_file->constants[i].tag == CONST_UTF8) {
+            if (strcmp(ctx->djc_file->constants[i].data.utf8_data, ctx->exception_message) == 0) {
+                *result = i;
+                return 0;
+            }
+        }
+    }
+    
+    /* If message not found in constant pool, return index 0 (empty string) */
+    *result = 0;
+    return 0;
+}
+
+/**
  * Register all built-in native methods
  */
 int native_register_builtins(void) {
@@ -1135,6 +1173,32 @@ int native_register_builtins(void) {
         1,
         param_string,
         NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Exception.getType() */
+    if (native_register(
+        "Exception",
+        "getType",
+        "()I",
+        native_exception_getType,
+        0,
+        NULL,
+        NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Exception.getMessage() */
+    if (native_register(
+        "Exception",
+        "getMessage",
+        "()Ljava/lang/String;",
+        native_exception_getMessage,
+        0,
+        NULL,
+        NATIVE_RETURN_STRING
     ) != 0) {
         return -1;
     }
