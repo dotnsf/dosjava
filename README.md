@@ -240,7 +240,7 @@ Date d = new Date(timestamp);
 - **タイムゾーン**: ローカル時刻のみ（タイムゾーン変換なし）
 - **精度**: 秒単位（ミリ秒精度なし）
 
-### Exceptionクラス（Phase 11で追加）
+### Exceptionクラス（Phase 11で追加、Phase 12で拡張）
 ランタイム例外の検出と処理を行うためのクラス
 
 #### 自動検出される例外
@@ -259,6 +259,9 @@ DOSJava VMは以下の5種類のランタイム例外を自動的に検出し、
   - 0: 一般的な例外（throw文で明示的にスローされた場合）
   - 1-5: 上記の自動検出例外
 - `String getMessage()` - 例外メッセージを返す
+  - **Phase 12で拡張**: メッセージに例外発生行番号が含まれるようになりました
+  - 形式: `"<例外タイプ> (line <行番号>)"`
+  - 例: `"NullPointerException (line 42)"`
 
 #### 使用例
 ```java
@@ -276,10 +279,10 @@ class ExceptionDemo {
             System.out.println("Type: ");
             System.out.println(type);  // 2
             
-            // 例外メッセージを取得
+            // 例外メッセージを取得（Phase 12: 行番号付き）
             String msg = e.getMessage();
             System.out.println("Message: ");
-            System.out.println(msg);  // "Array index out of bounds"
+            System.out.println(msg);  // "Array index out of bounds (line 7)"
         }
         
         return;
@@ -560,6 +563,8 @@ run_tests.bat
 - [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md) - 技術仕様
 - [PHASE3_5_SUMMARY.md](PHASE3_5_SUMMARY.md) - Phase 3.5実装サマリー（Date Support完了）
 - [PHASE5_PLAN.md](PHASE5_PLAN.md) - Phase 5実装計画
+- [PHASE11_COMPLETION.md](PHASE11_COMPLETION.md) - Phase 11実装完了報告（Runtime Exception Detection）
+- [PHASE12_COMPLETION.md](PHASE12_COMPLETION.md) - Phase 12実装完了報告（Exception Line Numbers）
 
 ## トラブルシューティング
 
@@ -715,6 +720,28 @@ Error: Type mismatch
   - サンプルプログラム（samples/excauto.jav）
 - **Phase 11.9**: Documentation
   - 詳細: [PHASE11_COMPLETION.md](PHASE11_COMPLETION.md)
+
+### Phase 12: Exception Line Number Information ✅ 完了
+- **Phase 12.1**: DJC Format Extension
+  - DJCファイルフォーマットをv0x0001からv0x0002に拡張
+  - 行番号テーブル（LineNumberEntry配列）の追加
+  - バイナリサーチによる高速な行番号ルックアップ
+- **Phase 12.2**: Compiler Line Number Tracking
+  - コンパイラでの行番号追跡機能の実装
+  - グローバルPC（Program Counter）計算の修正
+  - 各ステートメントの行番号とバイトコードオフセットの記録
+- **Phase 12.3**: VM Line Number Lookup
+  - VMでの例外PC保存機能の実装
+  - exception_pendingフラグによるPC保護
+  - 例外メッセージへの行番号追加
+- **Phase 12.4**: Testing and Validation
+  - 詳細テストプログラム（tests/excline.jav）
+  - サンプルプログラム（samples/exctest.jav）
+  - 全6種類の例外で行番号が正確に報告されることを確認
+- **Phase 12.5**: Documentation
+  - 例外メッセージ形式: `"<例外タイプ> (line <行番号>)"`
+  - 後方互換性: 旧フォーマット（v0x0001）のDJCファイルも実行可能
+  - 詳細: [PHASE12_COMPLETION.md](PHASE12_COMPLETION.md)
 
 ### 今後の予定
 - [ ] Phase 4 Network機能完成

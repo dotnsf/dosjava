@@ -36,6 +36,20 @@ typedef struct {
     uint16_t capacity;      /* Buffer capacity */
 } ByteBuffer;
 
+/* Line number entry for code generation */
+typedef struct {
+    uint16_t pc;            /* Program counter (bytecode offset) */
+    uint16_t line_no;       /* Source line number */
+} CodeGenLineEntry;
+
+/* Line number table builder */
+typedef struct {
+    CodeGenLineEntry* entries;  /* Line number entries (allocated separately) */
+    uint16_t count;             /* Number of entries */
+    uint16_t capacity;          /* Buffer capacity */
+    uint16_t current_line;      /* Current source line being processed */
+} LineNumberTable;
+
 /* Constant pool builder */
 typedef struct {
     DJCConstant constants[256];  /* Constant entries */
@@ -74,6 +88,7 @@ typedef struct {
     DJCField fields[64];        /* Field descriptors */
     uint16_t field_count;
     ByteBuffer* bytecode;       /* All bytecode */
+    LineNumberTable* line_numbers; /* Line number table */
     
     /* Current context */
     CodeGenContext* context;    /* Current method context */

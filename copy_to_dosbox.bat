@@ -12,6 +12,9 @@ REM Copy test files
 copy tests\ftst1.jav C:\dosbox\ftst1.jav
 copy tests\ftst2.jav C:\dosbox\ftst2.jav
 copy tests\ftest_simple.jav C:\dosbox\ftest_simple.jav
+copy tests\excline.jav C:\dosbox\excline.jav
+copy tests\rexcline.bat C:\dosbox\rexcline.bat
+copy tests\rexcdbg.bat C:\dosbox\rexcdbg.bat
 
 echo.
 echo Files copied successfully to C:\dosbox
@@ -19,8 +22,7 @@ echo.
 echo In DOSBox-X, run:
 echo   mount c c:\dosbox
 echo   c:
-echo   djc ftest_simple.jav
-echo   djc ftst1.jav
-echo   djvm ftst1.jav
+echo   rexcline.bat    (normal mode)
+echo   rexcdbg.bat     (debug mode)
 echo.
 pause

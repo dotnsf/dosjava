@@ -74,6 +74,8 @@ typedef struct {
     uint8_t in_try_block;       /* 1 if currently in try block */
     uint8_t exception_type;     /* Exception type (EXCEPTION_TYPE_*) */
     char exception_message[64]; /* Error message for runtime exceptions */
+    uint8_t* exception_pc;      /* PC where exception occurred (for line number lookup) */
+    uint8_t exception_pending;  /* 1 if exception was thrown and being handled */
 } ExecutionContext;
 
 /**

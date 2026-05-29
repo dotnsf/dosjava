@@ -47,6 +47,13 @@ static int read_header(FILE* fp, DJCHeader* header) {
         return -1;
     }
     
+    /* Read line_number_table_count for version 0x0002+ */
+    if (header->version >= DJC_VERSION_2) {
+        header->line_number_table_count = read_uint16(fp);
+    } else {
+        header->line_number_table_count = 0;
+    }
+    
     return 0;
 }
 
@@ -237,6 +244,41 @@ static int read_bytecode(FILE* fp, DJCFile* file) {
 }
 
 /**
+ * Read line number table from file (version 0x0002+)
+ */
+static int read_line_numbers(FILE* fp, DJCFile* file) {
+    uint16_t i;
+    LineNumberEntry* entry;
+    
+    if (file->header.line_number_table_count == 0) {
+        file->line_numbers = NULL;
+        return 0;
+    }
+    
+    /* Allocate line number table */
+    file->line_numbers = (LineNumberEntry*)memory_alloc(
+        sizeof(LineNumberEntry) * file->header.line_number_table_count);
+    if (file->line_numbers == NULL) {
+        return -1;
+    }
+    
+    /* Read each line number entry */
+    for (i = 0; i < file->header.line_number_table_count; i++) {
+        entry = &file->line_numbers[i];
+        
+        entry->pc = read_uint16(fp);
+        entry->line_no = read_uint16(fp);
+        
+        /* Check for read errors */
+        if (feof(fp) || ferror(fp)) {
+            return -1;
+        }
+    }
+    
+    return 0;
+}
+
+/**
  * Open and read a .djc file
  */
 DJCFile* djc_open(const char* filename) {
@@ -300,6 +342,17 @@ DJCFile* djc_open(const char* filename) {
         return NULL;
     }
     
+    /* Read line number table (version 0x0002+) */
+    if (file->header.version >= DJC_VERSION_2) {
+        if (read_line_numbers(fp, file) != 0) {
+            fclose(fp);
+            djc_close(file);
+            return NULL;
+        }
+    } else {
+        file->line_numbers = NULL;
+    }
+    
     fclose(fp);
     return file;
 }
@@ -338,6 +391,11 @@ void djc_close(DJCFile* file) {
     /* Free bytecode */
     if (file->bytecode != NULL) {
         memory_free(file->bytecode);
+    }
+    
+    /* Free line number table */
+    if (file->line_numbers != NULL) {
+        memory_free(file->line_numbers);
     }
     
     /* Free file structure */
@@ -458,6 +516,44 @@ DJCMethod* djc_find_method_by_name(DJCFile* file, const char* method_name) {
     }
     
     return NULL;
+}
+/**
+ * Get source line number for a given program counter
+ * Uses binary search to find the line number entry
+ */
+uint16_t djc_get_source_line(DJCFile* file, uint16_t pc) {
+    int left, right, mid;
+    uint16_t result;
+    
+    /* Check if file or line number table is NULL */
+    if (file == NULL || file->line_numbers == NULL) {
+        return 0;
+    }
+    
+    /* Check if line number table is empty */
+    if (file->header.line_number_table_count == 0) {
+        return 0;
+    }
+    
+    /* Binary search for the line number entry */
+    left = 0;
+    right = (int)file->header.line_number_table_count - 1;
+    result = 0;
+    
+    while (left <= right) {
+        mid = (left + right) / 2;
+        
+        if (file->line_numbers[mid].pc <= pc) {
+            /* This entry's PC is <= target PC, so it's a candidate */
+            result = file->line_numbers[mid].line_no;
+            left = mid + 1;  /* Search for a closer match */
+        } else {
+            /* This entry's PC is > target PC, search left */
+            right = mid - 1;
+        }
+    }
+    
+    return result;
 }
 
 

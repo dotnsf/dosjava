@@ -378,15 +378,36 @@ static inline void store_local_long(ExecutionContext* ctx, uint8_t index, uint32
  * @return 0 if exception handled (jumped to catch), -1 if should terminate
  */
 int throw_runtime_exception(ExecutionContext* ctx, uint8_t exception_type, const char* message) {
+    uint16_t line_no;
+    uint16_t pc_offset;
+    char full_message[64];
+    
+    /* Mark that an exception is pending (to preserve exception_pc) */
+    ctx->exception_pending = 1;
+    
+    /* Get source line number from saved exception_pc (set by interpreter_step) */
+    if (ctx->djc_file && ctx->djc_file->bytecode && ctx->exception_pc >= ctx->djc_file->bytecode) {
+        pc_offset = (uint16_t)(ctx->exception_pc - ctx->djc_file->bytecode);
+        line_no = djc_get_source_line(ctx->djc_file, pc_offset);
+    } else {
+        line_no = 0;
+    }
+    
+    /* Format message with line number if available */
+    if (line_no > 0 && message != NULL) {
+        snprintf(full_message, sizeof(full_message), "%s (line %u)", message, line_no);
+        full_message[sizeof(full_message) - 1] = '\0';
+    } else if (message != NULL) {
+        strncpy(full_message, message, sizeof(full_message) - 1);
+        full_message[sizeof(full_message) - 1] = '\0';
+    } else {
+        full_message[0] = '\0';
+    }
+    
     /* Save exception type and message to context */
     ctx->exception_type = exception_type;
-    
-    if (message != NULL) {
-        strncpy(ctx->exception_message, message, sizeof(ctx->exception_message) - 1);
-        ctx->exception_message[sizeof(ctx->exception_message) - 1] = '\0';
-    } else {
-        ctx->exception_message[0] = '\0';
-    }
+    strncpy(ctx->exception_message, full_message, sizeof(ctx->exception_message) - 1);
+    ctx->exception_message[sizeof(ctx->exception_message) - 1] = '\0';
     
     if (ctx->in_try_block && ctx->catch_pc) {
         /* Push exception reference (dummy value 0x0001) onto stack for catch parameter */
@@ -398,10 +419,15 @@ int throw_runtime_exception(ExecutionContext* ctx, uint8_t exception_type, const
         /* Jump to catch block */
         ctx->pc = ctx->catch_pc;
         ctx->in_try_block = 0;
+        
+        /* Clear exception pending flag after jumping to catch block
+         * This allows exception_pc to be updated for subsequent exceptions */
+        ctx->exception_pending = 0;
+        
         return 0;  /* Exception handled */
     } else {
         /* No try block - print error and terminate */
-        printf("ERROR: %s\n", message);
+        printf("ERROR: %s\n", full_message);
         return -1;  /* Should terminate */
     }
 }
@@ -437,6 +463,7 @@ int interpreter_init_context(ExecutionContext* ctx, DJCFile* djc_file, DJCMethod
     ctx->catch_pc = NULL;
     ctx->in_try_block = 0;
     ctx->exception_type = EXCEPTION_TYPE_GENERIC;
+    ctx->exception_pending = 0;
     
     /* Initialize shared stack */
     ctx->stack_pointer = 0;
@@ -549,6 +576,12 @@ int interpreter_step(ExecutionContext* ctx) {
     if (ctx->pc < ctx->code_start ||
         ctx->pc > ctx->code_start + ctx->code_length + 1) {
         return -1;
+    }
+    
+    /* Save PC before fetching opcode (for accurate exception line numbers)
+     * Only update if no exception is pending (to preserve exception location) */
+    if (!ctx->exception_pending) {
+        ctx->exception_pc = ctx->pc;
     }
     
     /* Fetch opcode */
@@ -3213,6 +3246,8 @@ int interpreter_step(ExecutionContext* ctx) {
         
         case OP_CATCH_BEGIN:
             /* Mark catch block begin - catch_pc already set by OP_TRY_BEGIN */
+            /* Clear exception pending flag now that we're in the catch block */
+            ctx->exception_pending = 0;
             break;
         
         case OP_CATCH_END:

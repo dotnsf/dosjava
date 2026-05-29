@@ -836,6 +836,9 @@ static int native_exception_getType(ExecutionContext* ctx, uint16_t* args, uint8
 /**
  * Exception.getMessage() - Get exception message
  * Returns string constant pool index
+ *
+ * For dynamically generated messages (e.g., with line numbers),
+ * this will create a temporary string in the constant pool.
  */
 static int native_exception_getMessage(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
     uint16_t i;
@@ -843,7 +846,7 @@ static int native_exception_getMessage(ExecutionContext* ctx, uint16_t* args, ui
     (void)args;
     (void)arg_count;
     
-    /* Find or create string constant for exception message */
+    /* Try to find message in constant pool */
     for (i = 0; i < ctx->djc_file->header.constant_pool_count; i++) {
         if (ctx->djc_file->constants[i].tag == CONST_UTF8) {
             if (strcmp(ctx->djc_file->constants[i].data.utf8_data, ctx->exception_message) == 0) {
@@ -853,7 +856,17 @@ static int native_exception_getMessage(ExecutionContext* ctx, uint16_t* args, ui
         }
     }
     
-    /* If message not found in constant pool, return index 0 (empty string) */
+    /* Message not in constant pool - add it dynamically if there's space */
+    if (ctx->djc_file->header.constant_pool_count < 256) {
+        i = ctx->djc_file->header.constant_pool_count;
+        ctx->djc_file->constants[i].tag = CONST_UTF8;
+        ctx->djc_file->constants[i].data.utf8_data = ctx->exception_message;
+        ctx->djc_file->header.constant_pool_count++;
+        *result = i;
+        return 0;
+    }
+    
+    /* Constant pool full - return index 0 (empty string) */
     *result = 0;
     return 0;
 }

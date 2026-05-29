@@ -8,8 +8,10 @@
 /* Magic number for .djc files: 'DJ' */
 #define DJC_MAGIC 0x444A
 
-/* Current format version */
-#define DJC_VERSION 0x0001
+/* Format versions */
+#define DJC_VERSION_1 0x0001  /* Original format without line numbers */
+#define DJC_VERSION_2 0x0002  /* Format with line number table */
+#define DJC_VERSION   0x0002  /* Current format version */
 
 /* Maximum sizes */
 #define DJC_MAX_CONSTANTS 256
@@ -39,15 +41,27 @@
 
 /**
  * DJC file header structure
+ * Version 0x0001: 12 bytes (original format)
+ * Version 0x0002: 14 bytes (with line_number_table_count)
  */
 typedef struct {
-    uint16_t magic;              /* Magic number (0x444A) */
-    uint16_t version;            /* Format version */
-    uint16_t constant_pool_count;/* Number of constants */
-    uint16_t method_count;       /* Number of methods */
-    uint16_t field_count;        /* Number of fields */
-    uint16_t code_size;          /* Total bytecode size */
+    uint16_t magic;                    /* Magic number (0x444A) */
+    uint16_t version;                  /* Format version */
+    uint16_t constant_pool_count;      /* Number of constants */
+    uint16_t method_count;             /* Number of methods */
+    uint16_t field_count;              /* Number of fields */
+    uint16_t code_size;                /* Total bytecode size */
+    uint16_t line_number_table_count;  /* Number of line number entries (v0x0002+) */
 } DJCHeader;
+
+/**
+ * Line number table entry
+ * Maps bytecode PC to source line number
+ */
+typedef struct {
+    uint16_t pc;        /* Program counter (bytecode offset) */
+    uint16_t line_no;   /* Source line number */
+} LineNumberEntry;
 
 /**
  * Constant pool entry
@@ -93,6 +107,7 @@ typedef struct {
     DJCMethod* methods;          /* Method array */
     DJCField* fields;            /* Field array */
     uint8_t* bytecode;           /* Bytecode section */
+    LineNumberEntry* line_numbers; /* Line number table (v0x0002+) */
 } DJCFile;
 
 /* Function prototypes */
@@ -157,6 +172,14 @@ const char* djc_get_utf8(DJCFile* file, uint16_t index);
  * @return Pointer to bytecode, or NULL if invalid
  */
 uint8_t* djc_get_method_code(DJCFile* file, DJCMethod* method);
+
+/**
+ * Get source line number for a given program counter
+ * @param file DJC file
+ * @param pc Program counter (bytecode offset)
+ * @return Source line number, or 0 if not available
+ */
+uint16_t djc_get_source_line(DJCFile* file, uint16_t pc);
 
 #endif /* DJC_H */
 

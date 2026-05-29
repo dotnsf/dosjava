@@ -168,6 +168,10 @@ goto run_test
 set TESTFILE=excauto.jav
 set BASENAME=excauto
 goto run_test
+:next34
+set TESTFILE=exctest.jav
+set BASENAME=exctest
+goto run_test
 
 :all_done
 echo.
@@ -227,6 +231,7 @@ if "%1"=="swnest.jav" set BASENAME=swnest
 if "%1"=="varinit.jav" set BASENAME=varinit
 if "%1"=="except.jav" set BASENAME=except
 if "%1"=="excauto.jav" set BASENAME=excauto
+if "%1"=="exctest.jav" set BASENAME=exctest
 goto run_test
 
 :run_test
@@ -337,7 +342,8 @@ if "%TESTFILE%"=="swstring.jav" goto next31
 if "%TESTFILE%"=="swnest.jav" goto next31
 if "%TESTFILE%"=="varinit.jav" goto next32
 if "%TESTFILE%"=="except.jav" goto next33
-if "%TESTFILE%"=="excauto.jav" goto all_done
+if "%TESTFILE%"=="excauto.jav" goto next34
+if "%TESTFILE%"=="exctest.jav" goto all_done
 goto all_done
 
 :end

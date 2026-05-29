@@ -97,6 +97,10 @@ except.jav worked correctly.
 excauto.jav worked correctly.
 [PASS] excauto.jav
 
+[TEST] exctest.jav
+exctest.jav worked correctly.
+[PASS] exctest.jav
+
 
 ============================
 All tests completed

@@ -94,6 +94,39 @@ int codegen_init(CodeGenerator* codegen, const char* ast_file, const char* symbo
         return -1;
     }
     codegen->bytecode->size = 0;
+    
+    /* Allocate line number table structure */
+    codegen->line_numbers = (LineNumberTable*)malloc(sizeof(LineNumberTable));
+    if (!codegen->line_numbers) {
+        free(codegen->bytecode->data);
+        free(codegen->bytecode);
+        free(codegen->constants);
+        fclose(codegen->ast_file);
+        fclose(codegen->output_file);
+        symtable_cleanup(codegen->symtable);
+        free(codegen->symtable);
+        return -1;
+    }
+    memset(codegen->line_numbers, 0, sizeof(LineNumberTable));
+    
+    /* Allocate line number entries (initial capacity: 256 entries) */
+    codegen->line_numbers->capacity = 256;
+    codegen->line_numbers->entries = (CodeGenLineEntry*)malloc(
+        sizeof(CodeGenLineEntry) * codegen->line_numbers->capacity);
+    if (!codegen->line_numbers->entries) {
+        free(codegen->line_numbers);
+        free(codegen->bytecode->data);
+        free(codegen->bytecode);
+        free(codegen->constants);
+        fclose(codegen->ast_file);
+        fclose(codegen->output_file);
+        symtable_cleanup(codegen->symtable);
+        free(codegen->symtable);
+        return -1;
+    }
+    codegen->line_numbers->count = 0;
+    codegen->line_numbers->current_line = 0;
+    
     return 0;
 }
 
@@ -127,6 +160,13 @@ void codegen_cleanup(CodeGenerator* codegen) {
             free(codegen->bytecode->data);
         }
         free(codegen->bytecode);
+    }
+    
+    if (codegen->line_numbers) {
+        if (codegen->line_numbers->entries) {
+            free(codegen->line_numbers->entries);
+        }
+        free(codegen->line_numbers);
     }
     
     if (codegen->context) {
@@ -239,6 +279,67 @@ void codegen_error(CodeGenerator* codegen, const char* message) {
     printf("Code generation error: %s\n", message);
     codegen->has_error = 1;
     codegen->error_count++;
+}
+/**
+ * Add line number entry
+ * Records the mapping between bytecode PC and source line number
+ */
+static void add_line_number_entry(CodeGenerator* codegen, uint16_t line_no) {
+    CodeGenLineEntry* new_entries;
+    uint16_t new_capacity;
+    uint16_t current_pc;
+    
+    if (!codegen || !codegen->line_numbers || !codegen->bytecode) {
+        return;
+    }
+    
+    /* Skip if line number hasn't changed */
+    if (line_no == codegen->line_numbers->current_line) {
+        return;
+    }
+    
+    /* Get current PC (bytecode offset)
+     * If we're in a method context, add the global bytecode size to get the absolute PC
+     * Otherwise, just use the global bytecode size */
+    if (codegen->context && codegen->context->code) {
+        current_pc = codegen->bytecode->size + codegen->context->code->size;
+    } else {
+        current_pc = codegen->bytecode->size;
+    }
+    
+    /* Expand capacity if needed */
+    if (codegen->line_numbers->count >= codegen->line_numbers->capacity) {
+        new_capacity = codegen->line_numbers->capacity * 2;
+        new_entries = (CodeGenLineEntry*)realloc(
+            codegen->line_numbers->entries,
+            sizeof(CodeGenLineEntry) * new_capacity);
+        if (!new_entries) {
+            return;  /* Silently fail - line numbers are optional */
+        }
+        codegen->line_numbers->entries = new_entries;
+        codegen->line_numbers->capacity = new_capacity;
+    }
+    
+    /* Add new entry */
+    codegen->line_numbers->entries[codegen->line_numbers->count].pc = current_pc;
+    codegen->line_numbers->entries[codegen->line_numbers->count].line_no = line_no;
+    codegen->line_numbers->count++;
+    codegen->line_numbers->current_line = line_no;
+}
+
+/**
+ * Update current line number from AST node
+ * Should be called before generating code for each statement
+ */
+static void update_line_number(CodeGenerator* codegen, ASTNode* node) {
+    if (!codegen || !node) {
+        return;
+    }
+    
+    /* Add line number entry if line has changed */
+    if (node->line > 0) {
+        add_line_number_entry(codegen, node->line);
+    }
 }
 
 /* Generate code */
@@ -551,6 +652,9 @@ int generate_statement(CodeGenerator* codegen, ASTNode* stmt_node) {
     if (!codegen || !stmt_node) {
         return -1;
     }
+    
+    /* Update line number for this statement */
+    update_line_number(codegen, stmt_node);
     
     /* Save node type BEFORE any operations that might corrupt memory */
     node_type = stmt_node->type;
@@ -1440,6 +1544,9 @@ int generate_expression(CodeGenerator* codegen, ASTNode* expr_node) {
             /* Generate array and index expressions */
             generate_expression(codegen, &array_expr_copy);
             generate_expression(codegen, &index_expr_copy);
+            
+            /* Update line number before array access (where exception may occur) */
+            update_line_number(codegen, expr_node);
             
             /* Determine element type and emit appropriate load opcode */
             elem_type = get_array_element_type(codegen, &array_expr_copy);
@@ -4619,6 +4726,7 @@ int write_djc_file(CodeGenerator* codegen) {
     header.method_count = codegen->method_count;
     header.field_count = codegen->field_count;
     header.code_size = codegen->bytecode->size;
+    header.line_number_table_count = codegen->line_numbers ? codegen->line_numbers->count : 0;
     
     if (fwrite(&header, sizeof(DJCHeader), 1, codegen->output_file) != 1) {
         return -1;
@@ -4680,6 +4788,23 @@ int write_djc_file(CodeGenerator* codegen) {
     if (codegen->bytecode->size > 0) {
         if (fwrite(codegen->bytecode->data, 1, codegen->bytecode->size, codegen->output_file) != codegen->bytecode->size) {
             return -1;
+        }
+    }
+    
+    /* Write line number table (version 0x0002+) */
+    if (codegen->line_numbers && codegen->line_numbers->count > 0) {
+        for (i = 0; i < codegen->line_numbers->count; i++) {
+            CodeGenLineEntry* entry = &codegen->line_numbers->entries[i];
+            
+            /* Write PC */
+            if (fwrite(&entry->pc, sizeof(uint16_t), 1, codegen->output_file) != 1) {
+                return -1;
+            }
+            
+            /* Write line number */
+            if (fwrite(&entry->line_no, sizeof(uint16_t), 1, codegen->output_file) != 1) {
+                return -1;
+            }
         }
     }
     
