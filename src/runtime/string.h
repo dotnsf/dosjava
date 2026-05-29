@@ -104,6 +104,53 @@ String* string_fromint(int16_t value);
  */
 uint16_t string_hashcode(String* str);
 
+/**
+ * Check if string is empty
+ * @param str String
+ * @return 1 if empty (length == 0), 0 otherwise
+ */
+uint8_t string_isempty(String* str);
+
+/**
+ * Trim leading and trailing whitespace
+ * @param str String
+ * @return New string with whitespace removed, or NULL on error
+ */
+String* string_trim(String* str);
+
+/**
+ * Replace all occurrences of a substring
+ * @param str String
+ * @param old_str Substring to replace
+ * @param new_str Replacement substring
+ * @return New string with replacements, or NULL on error
+ */
+String* string_replace(String* str, String* old_str, String* new_str);
+
+/**
+ * Find last occurrence of substring
+ * @param str String to search in
+ * @param search Substring to search for
+ * @return Index of last occurrence, or -1 if not found
+ */
+int16_t string_lastindexof(String* str, String* search);
+
+/**
+ * Check if string contains substring
+ * @param str String to search in
+ * @param search Substring to search for
+ * @return 1 if contains, 0 otherwise
+ */
+uint8_t string_contains(String* str, String* search);
+
+/**
+ * Repeat string n times
+ * @param str String to repeat
+ * @param count Number of times to repeat (must be >= 0)
+ * @return New string with repetitions, or NULL on error
+ */
+String* string_repeat(String* str, uint16_t count);
+
 #endif /* STRING_H */
 
 

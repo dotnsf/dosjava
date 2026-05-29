@@ -25,9 +25,9 @@ class StrOpsTest {
         
         // Verify results
         if (len == 11 &&
-            sub1.equals("Hello") && sub2.equals("World") &&
+            sub1.equals("Hello") == 1 && sub2.equals("World") == 1 &&
             idx1 == 4 && idx2 == 6 && idx3 == -1 && lidx == 7 &&
-            upper.equals("TEST") && lower.equals("test")) {
+            upper.equals("TEST") == 1 && lower.equals("test") == 1) {
             System.out.println("strops.jav worked correctly.");
         }
         

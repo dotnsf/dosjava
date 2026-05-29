@@ -13,7 +13,7 @@ class FileReadTest {
         File.close();
         
         // Verify results
-        if (line1.equals("Line 1") && line2.equals("Line 2")) {
+        if (line1.equals("Line 1") == 1 && line2.equals("Line 2") == 1) {
             System.out.println("fileread.jav worked correctly.");
         }
         

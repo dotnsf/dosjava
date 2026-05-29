@@ -3120,6 +3120,193 @@ int interpreter_step(ExecutionContext* ctx) {
                     stack_push_shared(ctx, (uint16_t)seconds);
                     break;
                 }
+                else if (strcmp(method_name, "charAt") == 0) {
+                    /* String.charAt(int) - returns String */
+                    uint16_t str_idx, index_value;
+                    uint16_t result_idx;
+                    uint16_t args[2];
+                    
+                    /* Pop index argument */
+                    index_value = stack_pop_shared(ctx);
+                    
+                    /* Pop string reference */
+                    str_idx = stack_pop_shared(ctx);
+                    
+                    /* Prepare arguments for native method */
+                    args[0] = str_idx;
+                    args[1] = index_value;
+                    
+                    /* Call native method */
+                    if (native_string_charAt(ctx, args, 2, &result_idx) != 0) {
+                        /* Exception was thrown and not handled - terminate */
+                        return -1;
+                    }
+                    
+                    /* Push result (or exception was handled and PC was updated) */
+                    stack_push_shared(ctx, result_idx);
+                    break;
+                }
+                else if (strcmp(method_name, "isEmpty") == 0) {
+                    /* String.isEmpty() - returns int (boolean) */
+                    uint16_t str_idx;
+                    uint16_t result_val;
+                    uint16_t args[1];
+                    
+                    /* Pop string reference */
+                    str_idx = stack_pop_shared(ctx);
+                    
+                    /* Prepare arguments */
+                    args[0] = str_idx;
+                    
+                    /* Call native method */
+                    if (native_string_isEmpty(ctx, args, 1, &result_val) != 0) {
+                        return -1;
+                    }
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, result_val);
+                    break;
+                }
+                else if (strcmp(method_name, "trim") == 0) {
+                    /* String.trim() - returns String */
+                    uint16_t str_idx;
+                    uint16_t result_idx;
+                    uint16_t args[1];
+                    
+                    /* Pop string reference */
+                    str_idx = stack_pop_shared(ctx);
+                    
+                    /* Prepare arguments */
+                    args[0] = str_idx;
+                    
+                    /* Call native method */
+                    if (native_string_trim(ctx, args, 1, &result_idx) != 0) {
+                        return -1;
+                    }
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, result_idx);
+                    break;
+                }
+                else if (strcmp(method_name, "replace") == 0) {
+                    /* String.replace(String, String) - returns String */
+                    uint16_t str_idx, old_str_idx, new_str_idx;
+                    uint16_t result_idx;
+                    uint16_t args[3];
+                    
+                    /* Pop arguments in reverse order */
+                    new_str_idx = stack_pop_shared(ctx);
+                    old_str_idx = stack_pop_shared(ctx);
+                    str_idx = stack_pop_shared(ctx);
+                    
+                    /* Prepare arguments */
+                    args[0] = str_idx;
+                    args[1] = old_str_idx;
+                    args[2] = new_str_idx;
+                    
+                    /* Call native method */
+                    if (native_string_replace(ctx, args, 3, &result_idx) != 0) {
+                        return -1;
+                    }
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, result_idx);
+                    break;
+                }
+                else if (strcmp(method_name, "compareTo") == 0) {
+                    /* String.compareTo(String) - returns int */
+                    uint16_t str1_idx, str2_idx;
+                    uint16_t result_val;
+                    uint16_t args[2];
+                    
+                    /* Pop arguments */
+                    str2_idx = stack_pop_shared(ctx);
+                    str1_idx = stack_pop_shared(ctx);
+                    
+                    /* Prepare arguments */
+                    args[0] = str1_idx;
+                    args[1] = str2_idx;
+                    
+                    /* Call native method */
+                    if (native_string_compareTo(ctx, args, 2, &result_val) != 0) {
+                        /* Exception was thrown and not handled - terminate */
+                        return -1;
+                    }
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, result_val);
+                    break;
+                }
+                else if (strcmp(method_name, "lastIndexOf") == 0) {
+                    /* String.lastIndexOf(String) - returns int */
+                    uint16_t str_idx, search_idx;
+                    uint16_t result_val;
+                    uint16_t args[2];
+                    
+                    /* Pop arguments */
+                    search_idx = stack_pop_shared(ctx);
+                    str_idx = stack_pop_shared(ctx);
+                    
+                    /* Prepare arguments */
+                    args[0] = str_idx;
+                    args[1] = search_idx;
+                    
+                    /* Call native method */
+                    if (native_string_lastIndexOf(ctx, args, 2, &result_val) != 0) {
+                        return -1;
+                    }
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, result_val);
+                    break;
+                }
+                else if (strcmp(method_name, "contains") == 0) {
+                    /* String.contains(String) - returns int (boolean) */
+                    uint16_t str_idx, search_idx;
+                    uint16_t result_val;
+                    uint16_t args[2];
+                    
+                    /* Pop arguments */
+                    search_idx = stack_pop_shared(ctx);
+                    str_idx = stack_pop_shared(ctx);
+                    
+                    /* Prepare arguments */
+                    args[0] = str_idx;
+                    args[1] = search_idx;
+                    
+                    /* Call native method */
+                    if (native_string_contains(ctx, args, 2, &result_val) != 0) {
+                        return -1;
+                    }
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, result_val);
+                    break;
+                }
+                else if (strcmp(method_name, "repeat") == 0) {
+                    /* String.repeat(int) - returns String */
+                    uint16_t str_idx, count_val;
+                    uint16_t result_idx;
+                    uint16_t args[2];
+                    
+                    /* Pop arguments */
+                    count_val = stack_pop_shared(ctx);
+                    str_idx = stack_pop_shared(ctx);
+                    
+                    /* Prepare arguments */
+                    args[0] = str_idx;
+                    args[1] = count_val;
+                    
+                    /* Call native method */
+                    if (native_string_repeat(ctx, args, 2, &result_idx) != 0) {
+                        /* Exception was thrown and not handled - terminate */
+                        return -1;
+                    }
+                    
+                    /* Push result */
+                    stack_push_shared(ctx, result_idx);
+                    break;
+                }
             }
             
             /* Find method by name */

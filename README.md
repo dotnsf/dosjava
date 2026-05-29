@@ -38,13 +38,22 @@ DOS Java Compilerは、16-bit PC-DOS環境でJavaのサブセットをコンパ�
 - `null` - nullリテラル（Phase 9.3で追加）
   - 参照型（String、配列）への代入可能
   - 参照型との比較演算（`==`, `!=`）
-- `String` - Phase 1 の限定サポート
+- `String` - 文字列型
   - 文字列リテラル
   - `String` ローカル変数
   - `System.out.println(String)`
   - `str.length()` / `"abc".length()`
-  - `String + String`
+  - `String + String` 連結
   - 連結の連鎖（例: `a + b + "56"`）
+  - **Phase 13で追加されたメソッド**:
+    - `String charAt(int index)` - 指定位置の文字を返す（String型）
+    - `int isEmpty()` - 空文字列かチェック（1=true, 0=false）
+    - `String trim()` - 前後の空白を削除
+    - `String replace(String target, String replacement)` - 文字列置換
+    - `int compareTo(String other)` - 辞書順比較
+    - `int lastIndexOf(String str)` - 最後の出現位置
+    - `int contains(String str)` - 部分文字列チェック（1=true, 0=false）
+    - `String repeat(int count)` - 文字列の繰り返し
 
 ### 制御構文
 - `if` / `else`
@@ -742,6 +751,24 @@ Error: Type mismatch
   - 例外メッセージ形式: `"<例外タイプ> (line <行番号>)"`
   - 後方互換性: 旧フォーマット（v0x0001）のDJCファイルも実行可能
   - 詳細: [PHASE12_COMPLETION.md](PHASE12_COMPLETION.md)
+
+### Phase 13: String Method Enhancement ✅ 完了
+- **Phase 13.1-13.8**: 8つの新しいStringメソッドの実装
+  - `charAt(int)` - 指定位置の文字を返す（StringIndexOutOfBoundsException対応）
+  - `isEmpty()` - 空文字列チェック
+  - `trim()` - 前後の空白削除（スペース、タブ、改行、CR）
+  - `replace(String, String)` - 全置換
+  - `compareTo(String)` - 辞書順比較（NullPointerException対応）
+  - `lastIndexOf(String)` - 最後の出現位置
+  - `contains(String)` - 部分文字列チェック
+  - `repeat(int)` - 文字列繰り返し（IllegalArgumentException対応）
+- **Phase 13.9**: 包括的テストと検証
+  - 基本機能テスト（strext1-3.jav）
+  - 例外処理テスト（strexc.jav）
+  - エッジケーステスト（stredge1-2.jav）
+  - サンプルプログラム（samples/strext.jav）
+- **Phase 13.10**: ドキュメント作成
+  - 詳細: [PHASE13_COMPLETION.md](PHASE13_COMPLETION.md)
 
 ### 今後の予定
 - [ ] Phase 4 Network機能完成

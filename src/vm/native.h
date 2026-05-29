@@ -145,4 +145,17 @@ int native_register_builtins(void);
  */
 int native_register_socket_methods(void);
 
+/**
+ * Native String methods (for OP_INVOKE_VIRTUAL)
+ * These are called directly from interpreter.c
+ */
+int native_string_charAt(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+int native_string_isEmpty(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+int native_string_trim(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+int native_string_replace(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+int native_string_compareTo(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+int native_string_lastIndexOf(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+int native_string_contains(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+int native_string_repeat(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+
 #endif /* NATIVE_H */

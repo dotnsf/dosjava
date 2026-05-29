@@ -101,6 +101,10 @@ excauto.jav worked correctly.
 exctest.jav worked correctly.
 [PASS] exctest.jav
 
+[TEST] strext.jav
+strext.jav worked correctly.
+[PASS] strext.jav
+
 
 ============================
 All tests completed

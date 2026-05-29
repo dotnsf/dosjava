@@ -83,7 +83,7 @@ class ExcAuto {
         // Test 9: StringIndexOutOfBoundsException
         try {
             String s = "hello";
-            String sub = s.substr(10);
+            String sub = s.charAt(10);
         } catch (Exception e) {
             if (e.getType() == 5) {
                 pass = pass + 1;

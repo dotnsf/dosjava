@@ -295,6 +295,566 @@ static int native_string_length(ExecutionContext* ctx, uint16_t* args, uint8_t a
 }
 
 /**
+ * String.charAt(int index)
+ * Returns the character at the specified index as a String
+ */
+int native_string_charAt(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t str_value;
+    uint16_t index;
+    const char* str;
+    uint16_t len;
+    char char_str[2];
+    uint16_t char_index;
+    
+    if (arg_count != 2) {
+        printf("ERROR: charAt expects 2 arguments, got %u\n", arg_count);
+        return -1;
+    }
+    
+    str_value = args[0];
+    index = args[1];
+    str = NULL;
+    
+    /* Get string from constant pool */
+    if (str_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+            str = ctx->djc_file->constants[str_value].data.utf8_data;
+        }
+    }
+    
+    if (!str) {
+        printf("ERROR: Invalid string constant index for charAt: %d\n", str_value);
+        return -1;
+    }
+    
+    len = (uint16_t)strlen(str);
+    
+    /* Check bounds */
+    if (index >= len) {
+        char error_msg[64];
+        int throw_result;
+        sprintf(error_msg, "String index out of range: %u", index);
+        throw_result = throw_runtime_exception(ctx, EXCEPTION_TYPE_STRING_INDEX_OUT_OF_BOUNDS, error_msg);
+        return throw_result;
+    }
+    
+    /* Create single-character string */
+    char_str[0] = str[index];
+    char_str[1] = '\0';
+    
+    /* Add to constant pool and return index */
+    char_index = djc_add_string(ctx->djc_file, char_str);
+    if (char_index == 0xFFFF) {
+        printf("ERROR: Failed to add character string to constant pool\n");
+        return -1;
+    }
+    
+    *result = char_index;
+    return 0;
+}
+
+/**
+ * String.isEmpty()
+ * Returns true if string length is 0
+ */
+int native_string_isEmpty(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t str_value;
+    const char* str;
+    uint16_t len;
+    
+    if (arg_count != 1) {
+        printf("ERROR: isEmpty expects 1 argument, got %u\n", arg_count);
+        return -1;
+    }
+    
+    str_value = args[0];
+    str = NULL;
+    
+    /* Get string from constant pool */
+    if (str_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+            str = ctx->djc_file->constants[str_value].data.utf8_data;
+        }
+    }
+    
+    if (!str) {
+        printf("ERROR: Invalid string constant index for isEmpty: %d\n", str_value);
+        return -1;
+    }
+    
+    len = (uint16_t)strlen(str);
+    
+    /* Return 1 (true) if empty, 0 (false) otherwise */
+    *result = (len == 0) ? 1 : 0;
+    return 0;
+}
+
+/**
+ * String.trim()
+ * Returns a string with leading and trailing whitespace removed
+ */
+int native_string_trim(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t str_value;
+    const char* src_str;
+    char trim_buf[256];
+    uint16_t len;
+    uint16_t start, end;
+    uint16_t new_len;
+    uint16_t i;
+    uint16_t const_idx;
+    
+    if (arg_count != 1) {
+        printf("ERROR: trim expects 1 argument, got %u\n", arg_count);
+        return -1;
+    }
+    
+    str_value = args[0];
+    src_str = NULL;
+    
+    /* Get string from constant pool */
+    if (str_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+            src_str = ctx->djc_file->constants[str_value].data.utf8_data;
+        }
+    }
+    
+    if (!src_str) {
+        printf("ERROR: Invalid string constant index for trim: %d\n", str_value);
+        return -1;
+    }
+    
+    len = (uint16_t)strlen(src_str);
+    
+    /* Find first non-whitespace character */
+    start = 0;
+    while (start < len && (src_str[start] == ' ' || src_str[start] == '\t' ||
+                           src_str[start] == '\n' || src_str[start] == '\r')) {
+        start++;
+    }
+    
+    /* If all whitespace, return empty string */
+    if (start >= len) {
+        const_idx = djc_add_string(ctx->djc_file, "");
+        if (const_idx == 0) {
+            printf("ERROR: Failed to add UTF8 constant for trim\n");
+            return -1;
+        }
+        *result = const_idx;
+        return 0;
+    }
+    
+    /* Find last non-whitespace character */
+    end = len - 1;
+    while (end > start && (src_str[end] == ' ' || src_str[end] == '\t' ||
+                           src_str[end] == '\n' || src_str[end] == '\r')) {
+        end--;
+    }
+    
+    /* Calculate new length */
+    new_len = end - start + 1;
+    
+    if (new_len >= sizeof(trim_buf)) {
+        printf("ERROR: Trimmed string too long\n");
+        return -1;
+    }
+    
+    /* Copy trimmed content */
+    for (i = 0; i < new_len; i++) {
+        trim_buf[i] = src_str[start + i];
+    }
+    trim_buf[new_len] = '\0';
+    
+    /* Add constant to pool */
+    const_idx = djc_add_string(ctx->djc_file, trim_buf);
+    if (const_idx == 0) {
+        printf("ERROR: Failed to add UTF8 constant for trim\n");
+        return -1;
+    }
+    
+    *result = const_idx;
+    return 0;
+}
+
+/**
+ * String.replace(String oldStr, String newStr)
+ * Returns a string with all occurrences of oldStr replaced by newStr
+ */
+int native_string_replace(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t str_value;
+    uint16_t old_value;
+    uint16_t new_value;
+    const char* src_str;
+    const char* old_str;
+    const char* new_str;
+    char replace_buf[256];
+    uint16_t src_len, old_len, new_len;
+    uint16_t result_len;
+    uint16_t i, j;
+    uint8_t match;
+    uint16_t const_idx;
+    
+    if (arg_count != 3) {
+        printf("ERROR: replace expects 3 arguments, got %u\n", arg_count);
+        return -1;
+    }
+    
+    str_value = args[0];
+    old_value = args[1];
+    new_value = args[2];
+    src_str = NULL;
+    old_str = NULL;
+    new_str = NULL;
+    
+    /* Get strings from constant pool */
+    if (str_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+            src_str = ctx->djc_file->constants[str_value].data.utf8_data;
+        }
+    }
+    
+    if (old_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[old_value].tag == CONST_UTF8) {
+            old_str = ctx->djc_file->constants[old_value].data.utf8_data;
+        }
+    }
+    
+    if (new_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[new_value].tag == CONST_UTF8) {
+            new_str = ctx->djc_file->constants[new_value].data.utf8_data;
+        }
+    }
+    
+    if (!src_str || !old_str || !new_str) {
+        printf("ERROR: Invalid string constant for replace\n");
+        return -1;
+    }
+    
+    src_len = (uint16_t)strlen(src_str);
+    old_len = (uint16_t)strlen(old_str);
+    new_len = (uint16_t)strlen(new_str);
+    
+    /* Empty old string - return original */
+    if (old_len == 0) {
+        *result = str_value;
+        return 0;
+    }
+    
+    result_len = 0;
+    i = 0;
+    
+    while (i < src_len) {
+        /* Check if we have a match at current position */
+        match = 1;
+        if (i + old_len <= src_len) {
+            for (j = 0; j < old_len; j++) {
+                if (src_str[i + j] != old_str[j]) {
+                    match = 0;
+                    break;
+                }
+            }
+        } else {
+            match = 0;
+        }
+        
+        if (match) {
+            /* Replace: copy new string */
+            if (result_len + new_len >= sizeof(replace_buf)) {
+                printf("ERROR: Result string too long for replace\n");
+                return -1;
+            }
+            for (j = 0; j < new_len; j++) {
+                replace_buf[result_len++] = new_str[j];
+            }
+            i += old_len;  /* Skip old string */
+        } else {
+            /* No match: copy original character */
+            if (result_len >= sizeof(replace_buf)) {
+                printf("ERROR: Result string too long for replace\n");
+                return -1;
+            }
+            replace_buf[result_len++] = src_str[i];
+            i++;
+        }
+    }
+    
+    replace_buf[result_len] = '\0';
+    
+    /* Add constant to pool */
+    const_idx = djc_add_string(ctx->djc_file, replace_buf);
+    if (const_idx == 0) {
+        printf("ERROR: Failed to add UTF8 constant for replace\n");
+        return -1;
+    }
+    
+    *result = const_idx;
+    return 0;
+}
+
+/**
+ * String.compareTo(String anotherString)
+ * Compares two strings lexicographically
+ */
+int native_string_compareTo(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t str1_value;
+    uint16_t str2_value;
+    const char* str1;
+    const char* str2;
+    int cmp_result;
+    int throw_result;
+    
+    if (arg_count != 2) {
+        printf("ERROR: compareTo expects 2 arguments, got %u\n", arg_count);
+        return -1;
+    }
+    
+    str1_value = args[0];
+    str2_value = args[1];
+    str1 = NULL;
+    str2 = NULL;
+    
+    /* Get first string from constant pool */
+    if (str1_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[str1_value].tag == CONST_UTF8) {
+            str1 = ctx->djc_file->constants[str1_value].data.utf8_data;
+        }
+    }
+    
+    /* Get second string from constant pool */
+    if (str2_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[str2_value].tag == CONST_UTF8) {
+            str2 = ctx->djc_file->constants[str2_value].data.utf8_data;
+        }
+    }
+    
+    if (!str1 || !str2) {
+        /* Throw NullPointerException if either string is null */
+        throw_result = throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER, "Cannot compare null string");
+        return throw_result;
+    }
+    
+    /* Compare strings lexicographically */
+    cmp_result = strcmp(str1, str2);
+    
+    /* Return comparison result as int16_t */
+    *result = (uint16_t)(int16_t)cmp_result;
+    return 0;
+}
+
+/**
+ * String.lastIndexOf(String str)
+ * Returns the index of the last occurrence of the specified substring
+ */
+int native_string_lastIndexOf(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t str_value;
+    uint16_t search_value;
+    const char* str;
+    const char* search_str;
+    uint16_t str_len;
+    uint16_t search_len;
+    int16_t i;
+    uint16_t j;
+    int match;
+    
+    if (arg_count != 2) {
+        printf("ERROR: lastIndexOf expects 2 arguments, got %u\n", arg_count);
+        return -1;
+    }
+    
+    str_value = args[0];
+    search_value = args[1];
+    str = NULL;
+    search_str = NULL;
+    
+    /* Get strings from constant pool */
+    if (str_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+            str = ctx->djc_file->constants[str_value].data.utf8_data;
+        }
+    }
+    
+    if (search_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[search_value].tag == CONST_UTF8) {
+            search_str = ctx->djc_file->constants[search_value].data.utf8_data;
+        }
+    }
+    
+    if (!str || !search_str) {
+        printf("ERROR: Invalid string constant for lastIndexOf\n");
+        return -1;
+    }
+    
+    str_len = (uint16_t)strlen(str);
+    search_len = (uint16_t)strlen(search_str);
+    
+    /* Empty search string returns string length */
+    if (search_len == 0) {
+        *result = str_len;
+        return 0;
+    }
+    
+    /* Search string longer than source string */
+    if (search_len > str_len) {
+        *result = (uint16_t)-1;
+        return 0;
+    }
+    
+    /* Search from end to beginning */
+    for (i = (int16_t)(str_len - search_len); i >= 0; i--) {
+        match = 1;
+        for (j = 0; j < search_len; j++) {
+            if (str[i + j] != search_str[j]) {
+                match = 0;
+                break;
+            }
+        }
+        if (match) {
+            *result = (uint16_t)i;
+            return 0;
+        }
+    }
+    
+    /* Not found */
+    *result = (uint16_t)-1;
+    return 0;
+}
+
+/**
+ * String.contains(String str)
+ * Returns true if the string contains the specified substring
+ */
+int native_string_contains(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t str_value;
+    uint16_t search_value;
+    const char* str;
+    const char* search_str;
+    
+    if (arg_count != 2) {
+        printf("ERROR: contains expects 2 arguments, got %u\n", arg_count);
+        return -1;
+    }
+    
+    str_value = args[0];
+    search_value = args[1];
+    str = NULL;
+    search_str = NULL;
+    
+    /* Get strings from constant pool */
+    if (str_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+            str = ctx->djc_file->constants[str_value].data.utf8_data;
+        }
+    }
+    
+    if (search_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[search_value].tag == CONST_UTF8) {
+            search_str = ctx->djc_file->constants[search_value].data.utf8_data;
+        }
+    }
+    
+    if (!str || !search_str) {
+        printf("ERROR: Invalid string constant for contains\n");
+        return -1;
+    }
+    
+    /* Empty search string is always contained */
+    if (strlen(search_str) == 0) {
+        *result = 1;
+        return 0;
+    }
+    
+    /* Use strstr to check if substring exists */
+    *result = (strstr(str, search_str) != NULL) ? 1 : 0;
+    return 0;
+}
+
+/**
+ * String.repeat(int count)
+ * Returns a string repeated count times
+ */
+int native_string_repeat(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    uint16_t str_value;
+    uint16_t count;
+    const char* src_str;
+    char repeat_buf[256];
+    uint16_t str_len;
+    uint16_t total_len;
+    uint16_t i, j;
+    uint16_t pos;
+    uint16_t const_idx;
+    
+    if (arg_count != 2) {
+        printf("ERROR: repeat expects 2 arguments, got %u\n", arg_count);
+        return -1;
+    }
+    
+    str_value = args[0];
+    count = args[1];
+    src_str = NULL;
+    
+    /* Get string from constant pool */
+    if (str_value < ctx->djc_file->header.constant_pool_count) {
+        if (ctx->djc_file->constants[str_value].tag == CONST_UTF8) {
+            src_str = ctx->djc_file->constants[str_value].data.utf8_data;
+        }
+    }
+    
+    if (!src_str) {
+        printf("ERROR: Invalid string constant index for repeat: %d\n", str_value);
+        return -1;
+    }
+    
+    /* Check for negative count (treated as signed) */
+    if ((int16_t)count < 0) {
+        char error_msg[64];
+        int throw_result;
+        sprintf(error_msg, "Negative repeat count: %d", (int16_t)count);
+        throw_result = throw_runtime_exception(ctx, EXCEPTION_TYPE_ILLEGAL_ARGUMENT, error_msg);
+        return throw_result;
+    }
+    
+    str_len = (uint16_t)strlen(src_str);
+    
+    /* count = 0 returns empty string */
+    if (count == 0) {
+        const_idx = djc_add_string(ctx->djc_file, "");
+        if (const_idx == 0) {
+            printf("ERROR: Failed to add UTF8 constant for repeat\n");
+            return -1;
+        }
+        *result = const_idx;
+        return 0;
+    }
+    
+    /* Calculate total length */
+    total_len = str_len * count;
+    
+    /* Check for overflow or buffer size */
+    if (total_len / count != str_len || total_len >= sizeof(repeat_buf)) {
+        printf("ERROR: Repeated string too long\n");
+        return -1;
+    }
+    
+    /* Copy string count times */
+    pos = 0;
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < str_len; j++) {
+            repeat_buf[pos++] = src_str[j];
+        }
+    }
+    repeat_buf[total_len] = '\0';
+    
+    /* Add constant to pool */
+    const_idx = djc_add_string(ctx->djc_file, repeat_buf);
+    if (const_idx == 0) {
+        printf("ERROR: Failed to add UTF8 constant for repeat\n");
+        return -1;
+    }
+    
+    *result = const_idx;
+    return 0;
+}
+
+/**
  * String.toUpperCase()
  */
 static int native_string_toUpperCase(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
@@ -991,6 +1551,110 @@ int native_register_builtins(void) {
         1,
         param_string,
         NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* String.charAt(int) */
+    if (native_register(
+        "java/lang/String",
+        "charAt",
+        "(Ljava/lang/String;I)Ljava/lang/String;",
+        native_string_charAt,
+        2,  /* String + int */
+        param_string,
+        NATIVE_RETURN_STRING
+    ) != 0) {
+        return -1;
+    }
+    
+    /* String.isEmpty() */
+    if (native_register(
+        "java/lang/String",
+        "isEmpty",
+        "(Ljava/lang/String;)I",
+        native_string_isEmpty,
+        1,
+        param_string,
+        NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* String.trim() */
+    if (native_register(
+        "java/lang/String",
+        "trim",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+        native_string_trim,
+        1,
+        param_string,
+        NATIVE_RETURN_STRING
+    ) != 0) {
+        return -1;
+    }
+    
+    /* String.replace(String, String) */
+    if (native_register(
+        "java/lang/String",
+        "replace",
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        native_string_replace,
+        3,  /* String + String + String */
+        param_string,
+        NATIVE_RETURN_STRING
+    ) != 0) {
+        return -1;
+    }
+    
+    /* String.compareTo(String) */
+    if (native_register(
+        "java/lang/String",
+        "compareTo",
+        "(Ljava/lang/String;Ljava/lang/String;)I",
+        native_string_compareTo,
+        2,  /* Two strings */
+        param_string,
+        NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* String.lastIndexOf(String) */
+    if (native_register(
+        "java/lang/String",
+        "lastIndexOf",
+        "(Ljava/lang/String;Ljava/lang/String;)I",
+        native_string_lastIndexOf,
+        2,  /* Two strings */
+        param_string,
+        NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* String.contains(String) */
+    if (native_register(
+        "java/lang/String",
+        "contains",
+        "(Ljava/lang/String;Ljava/lang/String;)I",
+        native_string_contains,
+        2,  /* Two strings */
+        param_string,
+        NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* String.repeat(int) */
+    if (native_register(
+        "java/lang/String",
+        "repeat",
+        "(Ljava/lang/String;I)Ljava/lang/String;",
+        native_string_repeat,
+        2,  /* String + int */
+        param_string,
+        NATIVE_RETURN_STRING
     ) != 0) {
         return -1;
     }

@@ -15,9 +15,9 @@ class FileWritTest {
         File.close();
         
         // Verify results
-        if (line1.equals("Test line 1") && 
-            line2.equals("Test line 2") && 
-            line3.equals("No newline")) {
+        if (line1.equals("Test line 1") == 1 &&
+            line2.equals("Test line 2") == 1 &&
+            line3.equals("No newline") == 1) {
             System.out.println("filewrit.jav worked correctly.");
         }
         

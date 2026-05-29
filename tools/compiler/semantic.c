@@ -2960,7 +2960,13 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
          strcmp(method_name, "compareTo") == 0 ||
          strcmp(method_name, "indexOf") == 0 ||
          strcmp(method_name, "lastIndexOf") == 0 ||
-         strcmp(method_name, "substr") == 0)) {
+         strcmp(method_name, "substr") == 0 ||
+         strcmp(method_name, "charAt") == 0 ||
+         strcmp(method_name, "isEmpty") == 0 ||
+         strcmp(method_name, "trim") == 0 ||
+         strcmp(method_name, "replace") == 0 ||
+         strcmp(method_name, "contains") == 0 ||
+         strcmp(method_name, "repeat") == 0)) {
         TypeInfo object_type;
         uint16_t string_name_off;
         int is_comparison_method;
@@ -2968,6 +2974,12 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         int is_compareto_method;
         int is_index_method;
         int is_substr_method;
+        int is_charat_method;
+        int is_isempty_method;
+        int is_trim_method;
+        int is_replace_method;
+        int is_contains_method;
+        int is_repeat_method;
         
         is_comparison_method = (strcmp(method_name, "startsWith") == 0 ||
                                 strcmp(method_name, "endsWith") == 0);
@@ -2976,24 +2988,43 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         is_index_method = (strcmp(method_name, "indexOf") == 0 ||
                            strcmp(method_name, "lastIndexOf") == 0);
         is_substr_method = (strcmp(method_name, "substr") == 0);
+        is_charat_method = (strcmp(method_name, "charAt") == 0);
+        is_isempty_method = (strcmp(method_name, "isEmpty") == 0);
+        is_trim_method = (strcmp(method_name, "trim") == 0);
+        is_replace_method = (strcmp(method_name, "replace") == 0);
+        is_contains_method = (strcmp(method_name, "contains") == 0);
+        is_repeat_method = (strcmp(method_name, "repeat") == 0);
         
         if (strcmp(method_name, "length") == 0 ||
             strcmp(method_name, "toUpperCase") == 0 ||
-            strcmp(method_name, "toLowerCase") == 0) {
+            strcmp(method_name, "toLowerCase") == 0 ||
+            is_isempty_method ||
+            is_trim_method) {
             if (arg_count != 0) {
                 if (strcmp(method_name, "length") == 0) {
                     semantic_error_node(analyzer, call_node, "length() takes no arguments");
+                } else if (is_isempty_method) {
+                    semantic_error_node(analyzer, call_node, "isEmpty() takes no arguments");
+                } else if (is_trim_method) {
+                    semantic_error_node(analyzer, call_node, "trim() takes no arguments");
                 } else {
                     semantic_error_node(analyzer, call_node, "String case conversion takes no arguments");
                 }
                 return -1;
             }
-        } else if (is_comparison_method || is_equals_method || is_compareto_method) {
+        } else if (is_comparison_method || is_equals_method || is_compareto_method ||
+                   is_charat_method || is_contains_method || is_repeat_method) {
             if (arg_count != 1) {
                 if (is_equals_method) {
                     semantic_error_node(analyzer, call_node, "equals() requires 1 argument");
                 } else if (is_compareto_method) {
                     semantic_error_node(analyzer, call_node, "compareTo() requires 1 argument");
+                } else if (is_charat_method) {
+                    semantic_error_node(analyzer, call_node, "charAt() requires 1 argument");
+                } else if (is_contains_method) {
+                    semantic_error_node(analyzer, call_node, "contains() requires 1 argument");
+                } else if (is_repeat_method) {
+                    semantic_error_node(analyzer, call_node, "repeat() requires 1 argument");
                 } else {
                     semantic_error_node(analyzer, call_node, "startsWith/endsWith requires 1 argument");
                 }
@@ -3004,9 +3035,13 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
                 semantic_error_node(analyzer, call_node, "indexOf/lastIndexOf requires 1 or 2 arguments");
                 return -1;
             }
-        } else if (is_substr_method) {
-            if (arg_count != 1 && arg_count != 2) {
-                semantic_error_node(analyzer, call_node, "substr requires 1 or 2 arguments");
+        } else if (is_substr_method || is_replace_method) {
+            if (arg_count != 2) {
+                if (is_replace_method) {
+                    semantic_error_node(analyzer, call_node, "replace() requires 2 arguments");
+                } else {
+                    semantic_error_node(analyzer, call_node, "substr requires 1 or 2 arguments");
+                }
                 return -1;
             }
         }
@@ -3034,15 +3069,16 @@ int check_call(SemanticAnalyzer* analyzer, ASTNode* call_node, TypeInfo* result_
         /* Get the canonical "String" offset for return type */
         string_name_off = semantic_add_string(analyzer, "String");
         
-        /* equals() returns boolean */
-        if (is_equals_method) {
-            result_type->kind = TYPE_BOOLEAN;
+        /* equals() and isEmpty() and contains() return boolean (int) */
+        if (is_equals_method || is_isempty_method || is_contains_method) {
+            result_type->kind = TYPE_INT;
             result_type->class_name = 0;
         } else if (strcmp(method_name, "length") == 0 || is_comparison_method || is_compareto_method || is_index_method) {
+            /* length, startsWith, endsWith, compareTo, indexOf, lastIndexOf return int */
             result_type->kind = TYPE_INT;
             result_type->class_name = 0;
         } else {
-            /* toUpperCase, toLowerCase, substr return String */
+            /* toUpperCase, toLowerCase, substr, charAt, trim, replace, repeat return String */
             result_type->kind = TYPE_CLASS;
             result_type->class_name = string_name_off;
         }
