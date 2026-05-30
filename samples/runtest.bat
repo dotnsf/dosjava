@@ -177,6 +177,12 @@ set TESTFILE=strext.jav
 set BASENAME=strext
 goto run_test
 
+REM Test Phase 4
+:next36
+set TESTFILE=http.jav
+set BASENAME=http
+goto run_test
+
 :all_done
 echo.
 echo ============================
@@ -237,6 +243,7 @@ if "%1"=="except.jav" set BASENAME=except
 if "%1"=="excauto.jav" set BASENAME=excauto
 if "%1"=="exctest.jav" set BASENAME=exctest
 if "%1"=="strext.jav" set BASENAME=strext
+if "%1"=="http.jav" set BASENAME=http
 goto run_test
 
 :run_test
@@ -349,7 +356,8 @@ if "%TESTFILE%"=="varinit.jav" goto next32
 if "%TESTFILE%"=="except.jav" goto next33
 if "%TESTFILE%"=="excauto.jav" goto next34
 if "%TESTFILE%"=="exctest.jav" goto next35
-if "%TESTFILE%"=="strext.jav" goto all_done
+if "%TESTFILE%"=="strext.jav" goto next36
+if "%TESTFILE%"=="http.jav" goto all_done
 goto all_done
 
 :end

@@ -18,6 +18,9 @@
 #define EXCEPTION_TYPE_NUMBER_FORMAT              3
 #define EXCEPTION_TYPE_ILLEGAL_ARGUMENT           4
 #define EXCEPTION_TYPE_STRING_INDEX_OUT_OF_BOUNDS 5
+#define EXCEPTION_TYPE_NETWORK                    6
+#define EXCEPTION_TYPE_IO                         7
+#define EXCEPTION_TYPE_OUT_OF_MEMORY              8
 
 /* Maximum call depth (nested method calls) */
 #define MAX_CALL_DEPTH 4

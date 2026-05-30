@@ -249,11 +249,61 @@ Date d = new Date(timestamp);
 - **タイムゾーン**: ローカル時刻のみ（タイムゾーン変換なし）
 - **精度**: 秒単位（ミリ秒精度なし）
 
+### Httpクラス（Phase 4で追加）
+DOS環境でHTTPクライアント機能を提供するクラス
+
+#### 前提条件
+- 外部プログラム `doscurl.exe` が必要（PATH環境変数に設定）
+- ネットワーク接続が利用可能であること
+
+#### メソッド
+- `String Http.get(String url)` - HTTP GETリクエスト（基本）
+- `String Http.get(String url, String headers)` - HTTP GETリクエスト（カスタムヘッダー付き）
+  - `headers`: 改行区切りのヘッダー文字列（例: `"User-Agent: DOSJava\nAccept: */*"`）
+- `String Http.post(String url, String data)` - HTTP POSTリクエスト
+- `String Http.put(String url, String data)` - HTTP PUTリクエスト
+- `String Http.delete(String url)` - HTTP DELETEリクエスト
+
+#### 使用例
+```java
+class HttpDemo {
+    public static void main() {
+        try {
+            // 基本的なGETリクエスト
+            String response1 = Http.get("http://example.com/api");
+            System.out.println(response1);
+            
+            // カスタムヘッダー付きGETリクエスト
+            String headers = "User-Agent: DOSJava/1.0\nAccept: application/json";
+            String response2 = Http.get("http://example.com/api", headers);
+            System.out.println(response2);
+            
+            // POSTリクエスト
+            String postData = "name=test&value=123";
+            String response3 = Http.post("http://example.com/api", postData);
+            System.out.println(response3);
+            
+        } catch (Exception e) {
+            System.out.println("Network error occurred");
+            System.out.println(e.getMessage());
+        }
+        
+        return;
+    }
+}
+```
+
+#### 重要な注意事項
+- すべてのHTTPメソッドは `NetworkException` をスローする可能性があります
+- レスポンスは文字列として返されます
+- タイムアウトは10秒（doscurl.exeの設定）
+- 連続したリクエストを行う場合は、リクエスト間に適切な遅延を入れることを推奨
+
 ### Exceptionクラス（Phase 11で追加、Phase 12で拡張）
 ランタイム例外の検出と処理を行うためのクラス
 
 #### 自動検出される例外
-DOSJava VMは以下の5種類のランタイム例外を自動的に検出し、スローします：
+DOSJava VMは以下の6種類のランタイム例外を自動的に検出し、スローします：
 
 | 例外タイプ | タイプコード | 検出条件 |
 |-----------|-------------|---------|
@@ -262,6 +312,7 @@ DOSJava VMは以下の5種類のランタイム例外を自動的に検出し、
 | NumberFormatException | 3 | Integer.parseInt()での不正な文字列 |
 | IllegalArgumentException | 4 | 負の配列サイズ、不正なsubstr範囲 |
 | StringIndexOutOfBoundsException | 5 | substr()の範囲外アクセス |
+| NetworkException | 6 | HTTPリクエストの失敗 |
 
 #### メソッド
 - `int getType()` - 例外のタイプコード（0-5）を返す
@@ -571,9 +622,11 @@ run_tests.bat
 - [BUILD.md](BUILD.md) - ビルド手順
 - [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md) - 技術仕様
 - [PHASE3_5_SUMMARY.md](PHASE3_5_SUMMARY.md) - Phase 3.5実装サマリー（Date Support完了）
+- [PHASE4_COMPLETION.md](PHASE4_COMPLETION.md) - Phase 4実装完了報告（HTTP Client Functionality）
 - [PHASE5_PLAN.md](PHASE5_PLAN.md) - Phase 5実装計画
 - [PHASE11_COMPLETION.md](PHASE11_COMPLETION.md) - Phase 11実装完了報告（Runtime Exception Detection）
 - [PHASE12_COMPLETION.md](PHASE12_COMPLETION.md) - Phase 12実装完了報告（Exception Line Numbers）
+- [PHASE13_COMPLETION.md](PHASE13_COMPLETION.md) - Phase 13実装完了報告（String Method Enhancement）
 
 ## トラブルシューティング
 
@@ -640,10 +693,25 @@ Error: Type mismatch
   - 全48テストパス
   - 詳細: [PHASE3_5_SUMMARY.md](PHASE3_5_SUMMARY.md)
 
-### Phase 4: Network Functionality 🔄 進行中
-- Wattcp TCP/IP スタック統合
-- Socket/ServerSocket クラス
-- ネットワークI/O
+### Phase 4: HTTP Client Functionality ✅ 完了
+- **Phase 4.1**: HTTP Client基本実装
+  - doscurl.exe統合によるHTTPクライアント機能
+  - Http.get(String url) - 基本的なGETリクエスト
+  - Http.post(String url, String data) - POSTリクエスト
+  - Http.put(String url, String data) - PUTリクエスト
+  - Http.delete(String url) - DELETEリクエスト
+  - NetworkException (タイプコード6) の追加
+- **Phase 4.5**: カスタムヘッダーサポート
+  - Http.get(String url, String headers) - ヘッダー付きGETリクエスト
+  - 改行区切りヘッダー形式のサポート
+  - DOS 127文字コマンドライン制限の回避（バッチファイル方式）
+- **Phase 4.6**: テストとサンプル
+  - 包括的テストプログラム（tests/httphead.jav, tests/httpsimpl.jav）
+  - サンプルプログラム（samples/http.jav）
+  - 連続リクエスト対応（遅延機能付き）
+- **制限事項**:
+  - HTTPステータスコード取得は未実装（doscurlの制限）
+  - POST/PUT/DELETEのカスタムヘッダーは未実装
 
 ### Phase 5: Long Type Support ✅ 完了
 - **Phase 5.1**: 32-bit long型の基本実装
@@ -771,7 +839,7 @@ Error: Type mismatch
   - 詳細: [PHASE13_COMPLETION.md](PHASE13_COMPLETION.md)
 
 ### 今後の予定
-- [ ] Phase 4 Network機能完成
+- [ ] Phase 4拡張（POST/PUT/DELETEのカスタムヘッダーサポート）
 - [ ] 最適化
 - [ ] デバッガ
 

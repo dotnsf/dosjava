@@ -29,13 +29,13 @@ OBJ_DIR = $(BUILD_DIR)/obj
 BIN_DIR = $(BUILD_DIR)/bin
 
 # Source files
-VM_SRCS = $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/native.c
+VM_SRCS = $(SRC_DIR)/vm/memory.c $(SRC_DIR)/vm/stack.c $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/native.c $(SRC_DIR)/vm/http.c
 FORMAT_SRCS = $(SRC_DIR)/format/djc.c $(SRC_DIR)/format/opcodes.c
 RUNTIME_SRCS = $(SRC_DIR)/runtime/object.c $(SRC_DIR)/runtime/string.c $(SRC_DIR)/runtime/system.c $(SRC_DIR)/runtime/integer.c $(SRC_DIR)/runtime/inputstream.c $(SRC_DIR)/runtime/outputstream.c $(SRC_DIR)/runtime/fileinputstream.c $(SRC_DIR)/runtime/fileoutputstream.c $(SRC_DIR)/runtime/bufferedreader.c $(SRC_DIR)/runtime/bufferedwriter.c $(SRC_DIR)/runtime/dostime.c $(SRC_DIR)/runtime/date.c
 TEST_SRCS = $(SRC_DIR)/test_memory.c
 
 # Object files
-VM_OBJS = $(OBJ_DIR)/memory.obj $(OBJ_DIR)/stack.obj $(OBJ_DIR)/interpreter.obj $(OBJ_DIR)/native.obj
+VM_OBJS = $(OBJ_DIR)/memory.obj $(OBJ_DIR)/stack.obj $(OBJ_DIR)/interpreter.obj $(OBJ_DIR)/native.obj $(OBJ_DIR)/http.obj
 FORMAT_OBJS = $(OBJ_DIR)/djc.obj $(OBJ_DIR)/opcodes.obj
 RUNTIME_OBJS = $(OBJ_DIR)/object.obj $(OBJ_DIR)/string.obj $(OBJ_DIR)/system.obj $(OBJ_DIR)/integer.obj $(OBJ_DIR)/inputstream.obj $(OBJ_DIR)/outputstream.obj $(OBJ_DIR)/fileinputstream.obj $(OBJ_DIR)/fileoutputstream.obj $(OBJ_DIR)/bufferedreader.obj $(OBJ_DIR)/bufferedwriter.obj $(OBJ_DIR)/dostime.obj $(OBJ_DIR)/date.obj
 TEST_OBJS = $(OBJ_DIR)/test_memory.obj
@@ -149,6 +149,10 @@ $(OBJ_DIR)/interpreter.obj: $(SRC_DIR)/vm/interpreter.c $(SRC_DIR)/vm/interprete
 $(OBJ_DIR)/native.obj: $(SRC_DIR)/vm/native.c $(SRC_DIR)/vm/native.h
 	@echo Compiling native.c...
 	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/native.c
+
+$(OBJ_DIR)/http.obj: $(SRC_DIR)/vm/http.c $(SRC_DIR)/vm/http.h $(SRC_DIR)/vm/interpreter.h
+	@echo Compiling http.c...
+	$(CC) $(CFLAGS) -fo=$@ $(SRC_DIR)/vm/http.c
 
 $(OBJ_DIR)/djvm.obj: $(SRC_DIR)/vm/djvm.c $(SRC_DIR)/vm/interpreter.h $(SRC_DIR)/vm/native.h
 	@echo Compiling djvm.c...

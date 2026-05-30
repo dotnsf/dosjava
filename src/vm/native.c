@@ -1,5 +1,6 @@
 #include "native.h"
 #include "interpreter.h"
+#include "http.h"
 #include "../runtime/system.h"
 #include "../runtime/string.h"
 #include "../format/djc.h"
@@ -1875,6 +1876,102 @@ int native_register_builtins(void) {
         native_exception_getMessage,
         0,
         NULL,
+        NATIVE_RETURN_STRING
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Http.get(String) */
+    if (native_register(
+        NULL,  /* No class name - match by method name and descriptor only */
+        "get",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+        native_http_get,
+        1,
+        param_string,
+        NATIVE_RETURN_STRING
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Http.get(String, String) - with headers */
+    {
+        NativeParamType params[2];
+        params[0] = NATIVE_PARAM_STRING;
+        params[1] = NATIVE_PARAM_STRING;
+        
+        if (native_register(
+            NULL,  /* No class name - match by method name and descriptor only */
+            "get",
+            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            native_http_get_with_headers,
+            2,
+            params,
+            NATIVE_RETURN_STRING
+        ) != 0) {
+            return -1;
+        }
+    }
+    
+    /* Http.getStatusCode(String) */
+    if (native_register(
+        NULL,  /* No class name - match by method name and descriptor only */
+        "getStatusCode",
+        "(Ljava/lang/String;)I",
+        native_http_getStatusCode,
+        1,
+        param_string,
+        NATIVE_RETURN_INT
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Http.post(String, String) */
+    {
+        NativeParamType params[2];
+        params[0] = NATIVE_PARAM_STRING;
+        params[1] = NATIVE_PARAM_STRING;
+        
+        if (native_register(
+            NULL,  /* No class name - match by method name and descriptor only */
+            "post",
+            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            native_http_post,
+            2,
+            params,
+            NATIVE_RETURN_STRING
+        ) != 0) {
+            return -1;
+        }
+    }
+    
+    /* Http.put(String, String) */
+    {
+        NativeParamType params[2];
+        params[0] = NATIVE_PARAM_STRING;
+        params[1] = NATIVE_PARAM_STRING;
+        
+        if (native_register(
+            NULL,  /* No class name - match by method name and descriptor only */
+            "put",
+            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            native_http_put,
+            2,
+            params,
+            NATIVE_RETURN_STRING
+        ) != 0) {
+            return -1;
+        }
+    }
+    
+    /* Http.delete(String) */
+    if (native_register(
+        NULL,  /* No class name - match by method name and descriptor only */
+        "delete",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+        native_http_delete,
+        1,
+        param_string,
         NATIVE_RETURN_STRING
     ) != 0) {
         return -1;

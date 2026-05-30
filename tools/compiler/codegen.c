@@ -3324,11 +3324,11 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         /* Exception.getType() and Exception.getMessage() are native */
         is_native = 1;
     } else if (object_idx != 0) {
-        /* Check if this is Math.method() or Integer.method() call */
+        /* Check if this is Math.method(), Integer.method(), or Http.method() call */
         ASTNode* obj_node = codegen_get_node(codegen, object_idx);
         if (obj_node && obj_node->type == NODE_IDENTIFIER) {
             const char* obj_name = codegen_get_string(codegen, obj_node->data.identifier.name);
-            if (obj_name && (strcmp(obj_name, "Math") == 0 || strcmp(obj_name, "Integer") == 0)) {
+            if (obj_name && (strcmp(obj_name, "Math") == 0 || strcmp(obj_name, "Integer") == 0 || strcmp(obj_name, "Http") == 0)) {
                 is_native = 1;
             }
         }
@@ -3792,6 +3792,27 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
         } else if (strcmp(method_name, "getMessage") == 0) {
             /* Exception.getMessage() returns String */
             strcpy(descriptor, "()Ljava/lang/String;");
+        } else if (strcmp(method_name, "get") == 0) {
+            /* Http.get can have 1 or 2 arguments */
+            if (arg_count == 1) {
+                /* Http.get(String url) returns String */
+                strcpy(descriptor, "(Ljava/lang/String;)Ljava/lang/String;");
+            } else {
+                /* Http.get(String url, String headers) returns String */
+                strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            }
+        } else if (strcmp(method_name, "getStatusCode") == 0) {
+            /* Http.getStatusCode(String) returns int */
+            strcpy(descriptor, "(Ljava/lang/String;)I");
+        } else if (strcmp(method_name, "post") == 0) {
+            /* Http.post(String, String) returns String */
+            strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+        } else if (strcmp(method_name, "put") == 0) {
+            /* Http.put(String, String) returns String */
+            strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+        } else if (strcmp(method_name, "delete") == 0) {
+            /* Http.delete(String) returns String */
+            strcpy(descriptor, "(Ljava/lang/String;)Ljava/lang/String;");
         } else if (strcmp(method_name, "abs") == 0 ||
                    strcmp(method_name, "sqrt") == 0 ||
                    strcmp(method_name, "sin") == 0 ||
@@ -3949,13 +3970,14 @@ int generate_identifier(CodeGenerator* codegen, ASTNode* id_node) {
         return -1;
     }
     
-    /* Check if this is a builtin class name (Socket, File, System, Math, Integer) */
+    /* Check if this is a builtin class name (Socket, File, System, Math, Integer, Http) */
     /* These are used for static method calls and should not be treated as variables */
     if (strcmp(var_name, "Socket") == 0 ||
         strcmp(var_name, "File") == 0 ||
         strcmp(var_name, "System") == 0 ||
         strcmp(var_name, "Math") == 0 ||
-        strcmp(var_name, "Integer") == 0) {
+        strcmp(var_name, "Integer") == 0 ||
+        strcmp(var_name, "Http") == 0) {
         /* For builtin classes, we don't push anything on the stack */
         /* The method call handler will deal with it */
         return 0;
@@ -4348,6 +4370,7 @@ uint16_t find_method_index(CodeGenerator* codegen, const char* method_name, int 
             break;
         }
     }
+    
     descriptor_idx = build_method_descriptor(codegen, target_method_sym);
     
     name_idx = find_or_add_utf8(codegen, method_name);
