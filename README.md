@@ -617,6 +617,7 @@ run_tests.bat
 
 ## ドキュメント
 
+- [API_REFERENCE.md](API_REFERENCE.md) - **APIリファレンス（全クラス・メソッド完全ガイド）**
 - [QUICKSTART.md](QUICKSTART.md) - 5分で始めるガイド
 - [ARCHITECTURE.md](ARCHITECTURE.md) - システムアーキテクチャ
 - [BUILD.md](BUILD.md) - ビルド手順
