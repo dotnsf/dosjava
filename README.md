@@ -701,7 +701,7 @@ Error: Type mismatch
   - Http.put(String url, String data) - PUTリクエスト
   - Http.delete(String url) - DELETEリクエスト
   - NetworkException (タイプコード6) の追加
-- **Phase 4.5**: カスタムヘッダーサポート
+- **Phase 4.5**: カスタムヘッダーサポート（GET）
   - Http.get(String url, String headers) - ヘッダー付きGETリクエスト
   - 改行区切りヘッダー形式のサポート
   - DOS 127文字コマンドライン制限の回避（バッチファイル方式）
@@ -709,9 +709,15 @@ Error: Type mismatch
   - 包括的テストプログラム（tests/httphead.jav, tests/httpsimpl.jav）
   - サンプルプログラム（samples/http.jav）
   - 連続リクエスト対応（遅延機能付き）
+- **Phase 4.7**: POST/PUT/DELETEカスタムヘッダーサポート ✅ 完了
+  - Http.post(String url, String data, String headers) - ヘッダー付きPOST
+  - Http.put(String url, String data, String headers) - ヘッダー付きPUT
+  - Http.delete(String url, String headers) - ヘッダー付きDELETE
+  - 全HTTPメソッドでカスタムヘッダー対応完了
+  - シンボルテーブルサイズ拡張（256→512シンボル、2KB→4KB string pool）
 - **制限事項**:
   - HTTPステータスコード取得は未実装（doscurlの制限）
-  - POST/PUT/DELETEのカスタムヘッダーは未実装
+- 詳細: [PHASE4_COMPLETION.md](PHASE4_COMPLETION.md)
 
 ### Phase 5: Long Type Support ✅ 完了
 - **Phase 5.1**: 32-bit long型の基本実装

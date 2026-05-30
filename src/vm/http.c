@@ -685,3 +685,491 @@ int native_http_delete(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count,
     
     return 0;
 }
+
+
+/**
+ * Native method: Http.post(String url, String data, String headers)
+ * Executes HTTP POST request with custom headers
+ * Headers are newline-separated (e.g., "Content-Type: application/json\nUser-Agent: MyApp")
+ */
+int native_http_post_with_headers(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    const char* url;
+    const char* data;
+    const char* headers;
+    char* response;
+    FILE* f;
+    int exit_code;
+    size_t len;
+    uint16_t const_idx;
+    size_t total_len;
+    size_t bytes_read;
+    char buffer[512];
+    char header_opts[256];
+    const char* p;
+    const char* line_start;
+    int header_len;
+    
+    /* Argument check */
+    if (arg_count != 3) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_ILLEGAL_ARGUMENT,
+                                       "Http.post requires 2 or 3 arguments");
+    }
+    
+    /* Get URL from constant pool */
+    url = get_string_from_constant_pool(ctx, args[0]);
+    if (!url) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                       "URL cannot be null");
+    }
+    
+    /* Get POST data from constant pool */
+    data = get_string_from_constant_pool(ctx, args[1]);
+    if (!data) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                       "POST data cannot be null");
+    }
+    
+    /* Get headers from constant pool */
+    headers = get_string_from_constant_pool(ctx, args[2]);
+    if (!headers) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                       "Headers cannot be null");
+    }
+    
+    /* Build header options: parse newline-separated headers and create -H options */
+    header_opts[0] = '\0';
+    p = headers;
+    line_start = p;
+    
+    while (*p) {
+        if (*p == '\n' || *p == '\r') {
+            /* Found end of line */
+            header_len = (int)(p - line_start);
+            if (header_len > 0 && header_len < 100) {
+                /* Add -H "header" option */
+                if (strlen(header_opts) + header_len + 7 <= sizeof(header_opts)) {
+                    strcat(header_opts, " -H \"");
+                    strncat(header_opts, line_start, header_len);
+                    strcat(header_opts, "\"");
+                }
+            }
+            /* Skip CR/LF */
+            while (*p == '\n' || *p == '\r') p++;
+            line_start = p;
+        } else {
+            p++;
+        }
+    }
+    
+    /* Handle last line if no trailing newline */
+    header_len = (int)(p - line_start);
+    if (header_len > 0 && header_len < 100) {
+        if (strlen(header_opts) + header_len + 7 <= sizeof(header_opts)) {
+            strcat(header_opts, " -H \"");
+            strncat(header_opts, line_start, header_len);
+            strcat(header_opts, "\"");
+        }
+    }
+    
+    /* Build doscurl command with headers using batch file */
+    {
+        FILE* batch_file;
+        batch_file = fopen("_http.bat", "w");
+        if (batch_file) {
+            fprintf(batch_file, "@echo off\n");
+            fprintf(batch_file, "doscurl.exe -d \"%s\"%s -o _http.tmp %s 2>_err.tmp\n", data, header_opts, url);
+            fclose(batch_file);
+            exit_code = system("_http.bat");
+            remove("_http.bat");
+        } else {
+            return throw_runtime_exception(ctx, EXCEPTION_TYPE_IO,
+                                           "Failed to create batch file");
+        }
+    }
+    
+    /* Note: In DOS, system() return value is unreliable, so we check file existence */
+    (void)exit_code;
+    
+    /* Check if output file exists */
+    f = fopen("_http.tmp", "rb");
+    if (!f) {
+        remove("_http.tmp");
+        remove("_err.tmp");
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NETWORK,
+                                       "HTTP POST request failed");
+    }
+    
+    /* Allocate buffer for response (2KB max) */
+    response = (char*)malloc(2048);
+    if (!response) {
+        fclose(f);
+        remove("_http.tmp");
+        remove("_err.tmp");
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_OUT_OF_MEMORY,
+                                       "Failed to allocate memory for response");
+    }
+    
+    /* Read response in chunks */
+    total_len = 0;
+    while ((bytes_read = fread(buffer, 1, sizeof(buffer), f)) > 0) {
+        if (total_len + bytes_read >= 2048) {
+            /* Truncate if response is too large */
+            bytes_read = 2048 - total_len - 1;
+            if (bytes_read > 0) {
+                memcpy(response + total_len, buffer, bytes_read);
+                total_len += bytes_read;
+            }
+            break;
+        }
+        memcpy(response + total_len, buffer, bytes_read);
+        total_len += bytes_read;
+    }
+    response[total_len] = '\0';
+    
+    fclose(f);
+    
+    /* Remove trailing whitespace */
+    len = total_len;
+    while (len > 0 && (response[len-1] == '\n' || response[len-1] == '\r' || response[len-1] == ' ')) {
+        response[len-1] = '\0';
+        len--;
+    }
+    
+    /* Clean up temporary files */
+    remove("_http.tmp");
+    remove("_err.tmp");
+    
+    /* Add response string to constant pool */
+    const_idx = djc_add_string(ctx->djc_file, response);
+    free(response);
+    
+    if (const_idx == 0xFFFF) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_OUT_OF_MEMORY,
+                                       "Failed to add response to constant pool");
+    }
+    
+    *result = const_idx;
+    return 0;
+}
+
+/**
+ * Native method: Http.put(String url, String data, String headers)
+ * Executes HTTP PUT request with custom headers
+ * Headers are newline-separated (e.g., "Content-Type: application/json\nUser-Agent: MyApp")
+ */
+int native_http_put_with_headers(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    const char* url;
+    const char* data;
+    const char* headers;
+    char* response;
+    FILE* f;
+    int exit_code;
+    size_t len;
+    uint16_t const_idx;
+    size_t total_len;
+    size_t bytes_read;
+    char buffer[512];
+    char header_opts[256];
+    const char* p;
+    const char* line_start;
+    int header_len;
+    
+    /* Argument check */
+    if (arg_count != 3) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_ILLEGAL_ARGUMENT,
+                                       "Http.put requires 2 or 3 arguments");
+    }
+    
+    /* Get URL from constant pool */
+    url = get_string_from_constant_pool(ctx, args[0]);
+    if (!url) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                       "URL cannot be null");
+    }
+    
+    /* Get PUT data from constant pool */
+    data = get_string_from_constant_pool(ctx, args[1]);
+    if (!data) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                       "PUT data cannot be null");
+    }
+    
+    /* Get headers from constant pool */
+    headers = get_string_from_constant_pool(ctx, args[2]);
+    if (!headers) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                       "Headers cannot be null");
+    }
+    
+    /* Build header options: parse newline-separated headers and create -H options */
+    header_opts[0] = '\0';
+    p = headers;
+    line_start = p;
+    
+    while (*p) {
+        if (*p == '\n' || *p == '\r') {
+            /* Found end of line */
+            header_len = (int)(p - line_start);
+            if (header_len > 0 && header_len < 100) {
+                /* Add -H "header" option */
+                if (strlen(header_opts) + header_len + 7 <= sizeof(header_opts)) {
+                    strcat(header_opts, " -H \"");
+                    strncat(header_opts, line_start, header_len);
+                    strcat(header_opts, "\"");
+                }
+            }
+            /* Skip CR/LF */
+            while (*p == '\n' || *p == '\r') p++;
+            line_start = p;
+        } else {
+            p++;
+        }
+    }
+    
+    /* Handle last line if no trailing newline */
+    header_len = (int)(p - line_start);
+    if (header_len > 0 && header_len < 100) {
+        if (strlen(header_opts) + header_len + 7 <= sizeof(header_opts)) {
+            strcat(header_opts, " -H \"");
+            strncat(header_opts, line_start, header_len);
+            strcat(header_opts, "\"");
+        }
+    }
+    
+    /* Build doscurl command with headers using batch file */
+    {
+        FILE* batch_file;
+        batch_file = fopen("_http.bat", "w");
+        if (batch_file) {
+            fprintf(batch_file, "@echo off\n");
+            fprintf(batch_file, "doscurl.exe -X PUT -d \"%s\"%s -o _http.tmp %s 2>_err.tmp\n", data, header_opts, url);
+            fclose(batch_file);
+            exit_code = system("_http.bat");
+            remove("_http.bat");
+        } else {
+            return throw_runtime_exception(ctx, EXCEPTION_TYPE_IO,
+                                           "Failed to create batch file");
+        }
+    }
+    
+    /* Note: In DOS, system() return value is unreliable, so we check file existence */
+    (void)exit_code;
+    
+    /* Check if output file exists */
+    f = fopen("_http.tmp", "rb");
+    if (!f) {
+        remove("_http.tmp");
+        remove("_err.tmp");
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NETWORK,
+                                       "HTTP PUT request failed");
+    }
+    
+    /* Allocate buffer for response (2KB max) */
+    response = (char*)malloc(2048);
+    if (!response) {
+        fclose(f);
+        remove("_http.tmp");
+        remove("_err.tmp");
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_OUT_OF_MEMORY,
+                                       "Failed to allocate memory for response");
+    }
+    
+    /* Read response in chunks */
+    total_len = 0;
+    while ((bytes_read = fread(buffer, 1, sizeof(buffer), f)) > 0) {
+        if (total_len + bytes_read >= 2048) {
+            /* Truncate if response is too large */
+            bytes_read = 2048 - total_len - 1;
+            if (bytes_read > 0) {
+                memcpy(response + total_len, buffer, bytes_read);
+                total_len += bytes_read;
+            }
+            break;
+        }
+        memcpy(response + total_len, buffer, bytes_read);
+        total_len += bytes_read;
+    }
+    response[total_len] = '\0';
+    
+    fclose(f);
+    
+    /* Remove trailing whitespace */
+    len = total_len;
+    while (len > 0 && (response[len-1] == '\n' || response[len-1] == '\r' || response[len-1] == ' ')) {
+        response[len-1] = '\0';
+        len--;
+    }
+    
+    /* Clean up temporary files */
+    remove("_http.tmp");
+    remove("_err.tmp");
+    
+    /* Add response string to constant pool */
+    const_idx = djc_add_string(ctx->djc_file, response);
+    free(response);
+    
+    if (const_idx == 0xFFFF) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_OUT_OF_MEMORY,
+                                       "Failed to add response to constant pool");
+    }
+    
+    *result = const_idx;
+    return 0;
+}
+
+/**
+ * Native method: Http.delete(String url, String headers)
+ * Executes HTTP DELETE request with custom headers
+ * Headers are newline-separated (e.g., "Content-Type: application/json\nUser-Agent: MyApp")
+ */
+int native_http_delete_with_headers(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result) {
+    const char* url;
+    const char* headers;
+    char* response;
+    FILE* f;
+    int exit_code;
+    size_t len;
+    uint16_t const_idx;
+    size_t total_len;
+    size_t bytes_read;
+    char buffer[512];
+    char header_opts[256];
+    const char* p;
+    const char* line_start;
+    int header_len;
+    
+    /* Argument check */
+    if (arg_count != 2) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_ILLEGAL_ARGUMENT,
+                                       "Http.delete requires 1 or 2 arguments");
+    }
+    
+    /* Get URL from constant pool */
+    url = get_string_from_constant_pool(ctx, args[0]);
+    if (!url) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                       "URL cannot be null");
+    }
+    
+    /* Get headers from constant pool */
+    headers = get_string_from_constant_pool(ctx, args[1]);
+    if (!headers) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NULL_POINTER,
+                                       "Headers cannot be null");
+    }
+    
+    /* Build header options: parse newline-separated headers and create -H options */
+    header_opts[0] = '\0';
+    p = headers;
+    line_start = p;
+    
+    while (*p) {
+        if (*p == '\n' || *p == '\r') {
+            /* Found end of line */
+            header_len = (int)(p - line_start);
+            if (header_len > 0 && header_len < 100) {
+                /* Add -H "header" option */
+                if (strlen(header_opts) + header_len + 7 <= sizeof(header_opts)) {
+                    strcat(header_opts, " -H \"");
+                    strncat(header_opts, line_start, header_len);
+                    strcat(header_opts, "\"");
+                }
+            }
+            /* Skip CR/LF */
+            while (*p == '\n' || *p == '\r') p++;
+            line_start = p;
+        } else {
+            p++;
+        }
+    }
+    
+    /* Handle last line if no trailing newline */
+    header_len = (int)(p - line_start);
+    if (header_len > 0 && header_len < 100) {
+        if (strlen(header_opts) + header_len + 7 <= sizeof(header_opts)) {
+            strcat(header_opts, " -H \"");
+            strncat(header_opts, line_start, header_len);
+            strcat(header_opts, "\"");
+        }
+    }
+    
+    /* Build doscurl command with headers using batch file */
+    {
+        FILE* batch_file;
+        batch_file = fopen("_http.bat", "w");
+        if (batch_file) {
+            fprintf(batch_file, "@echo off\n");
+            fprintf(batch_file, "doscurl.exe -X DELETE%s -o _http.tmp %s 2>_err.tmp\n", header_opts, url);
+            fclose(batch_file);
+            exit_code = system("_http.bat");
+            remove("_http.bat");
+        } else {
+            return throw_runtime_exception(ctx, EXCEPTION_TYPE_IO,
+                                           "Failed to create batch file");
+        }
+    }
+    
+    /* Note: In DOS, system() return value is unreliable, so we check file existence */
+    (void)exit_code;
+    
+    /* Check if output file exists */
+    f = fopen("_http.tmp", "rb");
+    if (!f) {
+        remove("_http.tmp");
+        remove("_err.tmp");
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_NETWORK,
+                                       "HTTP DELETE request failed");
+    }
+    
+    /* Allocate buffer for response (2KB max) */
+    response = (char*)malloc(2048);
+    if (!response) {
+        fclose(f);
+        remove("_http.tmp");
+        remove("_err.tmp");
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_OUT_OF_MEMORY,
+                                       "Failed to allocate memory for response");
+    }
+    
+    /* Read response in chunks */
+    total_len = 0;
+    while ((bytes_read = fread(buffer, 1, sizeof(buffer), f)) > 0) {
+        if (total_len + bytes_read >= 2048) {
+            /* Truncate if response is too large */
+            bytes_read = 2048 - total_len - 1;
+            if (bytes_read > 0) {
+                memcpy(response + total_len, buffer, bytes_read);
+                total_len += bytes_read;
+            }
+            break;
+        }
+        memcpy(response + total_len, buffer, bytes_read);
+        total_len += bytes_read;
+    }
+    response[total_len] = '\0';
+    
+    fclose(f);
+    
+    /* Remove trailing whitespace */
+    len = total_len;
+    while (len > 0 && (response[len-1] == '\n' || response[len-1] == '\r' || response[len-1] == ' ')) {
+        response[len-1] = '\0';
+        len--;
+    }
+    
+    /* Clean up temporary files */
+    remove("_http.tmp");
+    remove("_err.tmp");
+    
+    /* Add response string to constant pool */
+    const_idx = djc_add_string(ctx->djc_file, response);
+    free(response);
+    
+    if (const_idx == 0xFFFF) {
+        return throw_runtime_exception(ctx, EXCEPTION_TYPE_OUT_OF_MEMORY,
+                                       "Failed to add response to constant pool");
+    }
+    
+    *result = const_idx;
+    return 0;
+}

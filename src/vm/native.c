@@ -1945,6 +1945,26 @@ int native_register_builtins(void) {
         }
     }
     
+    /* Http.post(String, String, String) - with headers */
+    {
+        NativeParamType params[3];
+        params[0] = NATIVE_PARAM_STRING;
+        params[1] = NATIVE_PARAM_STRING;
+        params[2] = NATIVE_PARAM_STRING;
+        
+        if (native_register(
+            NULL,  /* No class name - match by method name and descriptor only */
+            "post",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            native_http_post_with_headers,
+            3,
+            params,
+            NATIVE_RETURN_STRING
+        ) != 0) {
+            return -1;
+        }
+    }
+    
     /* Http.put(String, String) */
     {
         NativeParamType params[2];
@@ -1964,6 +1984,26 @@ int native_register_builtins(void) {
         }
     }
     
+    /* Http.put(String, String, String) - with headers */
+    {
+        NativeParamType params[3];
+        params[0] = NATIVE_PARAM_STRING;
+        params[1] = NATIVE_PARAM_STRING;
+        params[2] = NATIVE_PARAM_STRING;
+        
+        if (native_register(
+            NULL,  /* No class name - match by method name and descriptor only */
+            "put",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            native_http_put_with_headers,
+            3,
+            params,
+            NATIVE_RETURN_STRING
+        ) != 0) {
+            return -1;
+        }
+    }
+    
     /* Http.delete(String) */
     if (native_register(
         NULL,  /* No class name - match by method name and descriptor only */
@@ -1975,6 +2015,25 @@ int native_register_builtins(void) {
         NATIVE_RETURN_STRING
     ) != 0) {
         return -1;
+    }
+    
+    /* Http.delete(String, String) - with headers */
+    {
+        NativeParamType params[2];
+        params[0] = NATIVE_PARAM_STRING;
+        params[1] = NATIVE_PARAM_STRING;
+        
+        if (native_register(
+            NULL,  /* No class name - match by method name and descriptor only */
+            "delete",
+            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            native_http_delete_with_headers,
+            2,
+            params,
+            NATIVE_RETURN_STRING
+        ) != 0) {
+            return -1;
+        }
     }
     
     return 0;

@@ -328,3 +328,147 @@ Phase 4は、DOSJavaに実用的なネットワーク機能を追加し、16-bit
 **実装完了日**: 2026年5月30日
 **実装者**: K.Kimura @ Juge.Me
 **テスト環境**: DOSBox-X on Windows 11
+
+### Phase 4.7: POST/PUT/DELETEカスタムヘッダーサポート ✅ 完了
+
+#### 実装したメソッド
+6. **Http.post(String url, String data, String headers)** - カスタムヘッダー付きPOSTリクエスト
+7. **Http.put(String url, String data, String headers)** - カスタムヘッダー付きPUTリクエスト
+8. **Http.delete(String url, String headers)** - カスタムヘッダー付きDELETEリクエスト
+
+#### 実装の詳細
+
+**新規ネイティブ関数（http.c）**:
+- `native_http_post_with_headers()` (約160行)
+- `native_http_put_with_headers()` (約160行)
+- `native_http_delete_with_headers()` (約165行)
+
+**メソッド登録（native.c）**:
+- `Http.post(String, String, String)` - 3パラメータPOST
+- `Http.put(String, String, String)` - 3パラメータPUT
+- `Http.delete(String, String)` - 2パラメータDELETE
+
+**コンパイラ対応（semantic.c）**:
+- 各メソッドのシンボル定義追加（約240行）
+- パラメータシンボルの登録
+
+**コード生成（codegen.c）**:
+- メソッドディスクリプタ生成の更新
+- パラメータ数に応じた分岐処理
+
+#### 技術的な課題と解決策
+
+**問題1**: シンボルテーブルサイズ制限
+- Httpクラスに8つのメソッド（各メソッドに複数パラメータ）を追加
+- 既存の256シンボル制限を超過
+- `semantic_init()` で "Failed to initialize semantic analyzer" エラー
+
+**解決策**: シンボルテーブルとstring poolのサイズ拡張
+```c
+// symtable.h
+typedef struct {
+    Symbol symbols[512];        // 256 → 512 (8KB → 16KB)
+    char string_pool[4096];     // 2048 → 4096 (2KB → 4KB)
+    // ...
+} SymbolTable;
+
+// semantic.h
+typedef struct {
+    char string_pool[4096];     // 2048 → 4096
+    // ...
+} SemanticAnalyzer;
+
+// semantic.c
+static int load_string_pool(SemanticAnalyzer* analyzer) {
+    if (analyzer->pool_size > 4096) {  // 2048 → 4096
+        return -1;
+    }
+    // ...
+}
+```
+
+**問題2**: samples/http.javのコンパイルエラー
+- `System.out.println()` の使用（DOSJavaでは未サポート）
+- コンパイル時に構文エラー
+
+**解決策**: 不要なデバッグ出力を削除
+```java
+// 修正前
+} catch (Exception e) {
+    System.out.println("Exception: " + e);
+    allPassed = false;
+}
+
+// 修正後
+} catch (Exception e) {
+    allPassed = false;
+}
+```
+
+#### テスト結果
+
+**samples/http.jav** - 9つのHTTPテストケース
+1. ✅ GET（基本）
+2. ✅ GET（単一ヘッダー）
+3. ✅ GET（複数ヘッダー）
+4. ✅ POST（基本）
+5. ✅ POST（ヘッダー付き）- **Phase 4.7で追加**
+6. ✅ PUT（基本）
+7. ✅ PUT（ヘッダー付き）- **Phase 4.7で追加**
+8. ✅ DELETE（基本）
+9. ✅ DELETE（ヘッダー付き）- **Phase 4.7で追加**
+
+**実行結果**:
+```
+> djc.exe http.jav
+Compiled: http.jav -> http.djc
+
+> djvm.exe http.djc
+http.jav worked correctly.
+```
+
+#### コード統計
+
+**Phase 4.7で追加されたコード**:
+- http.c: 約485行（3つの新関数）
+- http.h: 3つの関数宣言
+- native.c: 約54行（3つのメソッド登録）
+- semantic.c: 約240行（3つのメソッド定義）
+- codegen.c: 約27行（ディスクリプタ生成更新）
+- **合計**: 約809行
+
+**Phase 4全体のコード**:
+- http.c: 1172行
+- http.h: 126行
+- native.c: 約108行（HTTP関連）
+- semantic.c: 約570行（HTTP関連）
+- codegen.c: 約39行（HTTP関連）
+- **合計**: 約2015行
+
+#### まとめ
+
+Phase 4.7の完了により、DOSJavaのHttpクラスは以下の8つのメソッドをサポートします：
+
+1. `String get(String url)` - 基本GET
+2. `String get(String url, String headers)` - ヘッダー付きGET
+3. `String post(String url, String data)` - 基本POST
+4. `String post(String url, String data, String headers)` - ヘッダー付きPOST ✨
+5. `String put(String url, String data)` - 基本PUT
+6. `String put(String url, String data, String headers)` - ヘッダー付きPUT ✨
+7. `String delete(String url)` - 基本DELETE
+8. `String delete(String url, String headers)` - ヘッダー付きDELETE ✨
+
+これにより、**全HTTPメソッドでカスタムヘッダーのサポートが完了**しました。
+
+#### 今後の展望
+
+Phase 4は完全に完了しました。残る制限事項は以下の通りです：
+
+**制限事項**:
+- HTTPステータスコード取得は未実装（doscurlの制限により実装困難）
+
+**可能な拡張**:
+- HTTPSサポート（doscurlがサポートしている場合）
+- タイムアウト設定
+- リダイレクト制御
+- より詳細なエラー情報

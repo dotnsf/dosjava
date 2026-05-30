@@ -29,8 +29,8 @@ typedef struct {
     uint16_t node_count;        /* Nodes in buffer */
     uint16_t total_nodes;       /* Total nodes read */
     
-    /* String pool (shared with parser) */
-    char string_pool[2048];
+    /* String pool (shared with parser) - increased for Phase 4.7 */
+    char string_pool[4096];
     uint16_t pool_size;
     
     /* Symbol table */

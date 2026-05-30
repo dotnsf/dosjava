@@ -1128,6 +1128,88 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
                 }
             }
             
+            /* Add post(String, String, String) static method - returns String (with headers) */
+            method_offset = semantic_add_string(analyzer, "post");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_CLASS;
+            method_sym.type.class_name = semantic_add_string(analyzer, "String");
+            method_sym.data.method_data.param_count = 3;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameters for post(String url, String data, String headers) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset, string_class_offset;
+                
+                string_class_offset = semantic_add_string(analyzer, "String");
+                if (string_class_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* First parameter: url */
+                param_offset = semantic_add_string(analyzer, "url");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* Second parameter: data */
+                param_offset = semantic_add_string(analyzer, "data");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 1;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* Third parameter: headers */
+                param_offset = semantic_add_string(analyzer, "headers");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 2;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+            
             /* Add put(String, String) static method - returns String */
             method_offset = semantic_add_string(analyzer, "put");
             if (method_offset == 0xFFFF) {
@@ -1193,6 +1275,88 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
                 }
             }
             
+            /* Add put(String, String, String) static method - returns String (with headers) */
+            method_offset = semantic_add_string(analyzer, "put");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_CLASS;
+            method_sym.type.class_name = semantic_add_string(analyzer, "String");
+            method_sym.data.method_data.param_count = 3;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameters for put(String url, String data, String headers) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset, string_class_offset;
+                
+                string_class_offset = semantic_add_string(analyzer, "String");
+                if (string_class_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* First parameter: url */
+                param_offset = semantic_add_string(analyzer, "url");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* Second parameter: data */
+                param_offset = semantic_add_string(analyzer, "data");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 1;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* Third parameter: headers */
+                param_offset = semantic_add_string(analyzer, "headers");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 2;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+            
             /* Add delete(String) static method - returns String */
             method_offset = semantic_add_string(analyzer, "delete");
             if (method_offset == 0xFFFF) {
@@ -1234,6 +1398,71 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
                 param_sym.type.kind = TYPE_CLASS;
                 param_sym.type.class_name = string_class_offset;
                 param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+            
+            /* Add delete(String, String) static method - returns String (with headers) */
+            method_offset = semantic_add_string(analyzer, "delete");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_CLASS;
+            method_sym.type.class_name = semantic_add_string(analyzer, "String");
+            method_sym.data.method_data.param_count = 2;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameters for delete(String url, String headers) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset, string_class_offset;
+                
+                string_class_offset = semantic_add_string(analyzer, "String");
+                if (string_class_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* First parameter: url */
+                param_offset = semantic_add_string(analyzer, "url");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+                
+                /* Second parameter: headers */
+                param_offset = semantic_add_string(analyzer, "headers");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 1;
                 
                 if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
                     return -1;
@@ -1283,7 +1512,7 @@ static int read_ast_header(SemanticAnalyzer* analyzer) {
 
 /* Load string pool */
 static int load_string_pool(SemanticAnalyzer* analyzer) {
-    if (analyzer->pool_size > 2048) {
+    if (analyzer->pool_size > 4096) {
         return -1;
     }
     

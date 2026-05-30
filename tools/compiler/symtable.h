@@ -66,13 +66,13 @@ typedef struct {
 
 /* Symbol table */
 typedef struct {
-    Symbol symbols[256];        /* Symbol entries (8KB) */
+    Symbol symbols[512];        /* Symbol entries (16KB) - increased for Phase 4.7 */
     uint16_t symbol_count;      /* Number of symbols */
     
     uint16_t scope_stack[16];   /* Scope start indices (512 bytes) */
     uint16_t scope_level;       /* Current scope level (0 = global) */
     
-    char string_pool[2048];     /* Shared string pool (2KB) */
+    char string_pool[4096];     /* Shared string pool (4KB) - increased for Phase 4.7 */
     uint16_t pool_size;         /* Current pool size */
 } SymbolTable;
 

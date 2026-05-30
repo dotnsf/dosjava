@@ -3805,14 +3805,32 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
             /* Http.getStatusCode(String) returns int */
             strcpy(descriptor, "(Ljava/lang/String;)I");
         } else if (strcmp(method_name, "post") == 0) {
-            /* Http.post(String, String) returns String */
-            strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            /* Http.post can have 2 or 3 arguments */
+            if (arg_count == 2) {
+                /* Http.post(String url, String data) returns String */
+                strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            } else {
+                /* Http.post(String url, String data, String headers) returns String */
+                strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            }
         } else if (strcmp(method_name, "put") == 0) {
-            /* Http.put(String, String) returns String */
-            strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            /* Http.put can have 2 or 3 arguments */
+            if (arg_count == 2) {
+                /* Http.put(String url, String data) returns String */
+                strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            } else {
+                /* Http.put(String url, String data, String headers) returns String */
+                strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            }
         } else if (strcmp(method_name, "delete") == 0) {
-            /* Http.delete(String) returns String */
-            strcpy(descriptor, "(Ljava/lang/String;)Ljava/lang/String;");
+            /* Http.delete can have 1 or 2 arguments */
+            if (arg_count == 1) {
+                /* Http.delete(String url) returns String */
+                strcpy(descriptor, "(Ljava/lang/String;)Ljava/lang/String;");
+            } else {
+                /* Http.delete(String url, String headers) returns String */
+                strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            }
         } else if (strcmp(method_name, "abs") == 0 ||
                    strcmp(method_name, "sqrt") == 0 ||
                    strcmp(method_name, "sin") == 0 ||
