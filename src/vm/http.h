@@ -131,4 +131,46 @@ int native_http_delete(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count,
  */
 int native_http_delete_with_headers(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
 
+/**
+ * Native method: Http.setProxy(String proxyUrl)
+ *
+ * Sets the proxy server URL for all subsequent HTTP requests
+ * Pass empty string to clear proxy setting
+ *
+ * @param ctx Execution context
+ * @param args Arguments array [proxyUrl]
+ * @param arg_count Number of arguments (must be 1)
+ * @param result Pointer to store result (not used, set to 0)
+ * @return 0 on success, -1 on error (exception thrown)
+ */
+int native_http_setProxy(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+
+/**
+ * Native method: Http.clearProxy()
+ *
+ * Clears the proxy server setting
+ * Equivalent to Http.setProxy("")
+ *
+ * @param ctx Execution context
+ * @param args Arguments array (empty)
+ * @param arg_count Number of arguments (must be 0)
+ * @param result Pointer to store result (not used, set to 0)
+ * @return 0 on success, -1 on error (exception thrown)
+ */
+int native_http_clearProxy(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+
+/**
+ * Native method: Http.getProxy()
+ *
+ * Returns the current proxy server URL
+ * Returns empty string if no proxy is set
+ *
+ * @param ctx Execution context
+ * @param args Arguments array (empty)
+ * @param arg_count Number of arguments (must be 0)
+ * @param result Pointer to store result (String constant pool index)
+ * @return 0 on success, -1 on error (exception thrown)
+ */
+int native_http_getProxy(ExecutionContext* ctx, uint16_t* args, uint8_t arg_count, uint16_t* result);
+
 #endif /* HTTP_H */

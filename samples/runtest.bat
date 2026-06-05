@@ -182,6 +182,10 @@ REM Test Phase 4
 set TESTFILE=http.jav
 set BASENAME=http
 goto run_test
+:next37
+set TESTFILE=httpprox.jav
+set BASENAME=httpprox
+goto run_test
 
 :all_done
 echo.
@@ -244,6 +248,7 @@ if "%1"=="excauto.jav" set BASENAME=excauto
 if "%1"=="exctest.jav" set BASENAME=exctest
 if "%1"=="strext.jav" set BASENAME=strext
 if "%1"=="http.jav" set BASENAME=http
+if "%1"=="httpprox.jav" set BASENAME=httpprox
 goto run_test
 
 :run_test
@@ -357,7 +362,8 @@ if "%TESTFILE%"=="except.jav" goto next33
 if "%TESTFILE%"=="excauto.jav" goto next34
 if "%TESTFILE%"=="exctest.jav" goto next35
 if "%TESTFILE%"=="strext.jav" goto next36
-if "%TESTFILE%"=="http.jav" goto all_done
+if "%TESTFILE%"=="http.jav" goto next37
+if "%TESTFILE%"=="httpprox.jav" goto all_done
 goto all_done
 
 :end

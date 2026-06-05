@@ -1468,6 +1468,91 @@ static int register_builtin_classes(SemanticAnalyzer* analyzer) {
                     return -1;
                 }
             }
+            
+            /* Add setProxy(String) static method - returns void */
+            method_offset = semantic_add_string(analyzer, "setProxy");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_VOID;
+            method_sym.data.method_data.param_count = 1;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add parameter for setProxy(String proxyUrl) */
+            {
+                Symbol param_sym;
+                uint16_t param_offset, string_class_offset;
+                
+                param_offset = semantic_add_string(analyzer, "proxyUrl");
+                if (param_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                string_class_offset = semantic_add_string(analyzer, "String");
+                if (string_class_offset == 0xFFFF) {
+                    return -1;
+                }
+                
+                memset(&param_sym, 0, sizeof(Symbol));
+                param_sym.kind = SYM_PARAM;
+                param_sym.name_offset = param_offset;
+                param_sym.type.kind = TYPE_CLASS;
+                param_sym.type.class_name = string_class_offset;
+                param_sym.data.param_data.index = 0;
+                
+                if (symtable_add_symbol(analyzer->symtable, &param_sym) == 0xFFFF) {
+                    return -1;
+                }
+            }
+            
+            /* Add clearProxy() static method - returns void */
+            method_offset = semantic_add_string(analyzer, "clearProxy");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_VOID;
+            method_sym.data.method_data.param_count = 0;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
+            
+            /* Add getProxy() static method - returns String */
+            method_offset = semantic_add_string(analyzer, "getProxy");
+            if (method_offset == 0xFFFF) {
+                return -1;
+            }
+            
+            memset(&method_sym, 0, sizeof(Symbol));
+            method_sym.kind = SYM_METHOD;
+            method_sym.name_offset = method_offset;
+            method_sym.type.kind = TYPE_CLASS;
+            method_sym.type.class_name = semantic_add_string(analyzer, "String");
+            method_sym.data.method_data.param_count = 0;
+            method_sym.data.method_data.local_count = 0;
+            method_sym.data.method_data.is_static = 1;
+            method_sym.data.method_data.is_public = 1;
+            
+            if (symtable_add_symbol(analyzer->symtable, &method_sym) == 0xFFFF) {
+                return -1;
+            }
         }
     }
     

@@ -257,12 +257,25 @@ Class providing HTTP client functionality in DOS environment
 - Network connection must be available
 
 #### Methods
+
+**HTTP Request Methods:**
 - `String Http.get(String url)` - HTTP GET request (basic)
 - `String Http.get(String url, String headers)` - HTTP GET request (with custom headers)
   - `headers`: Newline-separated header string (e.g., `"User-Agent: DOSJava\nAccept: */*"`)
 - `String Http.post(String url, String data)` - HTTP POST request
+- `String Http.post(String url, String data, String headers)` - HTTP POST request (with custom headers)
 - `String Http.put(String url, String data)` - HTTP PUT request
+- `String Http.put(String url, String data, String headers)` - HTTP PUT request (with custom headers)
 - `String Http.delete(String url)` - HTTP DELETE request
+- `String Http.delete(String url, String headers)` - HTTP DELETE request (with custom headers)
+
+**Proxy Configuration Methods (Phase 4.8):**
+- `void Http.setProxy(String proxyUrl)` - Set proxy server URL
+  - Example: `Http.setProxy("http://proxy.example.com:8080")`
+  - With authentication: `Http.setProxy("http://user:pass@proxy.example.com:8080")`
+  - Pass empty string to clear proxy: `Http.setProxy("")`
+- `void Http.clearProxy()` - Clear proxy server setting
+- `String Http.getProxy()` - Get current proxy server URL (returns empty string if not set)
 
 #### Usage Example
 ```java
@@ -282,6 +295,14 @@ class HttpDemo {
             String postData = "name=test&value=123";
             String response3 = Http.post("http://example.com/api", postData);
             System.out.println(response3);
+            
+            // Using proxy server (Phase 4.8)
+            Http.setProxy("http://proxy.company.com:8080");
+            String response4 = Http.get("http://example.com/api");
+            System.out.println(response4);
+            
+            // Clear proxy for direct connection
+            Http.clearProxy();
             
         } catch (Exception e) {
             System.out.println("Network error occurred");

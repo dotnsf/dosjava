@@ -257,12 +257,25 @@ DOS環境でHTTPクライアント機能を提供するクラス
 - ネットワーク接続が利用可能であること
 
 #### メソッド
+
+**HTTPリクエストメソッド:**
 - `String Http.get(String url)` - HTTP GETリクエスト（基本）
 - `String Http.get(String url, String headers)` - HTTP GETリクエスト（カスタムヘッダー付き）
   - `headers`: 改行区切りのヘッダー文字列（例: `"User-Agent: DOSJava\nAccept: */*"`）
 - `String Http.post(String url, String data)` - HTTP POSTリクエスト
+- `String Http.post(String url, String data, String headers)` - HTTP POSTリクエスト（カスタムヘッダー付き）
 - `String Http.put(String url, String data)` - HTTP PUTリクエスト
+- `String Http.put(String url, String data, String headers)` - HTTP PUTリクエスト（カスタムヘッダー付き）
 - `String Http.delete(String url)` - HTTP DELETEリクエスト
+- `String Http.delete(String url, String headers)` - HTTP DELETEリクエスト（カスタムヘッダー付き）
+
+**プロクシー設定メソッド（Phase 4.8で追加）:**
+- `void Http.setProxy(String proxyUrl)` - プロクシーサーバーのURLを設定
+  - 例: `Http.setProxy("http://proxy.example.com:8080")`
+  - 認証付き: `Http.setProxy("http://user:pass@proxy.example.com:8080")`
+  - 空文字列でプロクシークリア: `Http.setProxy("")`
+- `void Http.clearProxy()` - プロクシーサーバー設定をクリア
+- `String Http.getProxy()` - 現在のプロクシーサーバーURLを取得（未設定時は空文字列）
 
 #### 使用例
 ```java
@@ -282,6 +295,14 @@ class HttpDemo {
             String postData = "name=test&value=123";
             String response3 = Http.post("http://example.com/api", postData);
             System.out.println(response3);
+            
+            // プロクシーサーバー経由でリクエスト（Phase 4.8）
+            Http.setProxy("http://proxy.company.com:8080");
+            String response4 = Http.get("http://example.com/api");
+            System.out.println(response4);
+            
+            // プロクシーをクリアして直接接続
+            Http.clearProxy();
             
         } catch (Exception e) {
             System.out.println("Network error occurred");

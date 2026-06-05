@@ -2036,5 +2036,44 @@ int native_register_builtins(void) {
         }
     }
     
+    /* Http.setProxy(String) */
+    if (native_register(
+        NULL,  /* No class name - match by method name and descriptor only */
+        "setProxy",
+        "(Ljava/lang/String;)V",
+        native_http_setProxy,
+        1,
+        param_string,
+        NATIVE_RETURN_VOID
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Http.clearProxy() */
+    if (native_register(
+        NULL,  /* No class name - match by method name and descriptor only */
+        "clearProxy",
+        "()V",
+        native_http_clearProxy,
+        0,
+        NULL,
+        NATIVE_RETURN_VOID
+    ) != 0) {
+        return -1;
+    }
+    
+    /* Http.getProxy() */
+    if (native_register(
+        NULL,  /* No class name - match by method name and descriptor only */
+        "getProxy",
+        "()Ljava/lang/String;",
+        native_http_getProxy,
+        0,
+        NULL,
+        NATIVE_RETURN_STRING
+    ) != 0) {
+        return -1;
+    }
+    
     return 0;
 }

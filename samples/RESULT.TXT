@@ -109,6 +109,10 @@ strext.jav worked correctly.
 http.jav worked correctly.
 [PASS] http.jav
 
+[TEST] httpprox.jav
+httpprox.jav worked correctly.
+[PASS] httpprox.jav
+
 
 ============================
 All tests completed

@@ -3831,6 +3831,15 @@ int generate_method_call(CodeGenerator* codegen, ASTNode* call_node) {
                 /* Http.delete(String url, String headers) returns String */
                 strcpy(descriptor, "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
             }
+        } else if (strcmp(method_name, "setProxy") == 0) {
+            /* Http.setProxy(String proxyUrl) returns void */
+            strcpy(descriptor, "(Ljava/lang/String;)V");
+        } else if (strcmp(method_name, "clearProxy") == 0) {
+            /* Http.clearProxy() returns void */
+            strcpy(descriptor, "()V");
+        } else if (strcmp(method_name, "getProxy") == 0) {
+            /* Http.getProxy() returns String */
+            strcpy(descriptor, "()Ljava/lang/String;");
         } else if (strcmp(method_name, "abs") == 0 ||
                    strcmp(method_name, "sqrt") == 0 ||
                    strcmp(method_name, "sin") == 0 ||
