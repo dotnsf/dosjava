@@ -1,5 +1,7 @@
 # DOS Java Compiler
 
+> **English documentation is available here**: [README_en.md](README_en.md)
+
 ![DOSJava](https://raw.githubusercontent.com/dotnsf/dosjava/refs/heads/main/dosjava.png)
 
 16-bit PC-DOS上で動作するJavaコンパイラとランタイム環境

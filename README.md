@@ -1,5 +1,7 @@
 # DOS Java Compiler
 
+> **日本語の説明はこちら**: [README_ja.md](README_ja.md)
+
 ![DOSJava](https://raw.githubusercontent.com/dotnsf/dosjava/refs/heads/main/dosjava.png)
 
 Java compiler and runtime environment for 16-bit PC-DOS
